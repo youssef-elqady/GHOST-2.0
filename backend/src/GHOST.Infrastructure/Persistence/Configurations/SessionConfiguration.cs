@@ -30,6 +30,10 @@ public sealed class SessionConfiguration : IEntityTypeConfiguration<Session>
 
         builder.Property(s => s.UpdatedAt);
 
+        // SQL Server rowversion for optimistic concurrency.
+        builder.Property<byte[]>("RowVersion")
+            .IsRowVersion();
+
         builder.HasMany(s => s.Segments)
             .WithOne()
             .HasForeignKey(seg => seg.SessionId)
