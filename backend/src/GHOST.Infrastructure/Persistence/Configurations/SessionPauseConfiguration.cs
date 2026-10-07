@@ -28,6 +28,12 @@ public sealed class SessionPauseConfiguration : IEntityTypeConfiguration<Session
 
         builder.Property(p => p.UpdatedAt);
 
+        // Supports loading all pauses for a segment.
         builder.HasIndex(p => p.SessionSegmentId);
+
+        // A segment can have multiple historical pauses, but only one active pause.
+        builder.HasIndex(p => p.SessionSegmentId)
+            .HasFilter("[EndedAt] IS NULL")
+            .IsUnique();
     }
 }
