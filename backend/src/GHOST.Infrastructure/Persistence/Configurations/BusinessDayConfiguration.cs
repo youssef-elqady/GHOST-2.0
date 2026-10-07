@@ -29,6 +29,10 @@ public sealed class BusinessDayConfiguration : IEntityTypeConfiguration<Business
 
         builder.Property(b => b.UpdatedAt);
 
+        // SQL Server rowversion for optimistic concurrency.
+        builder.Property<byte[]>("RowVersion")
+            .IsRowVersion();
+
         builder.HasMany(b => b.Shifts)
             .WithOne()
             .HasForeignKey(s => s.BusinessDayId)
@@ -39,7 +43,13 @@ public sealed class BusinessDayConfiguration : IEntityTypeConfiguration<Business
         builder.Metadata.FindNavigation(nameof(BusinessDay.Shifts))?
             .SetPropertyAccessMode(PropertyAccessMode.Field);
 
+        // A business date is unique historically.
         builder.HasIndex(b => b.BusinessDate)
+            .IsUnique();
+
+        // The single-PC cash register can have at most one active business day.
+        builder.HasIndex(b => b.IsClosed)
+            .HasFilter("[IsClosed] = 0")
             .IsUnique();
     }
 }
