@@ -31,6 +31,10 @@ public sealed class DeviceConfiguration : IEntityTypeConfiguration<Device>
 
         builder.Property(d => d.UpdatedAt);
 
+        // SQL Server rowversion for optimistic concurrency.
+        builder.Property<byte[]>("RowVersion")
+            .IsRowVersion();
+
         builder.HasMany(d => d.Rates)
             .WithOne()
             .HasForeignKey(r => r.DeviceId)
