@@ -27,8 +27,6 @@ public sealed class DeviceRateConfiguration : IEntityTypeConfiguration<DeviceRat
 
         builder.Property(dr => dr.UpdatedAt);
 
-        builder.HasIndex(dr => dr.DeviceId);
-
         builder.HasIndex(dr => new { dr.DeviceId, dr.PlayType })
             .IsUnique();
     }
