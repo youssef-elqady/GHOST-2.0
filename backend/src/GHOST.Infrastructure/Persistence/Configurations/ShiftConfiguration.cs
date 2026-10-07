@@ -50,11 +50,15 @@ public sealed class ShiftConfiguration : IEntityTypeConfiguration<Shift>
 
         builder.Property(s => s.UpdatedAt);
 
+        // SQL Server rowversion for optimistic concurrency.
+        builder.Property<byte[]>("RowVersion")
+            .IsRowVersion();
+
         builder.HasIndex(s => s.BusinessDayId);
         builder.HasIndex(s => s.StaffUserId);
         builder.HasIndex(s => s.Status);
 
-        // Enforce single Open shift globally (ShiftStatus.Open = 1)
+        // Single physical cash register: at most one open shift globally.
         builder.HasIndex(s => s.Status)
             .HasFilter("[Status] = 1")
             .IsUnique();
