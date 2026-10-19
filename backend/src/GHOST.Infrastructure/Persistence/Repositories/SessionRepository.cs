@@ -39,6 +39,27 @@ public sealed class SessionRepository : ISessionRepository
             .FirstOrDefaultAsync(cancellationToken);
     }
 
+    public Task<Device?> GetDeviceForStartAsync(
+        Guid deviceId,
+        CancellationToken cancellationToken = default)
+    {
+        return _dbContext.Devices
+            .Include(device => device.Rates)
+            .FirstOrDefaultAsync(
+                device => device.Id == deviceId,
+                cancellationToken);
+    }
+
+    public Task<Shift?> GetShiftAsync(
+        Guid shiftId,
+        CancellationToken cancellationToken = default)
+    {
+        return _dbContext.Shifts
+            .FirstOrDefaultAsync(
+                shift => shift.Id == shiftId,
+                cancellationToken);
+    }
+
     public async Task AddAsync(
         Session session,
         CancellationToken cancellationToken = default)
