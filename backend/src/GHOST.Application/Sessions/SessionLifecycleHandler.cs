@@ -141,7 +141,9 @@ public sealed class SessionLifecycleHandler
         return new SessionSnapshot(
             session.Id,
             segment.DeviceId,
-            session.Status.ToString(),
+            session.Status == SessionStatus.Active
+                ? (segment.Pauses.Any(pause => pause.IsActive) ? "Paused" : "Running")
+                : session.Status.ToString(),
             session.GetTotalAmount(),
             (long)session.GetTotalBillableDuration().TotalSeconds);
     }
