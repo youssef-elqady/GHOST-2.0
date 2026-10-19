@@ -14,6 +14,17 @@ public sealed class BusinessDayRepository : IBusinessDayRepository
         _dbContext = dbContext;
     }
 
+    public Task<BusinessDay?> GetForShiftOpeningAsync(
+        Guid businessDayId,
+        CancellationToken cancellationToken = default)
+    {
+        return _dbContext.BusinessDays
+            .Include(day => day.Shifts)
+            .FirstOrDefaultAsync(
+                day => day.Id == businessDayId,
+                cancellationToken);
+    }
+
     public Task<BusinessDay?> GetByDateAsync(
         DateOnly businessDate,
         CancellationToken cancellationToken = default)
