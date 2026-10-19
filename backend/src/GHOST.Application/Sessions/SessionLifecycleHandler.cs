@@ -3,7 +3,6 @@ using GHOST.Application.Common.Result;
 using GHOST.Domain.Entities;
 using GHOST.Domain.Enums;
 using GHOST.Domain.Exceptions;
-using Microsoft.EntityFrameworkCore;
 
 namespace GHOST.Application.Sessions;
 
@@ -78,11 +77,6 @@ public sealed class SessionLifecycleHandler
         {
             return Result<SessionSnapshot>.Failure(exception.Message);
         }
-        catch (DbUpdateConcurrencyException)
-        {
-            return Result<SessionSnapshot>.Failure(
-                "The session or device was changed by another operation. Refresh and retry.");
-        }
     }
 
     public async Task<Result<SessionSnapshot>> CompleteAsync(
@@ -124,11 +118,6 @@ public sealed class SessionLifecycleHandler
         catch (BusinessRuleValidationException exception)
         {
             return Result<SessionSnapshot>.Failure(exception.Message);
-        }
-        catch (DbUpdateConcurrencyException)
-        {
-            return Result<SessionSnapshot>.Failure(
-                "The session or device was changed by another operation. Refresh and retry.");
         }
     }
 
