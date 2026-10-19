@@ -5,6 +5,10 @@ namespace GHOST.Application.Abstractions.Persistence;
 
 public interface IBusinessDayRepository
 {
+    Task<BusinessDay?> GetForShiftOpeningAsync(
+        Guid businessDayId,
+        CancellationToken cancellationToken = default);
+
     Task<BusinessDay?> GetByDateAsync(
         DateOnly businessDate,
         CancellationToken cancellationToken = default);
