@@ -24,6 +24,8 @@ public sealed class SessionPauseTests
         session.PauseActiveDevice();
         var pause = Assert.Single(Assert.Single(session.Segments).Pauses);
 
+        // Ensure the pause end is later than the historical timestamp even on fast clocks.
+        Thread.Sleep(1);
         session.ResumeActiveDevice();
 
         var duration = pause.GetDuration(pause.StartedAt.AddTicks(1));
