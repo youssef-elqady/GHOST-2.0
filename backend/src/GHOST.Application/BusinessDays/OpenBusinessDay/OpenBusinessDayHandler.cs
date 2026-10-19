@@ -1,5 +1,5 @@
-
 using GHOST.Application.Abstractions.Persistence;
+using GHOST.Application.Common.Exceptions;
 using GHOST.Application.Common.Result;
 using GHOST.Domain.Entities;
 
@@ -22,15 +22,18 @@ public sealed class OpenBusinessDayHandler
         OpenBusinessDayCommand command,
         CancellationToken cancellationToken = default)
     {
+        if (command.BusinessDate == default)
+        {
+            return Result<Guid>.Failure("Business date is required.");
+        }
+
         var existingOpenBusinessDay =
-            await _businessDayRepository.GetOpenAsync(
-                cancellationToken);
+            await _businessDayRepository.GetOpenAsync(cancellationToken);
 
         if (existingOpenBusinessDay is not null)
         {
             return Result<Guid>.Failure(
-                $"There is already an open business day " +
-                $"({existingOpenBusinessDay.BusinessDate}).");
+                $"There is already an open business day ({existingOpenBusinessDay.BusinessDate}).");
         }
 
         var existingBusinessDay =
@@ -41,19 +44,24 @@ public sealed class OpenBusinessDayHandler
         if (existingBusinessDay is not null)
         {
             return Result<Guid>.Failure(
-                $"A business day already exists for " +
-                $"{command.BusinessDate}.");
+                $"A business day already exists for {command.BusinessDate}.");
         }
 
         var businessDay = new BusinessDay(command.BusinessDate);
 
-        await _businessDayRepository.AddAsync(
-            businessDay,
-            cancellationToken);
+        try
+        {
+            await _businessDayRepository.AddAsync(
+                businessDay,
+                cancellationToken);
 
-        await _unitOfWork.SaveChangesAsync(
-            cancellationToken);
+            await _unitOfWork.SaveChangesAsync(cancellationToken);
 
-        return Result<Guid>.Success(businessDay.Id);
+            return Result<Guid>.Success(businessDay.Id);
+        }
+        catch (PersistenceConflictException exception)
+        {
+            return Result<Guid>.Failure(exception.Message);
+        }
     }
 }
