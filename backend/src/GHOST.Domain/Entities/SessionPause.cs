@@ -40,21 +40,18 @@ public sealed class SessionPause : BaseEntity
 
     public TimeSpan GetDuration(DateTimeOffset? calculateUpTo = null)
     {
-        DateTimeOffset effectiveEnd;
+        var effectiveEnd = calculateUpTo ?? DateTimeOffset.UtcNow;
 
-        if (EndedAt.HasValue)
-        {
+        // A historical calculation must not subtract a pause that had not
+        // started yet at the requested point in time.
+        if (effectiveEnd <= StartedAt)
+            return TimeSpan.Zero;
+
+        if (EndedAt.HasValue && EndedAt.Value < effectiveEnd)
             effectiveEnd = EndedAt.Value;
-        }
-        else
-        {
-            effectiveEnd = calculateUpTo ?? DateTimeOffset.UtcNow;
-        }
 
-        if (effectiveEnd < StartedAt)
-        {
-            throw new BusinessRuleValidationException("Calculation time cannot be earlier than pause start time.");
-        }
+        if (effectiveEnd <= StartedAt)
+            return TimeSpan.Zero;
 
         return effectiveEnd - StartedAt;
     }
