@@ -9,37 +9,24 @@ public sealed class SessionSegment : BaseEntity
     private readonly List<SessionPause> _pauses = new();
 
     public Guid SessionId { get; private set; }
-
     public Guid DeviceId { get; private set; }
-
     public PlayType PlayType { get; private set; }
-
     public decimal AppliedHourlyRate { get; private set; }
-
     public DateTimeOffset StartedAt { get; private set; }
-
     public DateTimeOffset? EndedAt { get; private set; }
-
     public bool IsActive => EndedAt is null;
-
     public IReadOnlyCollection<SessionPause> Pauses => _pauses.AsReadOnly();
 
     private SessionSegment()
     {
     }
 
-    internal SessionSegment(
-        Guid sessionId,
-        Guid deviceId,
-        PlayType playType,
-        decimal appliedHourlyRate)
+    internal SessionSegment(Guid sessionId, Guid deviceId, PlayType playType, decimal appliedHourlyRate)
     {
         if (sessionId == Guid.Empty)
             throw new BusinessRuleValidationException("Session ID cannot be empty.");
-
         if (deviceId == Guid.Empty)
             throw new BusinessRuleValidationException("Device ID cannot be empty.");
-
         if (appliedHourlyRate <= 0)
             throw new BusinessRuleValidationException("Applied hourly rate must be greater than zero.");
 
@@ -66,7 +53,6 @@ public sealed class SessionSegment : BaseEntity
     {
         if (!IsActive)
             throw new BusinessRuleValidationException("Cannot pause an ended segment.");
-
         if (_pauses.Any(p => p.IsActive))
             throw new BusinessRuleValidationException("Segment is already paused.");
 
@@ -91,14 +77,15 @@ public sealed class SessionSegment : BaseEntity
     {
         var end = calculateUpTo ?? DateTimeOffset.UtcNow;
 
-        if (end < StartedAt)
-            throw new BusinessRuleValidationException("Calculation time cannot be earlier than segment start time.");
+        // A later segment contributes nothing to a historical calculation
+        // performed before that segment began (for example, before a transfer).
+        if (end <= StartedAt)
+            return TimeSpan.Zero;
 
         if (EndedAt.HasValue && end > EndedAt.Value)
             end = EndedAt.Value;
 
         var totalDuration = end - StartedAt;
-
         var totalPausedTimeTicks = _pauses.Sum(p => p.GetDuration(end).Ticks);
         var billableDuration = totalDuration - TimeSpan.FromTicks(totalPausedTimeTicks);
 
