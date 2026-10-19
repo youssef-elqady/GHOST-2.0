@@ -1,5 +1,6 @@
 using GHOST.Application.Abstractions.Persistence;
 using GHOST.Application.Common.Result;
+using GHOST.Application.Common.Exceptions;
 using GHOST.Domain.Entities;
 using GHOST.Domain.Enums;
 using GHOST.Domain.Exceptions;
@@ -77,6 +78,11 @@ public sealed class SessionLifecycleHandler
         {
             return Result<SessionSnapshot>.Failure(exception.Message);
         }
+
+        catch (PersistenceConflictException exception)
+        {
+            return Result<SessionSnapshot>.Failure(exception.Message);
+        }
     }
 
     public async Task<Result<SessionSnapshot>> CompleteAsync(
@@ -116,6 +122,11 @@ public sealed class SessionLifecycleHandler
             return Result<SessionSnapshot>.Success(CreateSnapshot(session));
         }
         catch (BusinessRuleValidationException exception)
+        {
+            return Result<SessionSnapshot>.Failure(exception.Message);
+        }
+
+        catch (PersistenceConflictException exception)
         {
             return Result<SessionSnapshot>.Failure(exception.Message);
         }
