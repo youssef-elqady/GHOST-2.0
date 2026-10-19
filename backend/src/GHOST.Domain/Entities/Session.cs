@@ -1,6 +1,7 @@
 ﻿using GHOST.Domain.Common;
 using GHOST.Domain.Enums;
 using GHOST.Domain.Exceptions;
+using GHOST.Domain.Services;
 
 namespace GHOST.Domain.Entities;
 
@@ -127,6 +128,18 @@ public sealed class Session : BaseEntity
     {
         var totalTicks = _segments.Sum(s => s.GetBillableDuration(calculateUpTo).Ticks);
         return TimeSpan.FromTicks(totalTicks);
+    }
+
+    public decimal GetTotalAmount(DateTimeOffset? calculateUpTo = null)
+    {
+        // Use one timestamp for every segment so an active session is priced
+        // against a consistent point in time.
+        var calculationTime = calculateUpTo ?? DateTimeOffset.UtcNow;
+
+        var billableSegments = _segments.Select(segment =>
+            (segment.GetBillableDuration(calculationTime), segment.AppliedHourlyRate));
+
+        return SessionBillingCalculator.CalculateTotalAmount(billableSegments);
     }
 
     public bool IsWithinGracePeriod(TimeSpan gracePeriod)
