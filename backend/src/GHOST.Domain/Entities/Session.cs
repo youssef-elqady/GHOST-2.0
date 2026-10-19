@@ -126,7 +126,8 @@ public sealed class Session : BaseEntity
 
     public TimeSpan GetTotalBillableDuration(DateTimeOffset? calculateUpTo = null)
     {
-        var totalTicks = _segments.Sum(s => s.GetBillableDuration(calculateUpTo).Ticks);
+        var calculationTime = calculateUpTo ?? DateTimeOffset.UtcNow;
+        var totalTicks = _segments.Sum(s => s.GetBillableDuration(calculationTime).Ticks);
         return TimeSpan.FromTicks(totalTicks);
     }
 
