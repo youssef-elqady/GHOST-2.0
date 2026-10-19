@@ -71,6 +71,22 @@ public sealed class TransferSessionHandlerTests
         Assert.Equal(0, unitOfWork.SaveCalls);
     }
 
+    [Fact]
+    public async Task HandleAsync_ReturnsFailureWhenPersistenceReportsConflict()
+    {
+        var session = CreateSession(out var currentDevice, out var destinationDevice);
+        var repository = new FakeSessionRepository(session, currentDevice, destinationDevice);
+        var unitOfWork = new ConflictUnitOfWork();
+        var handler = new TransferSessionHandler(repository, unitOfWork);
+
+        var result = await handler.HandleAsync(new TransferSessionCommand(
+            session.Id, destinationDevice.Id, PlayType.Multi));
+
+        Assert.False(result.IsSuccess);
+        Assert.Contains("conflicts", result.Error);
+        Assert.Equal(1, unitOfWork.SaveCalls);
+    }
+
     private static Session CreateSession(out Device currentDevice, out Device destinationDevice)
     {
         currentDevice = new Device("PS1", "PlayStation");
@@ -115,6 +131,18 @@ public sealed class TransferSessionHandlerTests
 
         public Task AddAsync(Session session, CancellationToken cancellationToken = default)
             => Task.CompletedTask;
+    }
+
+    private sealed class ConflictUnitOfWork : IUnitOfWork
+    {
+        public int SaveCalls { get; private set; }
+
+        public Task<int> SaveChangesAsync(CancellationToken cancellationToken = default)
+        {
+            SaveCalls++;
+            throw new GHOST.Application.Common.Exceptions.PersistenceConflictException(
+                "This operation conflicts with an existing record. Refresh the data and try again.");
+        }
     }
 
     private sealed class FakeUnitOfWork : IUnitOfWork
