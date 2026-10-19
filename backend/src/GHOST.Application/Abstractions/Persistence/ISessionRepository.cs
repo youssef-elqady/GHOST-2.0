@@ -12,6 +12,14 @@ public interface ISessionRepository
         Guid deviceId,
         CancellationToken cancellationToken = default);
 
+    Task<Device?> GetDeviceForStartAsync(
+        Guid deviceId,
+        CancellationToken cancellationToken = default);
+
+    Task<Shift?> GetShiftAsync(
+        Guid shiftId,
+        CancellationToken cancellationToken = default);
+
     Task AddAsync(
         Session session,
         CancellationToken cancellationToken = default);
