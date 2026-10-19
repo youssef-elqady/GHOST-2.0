@@ -86,6 +86,19 @@ public class UnitTest1
 
         public List<BusinessDay> AddedBusinessDays { get; } = new();
 
+        public Task<BusinessDay?> GetForShiftOpeningAsync(
+            Guid businessDayId,
+            CancellationToken cancellationToken = default)
+        {
+            var businessDay = AddedBusinessDays.FirstOrDefault(
+                day => day.Id == businessDayId);
+
+            if (businessDay is null && OpenBusinessDay?.Id == businessDayId)
+                businessDay = OpenBusinessDay;
+
+            return Task.FromResult(businessDay);
+        }
+
         public Task<BusinessDay?> GetByDateAsync(
             DateOnly businessDate,
             CancellationToken cancellationToken = default)
