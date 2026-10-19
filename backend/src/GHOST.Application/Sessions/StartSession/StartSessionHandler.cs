@@ -1,5 +1,6 @@
 using GHOST.Application.Abstractions.Persistence;
 using GHOST.Application.Common.Result;
+using GHOST.Application.Common.Exceptions;
 using GHOST.Domain.Entities;
 using GHOST.Domain.Exceptions;
 using GHOST.Domain.Enums;
@@ -89,6 +90,11 @@ public sealed class StartSessionHandler
             return Result<Guid>.Success(session.Id);
         }
         catch (BusinessRuleValidationException exception)
+        {
+            return Result<Guid>.Failure(exception.Message);
+        }
+
+        catch (PersistenceConflictException exception)
         {
             return Result<Guid>.Failure(exception.Message);
         }
