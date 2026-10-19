@@ -35,9 +35,7 @@ public sealed class SessionLifecycleDomainTests
         session.ResumeActiveDevice();
 
         Assert.False(pause.IsActive);
-        Assert.Null(session.GetActiveSegment()!.Pauses.Single().EndedAt is null
-            ? session.GetActiveSegment()!.Pauses.Single().EndedAt
-            : null);
+        Assert.NotNull(pause.EndedAt);
     }
 
     [Fact]
@@ -51,7 +49,7 @@ public sealed class SessionLifecycleDomainTests
     }
 
     [Fact]
-    public void ResumeActiveDevice_RejectsA segmentThatIsNotPaused()
+    public void ResumeActiveDevice_RejectsWhenSegmentIsNotPaused()
     {
         var session = CreateSession();
 
