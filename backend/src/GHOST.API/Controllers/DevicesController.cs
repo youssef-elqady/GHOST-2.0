@@ -1,5 +1,4 @@
 using GHOST.Application.Abstractions.Persistence;
-using GHOST.Application.Common.Result;
 using GHOST.Application.Devices.CreateDevice;
 using GHOST.Domain.Enums;
 using Microsoft.AspNetCore.Mvc;
@@ -26,7 +25,7 @@ public sealed class DevicesController : ControllerBase
     public sealed record CreateDeviceRequest(
         string Name,
         string Category,
-        IReadOnlyCollection<DeviceRateRequest> Rates);
+        IReadOnlyCollection<DeviceRateRequest>? Rates);
 
     [HttpGet]
     public async Task<IActionResult> GetAll(
@@ -55,14 +54,16 @@ public sealed class DevicesController : ControllerBase
         [FromBody] CreateDeviceRequest request,
         CancellationToken cancellationToken)
     {
+        var rates = request.Rates?
+            .Select(rate => new DeviceRateInput(
+                rate.PlayType,
+                rate.HourlyRate))
+            .ToArray() ?? Array.Empty<DeviceRateInput>();
+
         var command = new CreateDeviceCommand(
             request.Name,
             request.Category,
-            request.Rates
-                .Select(rate => new DeviceRateInput(
-                    rate.PlayType,
-                    rate.HourlyRate))
-                .ToArray());
+            rates);
 
         var result = await _createDeviceHandler.HandleAsync(
             command,
