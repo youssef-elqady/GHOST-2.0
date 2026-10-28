@@ -34,7 +34,7 @@ import {
   Zap,
 } from 'lucide-react'
 
-type Device = { id: string; name: string; type: string; room: string; status: 'available' | 'playing' | 'maintenance'; duration?: string; game?: string; price?: string }
+type Device = { id: string; name: string; type: string; room: string; status: 'available' | 'playing' | 'maintenance'; rates?: ApiDevice['rates']; duration?: string; game?: string; price?: string }
 
 function mapApiDevice(device: ApiDevice): Device {
   const status = device.status.toLowerCase()
@@ -48,6 +48,7 @@ function mapApiDevice(device: ApiDevice): Device {
     type: device.category,
     room: 'الأجهزة المسجلة',
     status: uiStatus,
+    rates: device.rates,
   }
 }
 
@@ -132,7 +133,7 @@ export function StaffDashboard() {
       </aside>
 
       <section className="content-area">
-        <header className="topbar"><button className="icon-button menu-button" onClick={() => setMobileNav(true)} aria-label="فتح القائمة"><Menu size={21} /></button><div className="breadcrumbs"><span>مساحة الموظفين</span><ChevronLeft size={14} /><strong>{navItems.find(n => n.id === activeNav)?.label}</strong></div><div className="top-actions"><div className="sync-state"><span /> متصل الآن</div><button className="icon-button notification" aria-label="التنبيهات"><Bell size={19} /></button><button className="theme-toggle" onClick={() => setDark(!dark)} aria-label="تبديل المظهر">{dark ? <Sun size={18} /> : <Moon size={18} />}<span>{dark ? 'فاتح' : 'داكن'}</span></button></div></header>
+        <header className="topbar"><button className="icon-button menu-button" onClick={() => setMobileNav(true)} aria-label="فتح القائمة"><Menu size={21} /></button><div className="breadcrumbs"><span>مساحة الموظفين</span><ChevronLeft size={14} /><strong>{navItems.find(n => n.id === activeNav)?.label}</strong></div><div className="top-actions"><div className="sync-state"><span /> {devicesLoading ? 'جاري الاتصال' : devicesError ? 'تعذر الاتصال' : 'متصل بالـ API'}</div><button className="icon-button notification" aria-label="التنبيهات"><Bell size={19} /></button><button className="theme-toggle" onClick={() => setDark(!dark)} aria-label="تبديل المظهر">{dark ? <Sun size={18} /> : <Moon size={18} />}<span>{dark ? 'فاتح' : 'داكن'}</span></button></div></header>
 
         {activeNav === 'overview' && <>
           <div className="page-heading"><div><p className="eyebrow">لوحة التشغيل اليومية</p><h1>أهلاً بك في GHOST <span>—</span></h1><p className="subheading">هذه نظرة سريعة على ما يحتاج انتباهك خلال ورديتك.</p></div><div className="shift-pill"><span className="live-pulse" /><div><b>شيفتك الحالية</b><strong>بيانات الشيفت بعد الربط</strong></div><ArrowLeftRight size={17} /></div></div>
@@ -150,7 +151,7 @@ export function StaffDashboard() {
         {activeNav === 'history' && <HistoryView />}
       </section>
 
-      {selectedDevice && <div className="modal-backdrop" onClick={() => setSelectedDevice(null)}><div className="session-modal" onClick={(e) => e.stopPropagation()}><div className="modal-header"><div><span className="eyebrow session-step">الخطوة 1 من 2 · إعداد الجلسة</span><h2>بدء جلسة جديدة</h2><p><strong>{selectedDevice.name}</strong> · {selectedDevice.room}</p></div><button className="icon-button" onClick={() => setSelectedDevice(null)} aria-label="إغلاق"><X size={18} /></button></div><div className="mode-select"><label>نوع الجلسة</label><div className="mode-buttons"><button className={mode === 'single' ? 'selected' : ''} onClick={() => setMode('single')}><Gamepad2 size={18} /><strong>فردية</strong><span>Single player</span></button><button className={mode === 'multi' ? 'selected' : ''} onClick={() => setMode('multi')}><Users size={18} /><strong>متعددة</strong><span>Multiplayer</span></button></div></div><div className="form-grid"><label>معرّف العميل<input placeholder="مثال: C-10482" /></label><label>المدة<input placeholder="اختر من التسعيرة المعتمدة" /></label></div><div className="modal-note"><ShieldCheck size={16} /> السعر والمدة يحددهما إعداد التسعيرة المعتمد — لا يمكن تعديلهما من حساب الموظف.</div><button className="primary-button" disabled title="يجب ربط الشيفت المفتوح والتحقق من هوية الموظف أولاً">بدء الجلسة بعد ربط الشيفت <ChevronLeft size={16} /></button></div></div>}
+      {selectedDevice && <div className="modal-backdrop" onClick={() => setSelectedDevice(null)}><div className="session-modal" onClick={(e) => e.stopPropagation()}><div className="modal-header"><div><span className="eyebrow session-step">الخطوة 1 من 2 · إعداد الجلسة</span><h2>بدء جلسة جديدة</h2><p><strong>{selectedDevice.name}</strong> · {selectedDevice.room}</p></div><button className="icon-button" onClick={() => setSelectedDevice(null)} aria-label="إغلاق"><X size={18} /></button></div><div className="mode-select"><label>نوع الجلسة</label><div className="mode-buttons"><button className={mode === 'single' ? 'selected' : ''} onClick={() => setMode('single')}><Gamepad2 size={18} /><strong>فردية</strong><span>Single player</span></button><button className={mode === 'multi' ? 'selected' : ''} onClick={() => setMode('multi')}><Users size={18} /><strong>متعددة</strong><span>Multiplayer</span></button></div></div><div className="form-grid"><div><label>التسعيرة المعتمدة</label><strong>{(() => { const rate = selectedDevice.rates?.find((item) => item.playType.toLowerCase() === mode); return rate ? `${rate.hourlyRate.toFixed(2)} ج.م / ساعة` : 'لا توجد تسعيرة لهذا النوع' })()}</strong></div><div><label>حالة الربط</label><strong>بدء الجلسة ينتظر تحديد الشيفت والموظف</strong></div></div><div className="modal-note"><ShieldCheck size={16} /> الأسعار المعروضة من إعدادات الجهاز المحفوظة في النظام.</div><button className="primary-button" disabled title="يجب ربط الشيفت المفتوح والتحقق من هوية الموظف أولاً">بدء الجلسة بعد ربط الشيفت <ChevronLeft size={16} /></button></div></div>}
     </main>
   )
 }
