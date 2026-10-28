@@ -135,18 +135,18 @@ export function AdminDeviceManager() {
               const draft = drafts[device.id] ?? { single: '', multi: '' }
               const configured = device.rates.length > 0
               return (
-                <article key={device.id} style={{ display: 'grid', gridTemplateColumns: 'minmax(130px, 1fr) minmax(120px, 1fr) minmax(120px, 1fr) auto', gap: 12, alignItems: 'end', border: '1px solid var(--border)', borderRadius: 12, padding: 14 }}>
+                <article key={device.id} style={{ display: 'grid', gridTemplateColumns: 'minmax(130px, 1fr) minmax(120px, 1fr) minmax(120px, 1fr) auto', gap: 12, alignItems: 'end', border: '1px solid var(--line)', borderRadius: 12, padding: 14 }}>
                   <div>
                     <strong>{device.name}</strong>
-                    <p style={{ margin: '5px 0 0', fontSize: 12, color: 'var(--muted-foreground)' }}>{device.category} · {configured ? 'السعر مضبوط' : 'لم يتم تحديد السعر'}</p>
+                    <p style={{ margin: '5px 0 0', fontSize: 12, color: 'var(--muted)' }}>{device.category} · {configured ? 'السعر مضبوط' : 'لم يتم تحديد السعر'}</p>
                   </div>
                   <label style={{ display: 'grid', gap: 6, fontSize: 13 }}>
                     سعر الفردية / ساعة (ج.م)
-                    <input type="number" min="0.01" step="0.5" value={draft.single} onChange={(event) => setDrafts((current) => ({ ...current, [device.id]: { ...draft, single: event.target.value } }))} placeholder="لم يحدد" style={{ width: '100%', minWidth: 0, padding: '10px 12px', borderRadius: 8, border: '1px solid var(--border)', background: 'var(--input)', color: 'var(--foreground)' }} />
+                    <input type="number" min="0.01" step="0.5" value={draft.single} onChange={(event) => setDrafts((current) => ({ ...current, [device.id]: { ...draft, single: event.target.value } }))} placeholder="لم يحدد" style={{ width: '100%', minWidth: 0, padding: '10px 12px', borderRadius: 8, border: '1px solid var(--line)', background: 'var(--card)', color: 'var(--foreground)' }} />
                   </label>
                   <label style={{ display: 'grid', gap: 6, fontSize: 13 }}>
                     سعر المتعددة / ساعة (ج.م)
-                    <input type="number" min="0.01" step="0.5" value={draft.multi} onChange={(event) => setDrafts((current) => ({ ...current, [device.id]: { ...draft, multi: event.target.value } }))} placeholder="لم يحدد" style={{ width: '100%', minWidth: 0, padding: '10px 12px', borderRadius: 8, border: '1px solid var(--border)', background: 'var(--input)', color: 'var(--foreground)' }} />
+                    <input type="number" min="0.01" step="0.5" value={draft.multi} onChange={(event) => setDrafts((current) => ({ ...current, [device.id]: { ...draft, multi: event.target.value } }))} placeholder="لم يحدد" style={{ width: '100%', minWidth: 0, padding: '10px 12px', borderRadius: 8, border: '1px solid var(--line)', background: 'var(--card)', color: 'var(--foreground)' }} />
                   </label>
                   <button className="primary-button" onClick={() => void saveRates(device)} disabled={savingId === device.id || loading}>
                     <Save size={15} /> {savingId === device.id ? 'حفظ...' : 'حفظ السعر'}
