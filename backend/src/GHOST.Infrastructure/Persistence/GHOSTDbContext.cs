@@ -7,6 +7,8 @@ public sealed class GHOSTDbContext : DbContext
 {
     public DbSet<Device> Devices => Set<Device>();
     public DbSet<DeviceRate> DeviceRates => Set<DeviceRate>();
+    public DbSet<Product> Products => Set<Product>();
+    public DbSet<StockMovement> StockMovements => Set<StockMovement>();
     public DbSet<BusinessDay> BusinessDays => Set<BusinessDay>();
     public DbSet<Shift> Shifts => Set<Shift>();
     public DbSet<Session> Sessions => Set<Session>();
