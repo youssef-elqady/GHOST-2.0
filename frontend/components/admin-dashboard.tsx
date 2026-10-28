@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useState } from 'react'
+import { AdminDeviceManager } from '@/components/admin-device-manager'
 import {
   Activity,
   Bell,
@@ -145,19 +146,25 @@ export function AdminDashboard() {
           <div><strong>هذه مساحة الإدارة بنفس هوية GHOST</strong><p>{current.message}</p></div>
         </div>
 
-        <div className="section-header">
-          <div><h2>متطلبات إكمال هذا القسم</h2><p>يتم تفعيل العمليات بعد تنفيذ endpoints واختبارها.</p></div>
-        </div>
-        <div className="bottom-grid">
-          <section className="panel activity-panel">
-            <div className="panel-heading"><div><h2>مصدر البيانات</h2><p>لا توجد بيانات تجريبية معروضة</p></div><ClipboardList size={19} /></div>
-            <div className="timeline"><div className="timeline-item"><span className="timeline-dot gold" /><div><strong>Backend API</strong><p>قراءة البيانات والتحقق من الصلاحيات يجب أن تتم في الخادم.</p></div></div><div className="timeline-item"><span className="timeline-dot blue" /><div><strong>قاعدة البيانات</strong><p>الأرقام المالية يجب أن تطابق السجلات المحفوظة والفواتير.</p></div></div><div className="timeline-item"><span className="timeline-dot green" /><div><strong>اختبارات القبول</strong><p>لن تُعرض الحالة على أنها جاهزة قبل نجاح اختبارات الربط والاسترجاع.</p></div></div></div>
-          </section>
-          <section className="panel handover-panel">
-            <div className="panel-heading"><div><h2>حالة الأمان</h2><p>قبل تشغيل لوحة الإدارة فعليًا</p></div><ShieldCheck size={19} /></div>
-            <div className="warning-box"><ShieldCheck size={17} /><span><strong>تسجيل الدخول غير مفعّل</strong><small>المسار /admin ليس محميًا حاليًا. لا تستخدمه لتشغيل المكان قبل إضافة المصادقة والتفويض في الـ API.</small></span></div>
-          </section>
-        </div>
+        {activeNav === 'devices' ? (
+          <AdminDeviceManager />
+        ) : (
+          <>
+            <div className="section-header">
+              <div><h2>متطلبات إكمال هذا القسم</h2><p>يتم تفعيل العمليات بعد تنفيذ endpoints واختبارها.</p></div>
+            </div>
+            <div className="bottom-grid">
+              <section className="panel activity-panel">
+                <div className="panel-heading"><div><h2>مصدر البيانات</h2><p>لا توجد بيانات تجريبية معروضة</p></div><ClipboardList size={19} /></div>
+                <div className="timeline"><div className="timeline-item"><span className="timeline-dot gold" /><div><strong>Backend API</strong><p>قراءة البيانات والتحقق من الصلاحيات يجب أن تتم في الخادم.</p></div></div><div className="timeline-item"><span className="timeline-dot blue" /><div><strong>قاعدة البيانات</strong><p>الأرقام المالية يجب أن تطابق السجلات المحفوظة والفواتير.</p></div></div><div className="timeline-item"><span className="timeline-dot green" /><div><strong>اختبارات القبول</strong><p>لن تُعرض الحالة على أنها جاهزة قبل نجاح اختبارات الربط والاسترجاع.</p></div></div></div>
+              </section>
+              <section className="panel handover-panel">
+                <div className="panel-heading"><div><h2>حالة الأمان</h2><p>قبل تشغيل لوحة الإدارة فعليًا</p></div><ShieldCheck size={19} /></div>
+                <div className="warning-box"><ShieldCheck size={17} /><span><strong>تسجيل الدخول غير مفعّل</strong><small>المسار /admin ليس محميًا حاليًا. لا تستخدمه لتشغيل المكان قبل إضافة المصادقة والتفويض في الـ API.</small></span></div>
+              </section>
+            </div>
+          </>
+        )}
       </section>
     </main>
   )
