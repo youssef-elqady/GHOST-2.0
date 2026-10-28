@@ -40,6 +40,8 @@ builder.Services.AddScoped<CloseShiftHandler>();
 
 var app = builder.Build();
 
+app.UseCors("GhostFrontend");
+
 if (app.Environment.IsDevelopment())
 {
     app.MapOpenApi();
