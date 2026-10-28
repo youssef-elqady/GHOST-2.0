@@ -126,7 +126,7 @@ export function StaffDashboard() {
           <p className="nav-label">مساحة العمل</p>
           {navItems.map((item) => {
             const Icon = item.icon
-            return <button key={item.id} className={`nav-item ${activeNav === item.id ? 'active' : ''}`} onClick={() => { setActiveNav(item.id); setMobileNav(false) }}><Icon size={19} /><span>{item.label}<small>{item.en}</small></span>{item.count && <em>{item.count}</em>}</button>
+            return <button key={item.id} className={`nav-item ${activeNav === item.id ? 'active' : ''}`} onClick={() => { setActiveNav(item.id); setMobileNav(false) }}><Icon size={19} /><span>{item.label}<small>{item.en}</small></span></button>
           })}
         </nav>
         <div className="sidebar-bottom"><div className="user-card"><div className="avatar">G</div><div><strong>موظف GHOST</strong><small>حساب الكاشير</small></div><MoreHorizontal size={18} /></div><button className="logout"><LogOut size={17} /> تسجيل الخروج</button></div>
