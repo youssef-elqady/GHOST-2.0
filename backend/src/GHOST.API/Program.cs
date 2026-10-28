@@ -20,6 +20,16 @@ builder.Services
 
 builder.Services.AddOpenApi();
 
+builder.Services.AddCors(options =>
+{
+    options.AddPolicy("GhostFrontend", policy =>
+        policy.WithOrigins(
+                "http://localhost:3000",
+                "http://127.0.0.1:3000")
+            .AllowAnyHeader()
+            .AllowAnyMethod());
+});
+
 builder.Services.AddDbContext<GHOSTDbContext>(options =>
     options.UseSqlServer(
         builder.Configuration.GetConnectionString("DefaultConnection"),
@@ -39,6 +49,8 @@ builder.Services.AddScoped<OpenShiftHandler>();
 builder.Services.AddScoped<CloseShiftHandler>();
 
 var app = builder.Build();
+
+app.UseCors("GhostFrontend");
 
 if (app.Environment.IsDevelopment())
 {

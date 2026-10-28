@@ -31,12 +31,6 @@ public sealed class CreateDeviceHandler
         CreateDeviceCommand command,
         CancellationToken cancellationToken = default)
     {
-        if (command.Rates is null || command.Rates.Count == 0)
-        {
-            return Result<Guid>.Failure(
-                "At least one hourly rate must be configured for the device.");
-        }
-
         if (command.Rates.Any(rate => !Enum.IsDefined(rate.PlayType)))
         {
             return Result<Guid>.Failure("A play type is invalid.");

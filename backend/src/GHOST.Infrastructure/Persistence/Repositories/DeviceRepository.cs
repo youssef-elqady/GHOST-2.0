@@ -23,6 +23,15 @@ public sealed class DeviceRepository : IDeviceRepository
             .ToListAsync(cancellationToken);
     }
 
+    public async Task<Device?> GetByIdAsync(
+        Guid id,
+        CancellationToken cancellationToken = default)
+    {
+        return await _dbContext.Devices
+            .Include(device => device.Rates)
+            .SingleOrDefaultAsync(device => device.Id == id, cancellationToken);
+    }
+
     public async Task AddAsync(
         Device device,
         CancellationToken cancellationToken = default)
