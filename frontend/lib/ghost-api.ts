@@ -13,6 +13,11 @@ export type ApiDevice = {
   rates: ApiDeviceRate[]
 }
 
+export type RateInput = {
+  playType: 'Single' | 'Multi'
+  hourlyRate: number
+}
+
 const API_BASE_URL = (
   process.env.NEXT_PUBLIC_GHOST_API_BASE_URL ?? 'http://localhost:5153'
 ).replace(/\/$/, '')
@@ -45,4 +50,15 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
 
 export function getDevices(): Promise<ApiDevice[]> {
   return request<ApiDevice[]>('/api/devices')
+}
+
+export function seedDefaultDevices(): Promise<{ added: number; message: string }> {
+  return request('/api/devices/seed-defaults', { method: 'POST' })
+}
+
+export function updateDeviceRates(id: string, rates: RateInput[]): Promise<ApiDevice> {
+  return request<ApiDevice>(`/api/devices/${encodeURIComponent(id)}/rates`, {
+    method: 'PUT',
+    body: JSON.stringify({ rates }),
+  })
 }
