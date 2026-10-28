@@ -8,6 +8,7 @@ using GHOST.Application.Sessions;
 using GHOST.Application.Sessions.StartSession;
 using GHOST.Infrastructure.Persistence;
 using GHOST.Infrastructure.Persistence.Repositories;
+using GHOST.Infrastructure.Persistence.Services;
 using Microsoft.EntityFrameworkCore;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -38,6 +39,7 @@ builder.Services.AddDbContext<GHOSTDbContext>(options =>
 
 builder.Services.AddScoped<IBusinessDayRepository, BusinessDayRepository>();
 builder.Services.AddScoped<IDeviceRepository, DeviceRepository>();
+builder.Services.AddScoped<IInventoryService, InventoryService>();
 builder.Services.AddScoped<IUnitOfWork, UnitOfWork>();
 builder.Services.AddScoped<OpenBusinessDayHandler>();
 builder.Services.AddScoped<CreateDeviceHandler>();
