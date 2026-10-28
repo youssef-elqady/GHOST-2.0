@@ -14,8 +14,9 @@ This folder contains the v0-generated Staff Dashboard UI imported from `youssef-
 
 - Connected: `GET /api/devices` loads active devices from the existing API.
 - Not yet connected: opening/closing shifts, starting/resuming/completing sessions, products/inventory, payments, persistent staff messages, activity history, and authentication.
+- `/admin` is a matching visual shell only. It is intentionally unprotected during development and must not be used in production until authentication and server-side authorization exist.
 - Session start is intentionally disabled in the UI until the API can identify the authenticated staff member and return the active shift. Do not use mock dashboard values as live financial data.
-- The separate `Admin-Dashboard` repository was empty at the time of integration, so an admin interface has not been copied from it.
+- The separate `Admin-Dashboard` repository was empty at the time of integration. The `/admin` shell was created using the same visual language as the staff UI, not copied from that repository.
 - This is a frontend foundation, not a production-ready installer. Desktop packaging, API security, recovery behavior, and end-to-end tests remain required.
 
 ## Configuration
