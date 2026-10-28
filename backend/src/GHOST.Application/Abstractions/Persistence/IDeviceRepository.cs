@@ -7,6 +7,10 @@ public interface IDeviceRepository
     Task<IReadOnlyList<Device>> GetAllAsync(
         CancellationToken cancellationToken = default);
 
+    Task<Device?> GetByIdAsync(
+        Guid id,
+        CancellationToken cancellationToken = default);
+
     Task AddAsync(
         Device device,
         CancellationToken cancellationToken = default);
