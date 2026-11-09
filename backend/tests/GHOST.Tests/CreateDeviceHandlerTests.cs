@@ -99,6 +99,14 @@ public sealed class CreateDeviceHandlerTests
             CancellationToken cancellationToken = default)
             => Task.FromResult<IReadOnlyList<Device>>(Devices);
 
+        public Task<Device?> GetByIdAsync(
+    Guid id,
+    CancellationToken cancellationToken = default)
+        {
+            var device = Devices.Find(device => device.Id == id);
+            return Task.FromResult(device);
+        }
+
         public Task AddAsync(
             Device device,
             CancellationToken cancellationToken = default)
