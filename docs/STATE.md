@@ -116,3 +116,43 @@ Current sprint: 01 - Foundation review (codebase review in progress)
 - `IsWithinGracePeriod` currently measures from `CreatedAt`; it is not a substitute for a configurable policy based on the authoritative session start time and authenticated role.
 - Enforce the policy in an application service using server time and authenticated claims, then persist the session state and audit/event records atomically.
 
+## Chat handoff / recovery protocol (2026-11-12)
+
+This section is the canonical resume point if the conversation ends or a new ChatGPT chat is opened.
+
+### How to resume
+1. Open the main repository: https://github.com/youssef-elqady/GHOST-2.0
+2. Read `docs/STATE.md` on branch `feature/products-inventory-billing` completely before proposing or changing code.
+3. Read `docs/GHOST — SRS + ERD v0.2.md` for approved requirements/business rules and `ai/GHOST-master-prompt.md` for project-wide engineering constraints.
+4. Read the relevant source files and tests from the live branch before making claims. Treat this STATE file as a handoff summary, not a substitute for source verification.
+5. Continue from the "Immediate next action" below. Do not ask the user to repeat project decisions already recorded here.
+
+### Current canonical repository position
+- Main working branch: `feature/products-inventory-billing`.
+- Latest documented commit on this branch at handoff: `301a07605656b3be2dd04d9bd39ec3469cc54b00` (billing rounding and cancellation mismatch review).
+- User reported local `git status -sb` output: `## feature/products-inventory-billing...origin/feature/products-inventory-billing`, with no modified/untracked files and no ahead/behind count at the time reported.
+- The user's tracking ref may be stale until fetch. Before local work, run `git fetch origin`, then `git status -sb`; if behind, use `git pull --ff-only origin feature/products-inventory-billing`. Never reset, force-push, or discard user changes.
+
+### Current product/engineering direction
+- Build a real commercial system for GHOST PlayStation, not a demo.
+- Next.js is the primary client for both Staff and Admin; the user owns v0 UI design. Preserve the existing frontend and visual direction; do not create a duplicate frontend or revert to WPF.
+- .NET 10 Web API + SQL Server + EF Core backend is authoritative for all money, permissions, inventory, and session state.
+- Prioritize correctness, recoverability, security, auditability, idempotency, and concurrency over speed of adding screens.
+- Work in small reviewed changes. Build and test after each meaningful change. No unreviewed branch merges or destructive Git actions.
+- Communicate in practical Egyptian Arabic, one next user action at a time. Explain verified facts vs assumptions; never claim tests ran unless tool output proves they ran.
+
+### Verified findings to retain
+- The foundation migration/snapshot contain the core business-day, shift, session-segment, active-pause filtered indexes and SQL Server RowVersion columns, but no Products/StockMovements tables.
+- The inventory branch is divergent (10 commits ahead / 6 behind at the last compare) and is not approved for merge. Its model has Product/StockMovement additions without a matching migration; stock receipt is not yet tied to the unified cash ledger.
+- Current unit tests are mostly fake-based; SQL Server integration/concurrency tests are absent.
+- Confirmed SRS/code mismatch: BD-04 requires ceiling to the next whole EGP once after summing all session segments. Current SessionBillingCalculator rounds to 2 decimal places; its test expects 0.01 EGP where SRS expects 1.00 EGP. Fix implementation and tests together before POS/payment.
+- Cancellation/void policy BD-03 (configurable 300-second staff window, reasons, zero gaming charge, event/audit, Admin-only void after window) is not fully enforced in application/domain flow.
+- Authentication/authorization is not configured; request-supplied staff/shift identifiers must not be trusted as actor identity.
+- Completing a session currently does not create a Sale/Payment/CashTransaction; returned amount is not collected revenue.
+- ExpectedCash must be derived from immutable cash ledger transactions, not arbitrary updates.
+
+### Immediate next action
+After the user synchronizes to latest branch tip, continue Sprint 01 by reviewing API controllers, request DTOs, DI registrations, and existing tests around session/shift operations; then propose a small, testable implementation order. Do not start inventory merge or payment implementation yet. First fix the BD-04 billing rule with focused unit tests, after confirming the latest local source and test baseline.
+
+### Working agreement
+The assistant is expected to act as a careful senior engineering reviewer/implementer: inspect repository state and dependencies, identify exception and data-integrity risks, make minimal changes, run available build/test checks, report exact commands/results, and maintain this STATE handoff after meaningful decisions or commits. The assistant cannot assume local test execution merely from GitHub source inspection; ask the user to run local commands when local runtime/database access is required.
