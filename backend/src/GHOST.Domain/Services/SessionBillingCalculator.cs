@@ -5,15 +5,15 @@ public static class SessionBillingCalculator
     /// <summary>
     /// Calculates the total session charge from each segment's billable duration
     /// and the hourly rate captured when that segment began.
-    /// The unrounded segment amounts are summed first; only the final total is
-    /// rounded to two decimal places.
+    /// The unrounded segment amounts are summed first; the final session total
+    /// is then rounded up to the next whole EGP exactly once (BD-04).
     /// </summary>
     public static decimal CalculateTotalAmount(
         IEnumerable<(TimeSpan BillableDuration, decimal AppliedHourlyRate)> segments)
     {
         ArgumentNullException.ThrowIfNull(segments);
 
-        decimal unroundedTotal = 0m;
+        decimal rawTotal = 0m;
 
         foreach (var (billableDuration, appliedHourlyRate) in segments)
         {
@@ -27,14 +27,14 @@ public static class SessionBillingCalculator
                     nameof(segments),
                     "Applied hourly rate must be greater than zero.");
 
-            var segmentAmount =
+            var segmentRawCost =
                 billableDuration.Ticks
                 * appliedHourlyRate
                 / TimeSpan.TicksPerHour;
 
-            unroundedTotal += segmentAmount;
+            rawTotal += segmentRawCost;
         }
 
-        return decimal.Round(unroundedTotal, 2, MidpointRounding.AwayFromZero);
+        return decimal.Ceiling(rawTotal);
     }
 }
