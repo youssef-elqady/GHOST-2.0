@@ -18,7 +18,7 @@ Current sprint: 01 - Foundation review (codebase review in progress)
 - SRS + ERD and business decisions BD-01 to BD-14 are documented.
 - Skill and master prompt are committed.
 - Existing GHOST-2.0 backend and Next.js frontend have been identified and reviewed at a high level.
-- Local branch `feature/products-inventory-billing` was synchronized with origin at commit `dcc07c5`.
+- User synchronized the local `feature/products-inventory-billing` branch to origin at commit `98b83bb` on 2026-11-12; the reported status was clean and tracking origin.
 
 ## In progress
 - Sprint 01: compare current backend/frontend code and inventory branch against SRS/ERD; produce KEEP / MODIFY / ADD / DEFER decisions.
@@ -81,7 +81,7 @@ Current sprint: 01 - Foundation review (codebase review in progress)
 
 ### Automated test coverage review
 - Existing tests are predominantly domain/application unit tests using fake repositories and fake UnitOfWork implementations.
-- `GHOST.Tests.csproj` references the Application project only; it does not reference Infrastructure and contains no SQL Server/EF Core integration test setup.
+- `GHOST.Tests.csproj` references the Application project only; it does not reference Infrastructure and contains no SQL Server/EF Core integration-test setup.
 - No test currently proves that the SQL Server filtered indexes are actually applied, that competing database transactions cannot start/transfer the same device, or that the UnitOfWork translates real SQL Server concurrency/unique-key errors as intended.
 - Billing calculator tests cover proportional partial-hour charging, captured rates across segments, sum-before-rounding, zero segments, and invalid inputs. These are useful unit tests but do not validate persisted end-to-end billing/payment.
 - The current CreateDevice fake repository implementation includes the required GetByIdAsync method; any earlier report of that method missing must be rechecked against the exact local commit and test output rather than repeated as a current confirmed defect.
@@ -146,7 +146,7 @@ This section is the canonical resume point if the conversation ends or a new Cha
 - The inventory branch is divergent (10 commits ahead / 6 behind at the last compare) and is not approved for merge. Its model has Product/StockMovement additions without a matching migration; stock receipt is not yet tied to the unified cash ledger.
 - Current unit tests are mostly fake-based; SQL Server integration/concurrency tests are absent.
 - Confirmed SRS/code mismatch: BD-04 requires ceiling to the next whole EGP once after summing all session segments. Current SessionBillingCalculator rounds to 2 decimal places; its test expects 0.01 EGP where SRS expects 1.00 EGP. Fix implementation and tests together before POS/payment.
-- Cancellation/void policy BD-03 (configurable 300-second staff window, reasons, zero gaming charge, event/audit, Admin-only void after window) is not fully enforced in application/domain flow.
+- Cancellation/void policy BD-03 (configurable 300-second staff window, reasons, zero gaming charge, event/audit, Admin-only void after window) is not fully enforced.
 - Authentication/authorization is not configured; request-supplied staff/shift identifiers must not be trusted as actor identity.
 - Completing a session currently does not create a Sale/Payment/CashTransaction; returned amount is not collected revenue.
 - ExpectedCash must be derived from immutable cash ledger transactions, not arbitrary updates.
@@ -156,7 +156,6 @@ After the user synchronizes to latest branch tip, continue Sprint 01 by reviewin
 
 ### Working agreement
 The assistant is expected to act as a careful senior engineering reviewer/implementer: inspect repository state and dependencies, identify exception and data-integrity risks, make minimal changes, run available build/test checks, report exact commands/results, and maintain this STATE handoff after meaningful decisions or commits. The assistant cannot assume local test execution merely from GitHub source inspection; ask the user to run local commands when local runtime/database access is required.
-
 
 ## Sprint 01 API, DTO, DI, and session/shift test review (2026-11-12)
 
@@ -183,13 +182,26 @@ The assistant is expected to act as a careful senior engineering reviewer/implem
 - Do not implement a separate live-display formula. Preserve the single shared calculator and update its tests with the mandatory boundary cases from the master prompt.
 
 ### Test baseline and verification limits
-- `GHOST.Tests.csproj` currently references only `GHOST.Application`; there is no Infrastructure reference or SQL Server integration-test setup.
+- `GHOST.Tests.csproj` currently references only `GHOST.Application`; there is no Infrastructure/SQL Server integration-test setup.
 - Existing session/shift handler tests use fake repositories and fake UnitOfWork implementations. They do not prove SQL Server transaction, filtered-index, concurrency, or API authorization behavior.
 - No GitHub Actions workflow run was associated with commit `98b83bba42ca41fa58dd17d2d3120be1f0238deb` at the time of review.
-- Source review only; no local build/test or SQL Server migration execution has been performed by the assistant.
+- User executed `dotnet test .\backend\tests\GHOST.Tests\GHOST.Tests.csproj --configuration Release` on commit `98b83bb`: 40 tests total, 39 passed, 1 failed; build emitted one CS8602 nullable warning in `CloseShiftHandlerTests.cs:24`.
+- The failing test was `CreateDeviceHandlerTests.HandleAsync_RejectsWhenNoRatesAreProvided`. Source inspection confirmed `CreateDeviceHandler` had no empty/null rates guard, so it created and persisted a device with no hourly rates. This is a genuine pre-existing baseline defect, not a BD-04 regression.
+
+### Baseline defect correction (pending local verification)
+- Updated `CreateDeviceHandler.HandleAsync` to reject null or empty `Rates` before enumerating or creating a Device, returning the explicit error "At least one hourly rate must be provided." This prevents a device with no billable play mode from being persisted.
+- Updated `CloseShiftHandlerTests` to assert the successful `ClosedShiftSnapshot` with `Assert.IsType` before reading its properties, removing the nullable dereference warning without suppressing nullable analysis.
+- Code commits:
+  - `c20fbc084be28bd13b702dd045a7fbfd6ea94500` — `fix: reject devices without configured hourly rates`
+  - `2ed2ba3ecae2c5150aea272fd3894bc436fd6ed5` — `test: assert successful shift snapshot without nullable warning`
+- These commits were made on `feature/products-inventory-billing`. The user has not yet pulled them or rerun tests. Do not describe the baseline as fixed until local test output confirms it.
+- The test that rejects empty rates already existed; its assertions now align with the new handler guard. A separate null-rates test has not been added.
 
 ### Immediate next action
-1. User confirms post-pull local state with `git status -sb`.
-2. Run baseline `dotnet test backend/tests/GHOST.Tests/GHOST.Tests.csproj --configuration Release` locally and return the complete output.
-3. If baseline is green, make the isolated BD-04 calculator + unit-test correction, then run tests and build. If baseline fails, classify and fix only the baseline failure first.
-4. Keep auth, actor/current-shift scoping, cash ledger, audit/events, idempotency, and SQL Server integration tests as Sprint 02/03 blockers. Do not merge the inventory branch or start payment implementation yet.
+1. User should run `git fetch origin`, `git pull --ff-only origin feature/products-inventory-billing`, and `git status -sb`.
+2. Then run `dotnet test .\backend\tests\GHOST.Tests\GHOST.Tests.csproj --configuration Release` and provide the complete output.
+3. If the baseline correction passes with 40/40 and no warnings, proceed to the isolated BD-04 calculator + focused boundary tests; otherwise diagnose the exact output before further changes.
+4. Do not merge inventory or implement payment until the relevant billing, auth, cash-ledger, idempotency, and integration-test gates are designed and verified.
+
+### Working agreement
+The assistant is the engineering lead/reviewer and should choose the next safe task, inspect current code before editing, make small testable commits, and keep this file current. The user executes local PowerShell commands and returns exact output. Never claim local tests/builds/database migrations passed unless the user/tool output proves it.
