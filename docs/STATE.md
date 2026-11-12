@@ -1,38 +1,48 @@
 # GHOST STATE
 
-Last updated: 2026-11-10
-Current sprint: 00 - Specification (SRS + ERD v0.4 drafted, awaiting review of GHOST-2.0 code)
+Last updated: 2026-11-12
+Current sprint: 01 - Foundation review (codebase review in progress)
+
+## Product and architecture decisions
+- Primary UI: **Next.js** for both Staff and Admin.
+- v0 is the UI design/build workflow owned by the user. Preserve the existing v0 visual direction; integrate screens into the existing `frontend/` app rather than creating a second production frontend.
+- Design references:
+  - Staff: https://github.com/youssef-elqady/ghost-staff
+  - Admin: https://github.com/youssef-elqady/Admin-Dashboard
+- Main repository: https://github.com/youssef-elqady/GHOST-2.0
+- Backend remains .NET 10 Web API + SQL Server + EF Core. Financial calculations, permissions, stock, and session state remain server-authoritative.
+- The existing `feature/frontend-v0-foundation` work is a reference/foundation to inspect and preserve; do not overwrite it blindly.
+- No WPF client is planned for v1.
 
 ## Done
-- SRS + ERD v0.4 written (Claude Doc "GHOST - SRS + ERD v0.2", sections 1-11).
-- Business decisions BD-01 to BD-14 fixed (see ai/ghost-ps-system/references/01-business-rules.md).
-- Skill + master prompt created (ai/ghost-ps-system, ai/GHOST-master-prompt.md).
+- SRS + ERD and business decisions BD-01 to BD-14 are documented.
+- Skill and master prompt are committed.
+- Existing GHOST-2.0 backend and Next.js frontend have been identified and reviewed at a high level.
+- Local branch `feature/products-inventory-billing` was synchronized with origin at commit `dcc07c5`.
 
 ## In progress
-- Nothing in code yet. Waiting for GHOST-2.0 Entities structure to start Sprint 01 (compare code vs ERD, produce keep/modify list).
+- Sprint 01: compare current backend/frontend code and inventory branch against SRS/ERD; produce KEEP / MODIFY / ADD / DEFER decisions.
+- Reconcile documentation with the actual Next.js Staff + Admin direction.
+- Review the separate inventory foundation branch before any merge.
 
-## Next step
-1. User sends the GHOST-2.0 Entities folder (list of classes with their properties).
-2. Run Sprint 01: diff against docs/GHOST-SRS-ERD.md, output keep/modify/add list.
-3. Then Sprint 02: Auth + Roles + Business Day + Shifts + Handover + CashTransaction + staff scoping.
+## Next steps
+1. Finish the code-to-SRS diff, including auth, cash ledger, sessions, inventory, migrations, concurrency, and tests.
+2. Confirm the exact v0 design inputs from the Staff and Admin reference repositories and preserve their visual language.
+3. Define the API contracts needed by each frontend workflow; replace mock data gradually with backend-owned data.
+4. Complete Sprint 01 review and get approval before structural changes.
+5. Sprint 02: authentication, roles, business day, shifts, handover, cash transactions, and staff data scoping.
+6. Continue with sessions/devices, then inventory/POS, reporting, audit/backup, and production readiness.
 
-## Decisions made (short)
-- Time in seconds, server UTC, no time rounding, no free minutes.
-- Gaming amount: ceiling to whole EGP once on session total (8.33 -> 9).
-- Multi = fixed device price; rates per device x mode (10 devices x 2).
-- Cancel window 300 s for Staff; after that Admin void only; Transfer Session exists.
-- Product sale prices are whole pounds. Cost may have decimals.
-- Staff can take cash from drawer without pre-approval but must give category + reason; routed to StockReceipt / Withdrawal / Expense; Admin sees all with alerts.
-- One drawer, one open shift at a time; documented handover.
-- Cameras: separate NVR system, no integration v1; Tailscale VPN for remote; read-only web dashboard later (P2).
+## Non-negotiable invariants
+- Backend is authoritative for money, time-based billing, permissions, stock balance, and session state.
+- No money calculations or authorization decisions in the browser.
+- Financial and stock operations must be transactional, idempotent where appropriate, auditable, and concurrency-safe.
+- No destructive Git operations or branch merges without review.
+- Preserve Arabic RTL, GHOST branding, and the user's v0 design direction.
 
-## Open questions
-- Percent discount rounding (proposal: round discount down to whole pound).
-- Withdrawal alert threshold amount.
-- Advance linked to salary deduction (P2)?
-- Number of cameras (proposal 8-channel NVR), thermal printer model.
-- GHOST-2.0 entities structure (needed now).
-
-## Known risks
-- No code tested yet; all rules are specification only.
-- Arabic RTL PDF fonts must be tested early (Sprint 07, but try a sample sooner).
+## Decisions still open
+- Discount rounding policy.
+- Withdrawal alert threshold.
+- Rejected stock receipt handling choice (cash reversal vs staff shortage), per approved auditable flow.
+- Printer model/driver details and camera count.
+- Remaining implementation choices discovered during Sprint 01.
