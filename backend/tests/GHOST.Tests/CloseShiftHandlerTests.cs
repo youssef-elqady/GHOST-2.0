@@ -21,11 +21,12 @@ public sealed class CloseShiftHandlerTests
             day.Id, shift.Id, 375m, "مشتريات نقدية مسجلة"));
 
         Assert.True(result.IsSuccess, result.Error);
-        Assert.Equal("Closed", result.Value.Status);
-        Assert.Equal(400m, result.Value.ExpectedCash);
-        Assert.Equal(375m, result.Value.ActualCash);
-        Assert.Equal(-25m, result.Value.CashDifference);
-        Assert.Equal("مشتريات نقدية مسجلة", result.Value.ClosingReason);
+        var snapshot = Assert.IsType<ClosedShiftSnapshot>(result.Value);
+        Assert.Equal("Closed", snapshot.Status);
+        Assert.Equal(400m, snapshot.ExpectedCash);
+        Assert.Equal(375m, snapshot.ActualCash);
+        Assert.Equal(-25m, snapshot.CashDifference);
+        Assert.Equal("مشتريات نقدية مسجلة", snapshot.ClosingReason);
         Assert.Equal(1, unitOfWork.SaveCalls);
     }
 
