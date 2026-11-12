@@ -1,4 +1,5 @@
 ﻿using GHOST.Domain.Entities;
+using GHOST.Infrastructure.Identity;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
 
@@ -16,6 +17,14 @@ public sealed class ShiftConfiguration : IEntityTypeConfiguration<Shift>
             .IsRequired();
 
         builder.Property(s => s.StaffUserId)
+            .IsRequired();
+
+        // The staff actor is a persisted Identity user. Restrict deletion so
+        // historical shifts remain attributable and auditable.
+        builder.HasOne<ApplicationUser>()
+            .WithMany()
+            .HasForeignKey(s => s.StaffUserId)
+            .OnDelete(DeleteBehavior.Restrict)
             .IsRequired();
 
         builder.Property(s => s.OpenedAt)
