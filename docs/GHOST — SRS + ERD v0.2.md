@@ -1,6 +1,6 @@
 # GHOST — SRS + ERD v0.2
 
-نظام إدارة وتشغيل ومحاسبة لمكان PlayStation (10 أجهزة، ورديتين Staff، Admin واحد). Stack: .NET 10 Web API + SQL Server + EF Core + WPF (MVVM). كل الحسابات في الـ Backend.
+نظام إدارة وتشغيل ومحاسبة لمكان PlayStation (10 أجهزة، ورديتين Staff، Admin واحد). Stack: .NET 10 Web API + SQL Server + EF Core + Next.js (Staff + Admin). واجهات الويب تستهلك الـ API، وكل الحسابات والصلاحيات وحالة المخزون والجلسات في الـ Backend.
 
 ---
 
@@ -333,7 +333,7 @@ Difference   = ActualCash − ExpectedCash
 | 6 | Expenses + Withdrawals + Summaries |
 | 7 | Analytics + PDF/Excel |
 | 8 | Audit + Backup + Smart Alerts |
-| 9 | واجهة WPF (Staff ثم Admin) |
+| 9 | واجهات Next.js (Staff + Admin) وربطها بالـ API |
 | 10 | اختبارات ضغط وانقطاع كهرباء واستعادة، ثم تشغيل تجريبي |
 | لاحقًا (P2/P3) | Recipes، Bundles، Suppliers، Customers |
 
