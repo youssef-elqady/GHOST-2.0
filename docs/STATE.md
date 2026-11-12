@@ -156,3 +156,40 @@ After the user synchronizes to latest branch tip, continue Sprint 01 by reviewin
 
 ### Working agreement
 The assistant is expected to act as a careful senior engineering reviewer/implementer: inspect repository state and dependencies, identify exception and data-integrity risks, make minimal changes, run available build/test checks, report exact commands/results, and maintain this STATE handoff after meaningful decisions or commits. The assistant cannot assume local test execution merely from GitHub source inspection; ask the user to run local commands when local runtime/database access is required.
+
+
+## Sprint 01 API, DTO, DI, and session/shift test review (2026-11-12)
+
+### API and dependency-injection findings
+- Reviewed `Program.cs`, `SessionsController`, and `BusinessDaysController` on branch tip `98b83bba42ca41fa58dd17d2d3120be1f0238deb`.
+- `Program.cs` registers repositories and handlers, but has no Authentication/Authorization services or middleware. No endpoint role/policy enforcement is present in the inspected controllers.
+- `SessionsController.StartSessionRequest` accepts `ShiftId` from the caller; `BusinessDaysController.OpenShiftRequest` accepts `StaffUserId`; session completion accepts `EndShiftId`. These are caller-controlled identifiers and must not be trusted as the acting identity or current shift.
+- Retryable session operations expose no Idempotency-Key contract. Start, completion, cancel, and payment flows need durable idempotency before production.
+- Controllers currently map most handler failures to HTTP 400; conflict, authorization, not-found, and validation/rule failures are not consistently mapped to the SRS API status/error-code contract.
+- No shifts-specific controller or authenticated current-shift endpoint was found in the inspected API tree; shift open/close currently sit under `BusinessDaysController`.
+
+### Session and shift application/domain findings
+- `SessionLifecycleHandler.CompleteAsync` updates session/device state and returns a billing snapshot, but it does not create a Sale, Payment, or CashTransaction. The returned amount is not collected revenue.
+- Pause/resume/transfer/completion do not write the SRS-required SessionEvent/AuditLog records in the inspected implementation.
+- Completion accepts a request-supplied EndShiftId and checks only that the shift exists and is open; actor ownership, current-shift scope, business-day relationship, and permitted handover policy are not enforced.
+- Session completion currently requires `SessionStatus.Active`; a paused session cannot be completed directly without resuming first. Confirm intended operational behavior against FR-22 before changing it.
+- `Shift.UpdateExpectedCash` permits direct mutation of ExpectedCash. The target must derive it from immutable CashTransactions; current shift close trusts the stored ExpectedCash.
+- `OpenShiftHandler` and `CloseShiftHandler` are fake-tested, but do not implement handover or ledger-based cash reconciliation.
+- `SessionRepository.GetActiveByDeviceAsync` filters `SessionStatus.Active` and unended segments. This is consistent with the current domain representation where pause is an active pause on a segment, not a separate SessionStatus value; keep API/query mapping consistent.
+
+### Billing correction gate
+- Confirmed again that `Session.GetTotalAmount` delegates to `SessionBillingCalculator`, and `SessionLifecycleHandler.CreateSnapshot` uses that same method for the displayed/completed amount. Correcting the calculator therefore fixes the shared server-side amount path.
+- The current calculator rounds to 2 decimal places, and the existing two-segment test expects `0.01m`; approved BD-04 and the master prompt require `Ceiling` to whole EGP once after summing all segments.
+- Do not implement a separate live-display formula. Preserve the single shared calculator and update its tests with the mandatory boundary cases from the master prompt.
+
+### Test baseline and verification limits
+- `GHOST.Tests.csproj` currently references only `GHOST.Application`; there is no Infrastructure reference or SQL Server integration-test setup.
+- Existing session/shift handler tests use fake repositories and fake UnitOfWork implementations. They do not prove SQL Server transaction, filtered-index, concurrency, or API authorization behavior.
+- No GitHub Actions workflow run was associated with commit `98b83bba42ca41fa58dd17d2d3120be1f0238deb` at the time of review.
+- Source review only; no local build/test or SQL Server migration execution has been performed by the assistant.
+
+### Immediate next action
+1. User confirms post-pull local state with `git status -sb`.
+2. Run baseline `dotnet test backend/tests/GHOST.Tests/GHOST.Tests.csproj --configuration Release` locally and return the complete output.
+3. If baseline is green, make the isolated BD-04 calculator + unit-test correction, then run tests and build. If baseline fails, classify and fix only the baseline failure first.
+4. Keep auth, actor/current-shift scoping, cash ledger, audit/events, idempotency, and SQL Server integration tests as Sprint 02/03 blockers. Do not merge the inventory branch or start payment implementation yet.
