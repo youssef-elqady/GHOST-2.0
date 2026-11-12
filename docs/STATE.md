@@ -259,3 +259,15 @@ The assistant is the engineering lead/reviewer and should choose the next safe t
 2. Add tests for unauthenticated access, invalid/expired tokens, Staff vs Admin role restrictions, and actor identity sourced only from claims.
 3. Then migrate shift/session commands to use `ICurrentUser` and server-resolved current shift; remove StaffUserId/ShiftId/EndShiftId from public request bodies wherever they represent the caller's identity or active shift.
 4. Keep payment/POS and inventory merge blocked until authentication, cash-ledger ownership, idempotency, and persistence integration gates are addressed.
+
+
+## Authentication and password lifecycle decisions approved (2026-11-12)
+
+- User approved one-time secure server-side bootstrap for the first Admin; no default password and no public bootstrap endpoint.
+- Admin creates, disables, and reactivates Staff accounts.
+- Admin can reset a Staff password using a cryptographically random temporary password shown once; the Staff account must change it at next login. Existing passwords are never viewable.
+- Admin changes their own password using current password + new password. If the only Admin forgets it, recovery is a separate server-side recovery command, not a public endpoint.
+- Password changes/resets revoke refresh sessions according to the AUTH policy; all sensitive account actions are audited without recording passwords or raw tokens.
+- Approved detailed policy and AUTH-01..AUTH-07 acceptance criteria: `docs/AUTHENTICATION-DECISIONS.md`.
+- Current branch tip before this documentation update: `ba0461fc6533eda4c63cb174e6bd28f84ccc2ec1`.
+- Next implementation gate: inspect Identity EF Core table mapping and migration strategy against the existing Guid-based `Shift.StaffUserId` and current SQL Server schema; then implement AUTH-01 without changing existing business behavior.
