@@ -12,18 +12,18 @@ public sealed class SessionBillingCalculatorTests
             (TimeSpan.FromMinutes(61), 60m)
         ]);
 
-        Assert.Equal(61.00m, amount);
+        Assert.Equal(61m, amount);
     }
 
     [Fact]
-    public void CalculateTotalAmount_CalculatesPartialHourProportionally()
+    public void CalculateTotalAmount_CalculatesPartialHourAndCeilsFinalAmount()
     {
         var amount = SessionBillingCalculator.CalculateTotalAmount(
         [
             (TimeSpan.FromMinutes(45), 40m)
         ]);
 
-        Assert.Equal(30.00m, amount);
+        Assert.Equal(30m, amount);
     }
 
     [Fact]
@@ -35,20 +35,55 @@ public sealed class SessionBillingCalculatorTests
             (TimeSpan.FromMinutes(30), 40m)
         ]);
 
-        Assert.Equal(50.00m, amount);
+        Assert.Equal(50m, amount);
     }
 
     [Fact]
-    public void CalculateTotalAmount_RoundsOnlyAfterSummingAllSegments()
+    public void CalculateTotalAmount_CeilingsFractionalSessionTotalToWholeEgp()
     {
-        // Each segment is exactly half a piastre before rounding.
+        var amount = SessionBillingCalculator.CalculateTotalAmount(
+        [
+            (TimeSpan.FromMinutes(1), 61m)
+        ]);
+
+        Assert.Equal(2m, amount);
+    }
+
+    [Fact]
+    public void CalculateTotalAmount_CeilingsOnlyAfterSummingAllSegments()
+    {
+        // Each segment costs 0.15 EGP; the session total is 0.30 EGP.
+        // Rounding each segment separately would incorrectly charge 2 EGP.
+        var amount = SessionBillingCalculator.CalculateTotalAmount(
+        [
+            (TimeSpan.FromSeconds(30), 18m),
+            (TimeSpan.FromSeconds(30), 18m)
+        ]);
+
+        Assert.Equal(1m, amount);
+    }
+
+    [Fact]
+    public void CalculateTotalAmount_CeilingsTinyPositiveTotalToOneEgp()
+    {
         var amount = SessionBillingCalculator.CalculateTotalAmount(
         [
             (TimeSpan.FromSeconds(1), 18m),
             (TimeSpan.FromSeconds(1), 18m)
         ]);
 
-        Assert.Equal(0.01m, amount);
+        Assert.Equal(1m, amount);
+    }
+
+    [Fact]
+    public void CalculateTotalAmount_DoesNotIncreaseAnExactWholeEgpAmount()
+    {
+        var amount = SessionBillingCalculator.CalculateTotalAmount(
+        [
+            (TimeSpan.FromMinutes(1), 60m)
+        ]);
+
+        Assert.Equal(1m, amount);
     }
 
     [Fact]
@@ -56,7 +91,7 @@ public sealed class SessionBillingCalculatorTests
     {
         var amount = SessionBillingCalculator.CalculateTotalAmount([]);
 
-        Assert.Equal(0.00m, amount);
+        Assert.Equal(0m, amount);
     }
 
     [Fact]
