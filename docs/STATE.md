@@ -235,3 +235,27 @@ The assistant is the engineering lead/reviewer and should choose the next safe t
 2. Confirm HEAD is `34fe476` and working tree is clean.
 3. Run `dotnet test .\\backend\\tests\\GHOST.Tests\\GHOST.Tests.csproj --configuration Release`.
 4. If all tests pass, review the resulting shared billing path and proceed to the next high-risk gap (authentication/actor and shift scoping) before payment/POS or inventory integration.
+
+## BD-04 local verification and authentication architecture review (2026-11-12)
+
+### BD-04 verification confirmed
+- User pulled through commit `d44c258` and ran `dotnet test .\\backend\\tests\\GHOST.Tests\\GHOST.Tests.csproj --configuration Release`.
+- Result: **43 total, 43 passed, 0 failed, 0 skipped**; build succeeded. This confirms the BD-04 calculator and its focused unit tests on the user's local checkout.
+- No SQL Server integration test or end-to-end invoice/payment test was run; BD-04 is verified at the shared domain-calculator/unit-test level only.
+
+### Authentication and actor identity source review
+- Re-inspected the live branch at `d44c258`.
+- `Program.cs` currently registers no authentication scheme, authorization services, or authentication/authorization middleware. The API controllers have no `[Authorize]` policies.
+- `ICurrentUser` already exists in Application (`UserId`, `IsAuthenticated`, `IsAdmin`, `IsStaff`), but no implementation/registration was found in the inspected API composition root.
+- `SessionsController.StartSessionRequest` accepts caller-supplied `ShiftId`; `BusinessDaysController.OpenShiftRequest` accepts caller-supplied `StaffUserId`; completion accepts caller-supplied `EndShiftId`. These are not trustworthy actor identity/current-shift sources.
+- `StartSessionHandler` validates that the supplied shift exists and is open, but does not verify that it belongs to the authenticated staff member.
+- `OpenShiftHandler` uses the supplied StaffUserId directly. This is an actor-spoofing risk until identity is derived from a verified principal.
+- API project currently has no ASP.NET Core Identity/JWT package reference visible in its project file, and no User entity/store was found in the current repository tree review. Do not add `[Authorize]` alone or accept arbitrary JWT claims without a defined, persisted user identity and credential lifecycle.
+- The correct next unit of work is an authentication design slice: define the persisted Staff/Admin user model and credential lifecycle, role claims, token validation/signing configuration and secret storage, then implement a claims-backed `ICurrentUser` and tests. Only after that should endpoint policies and removal of request-supplied actor IDs be wired through controllers and handlers.
+- Before implementation, inspect the SRS user/staff model and existing frontend login assumptions; do not invent password reset, initial admin provisioning, or token lifetime policies silently.
+
+### Immediate next action
+1. Implement and review the smallest authentication foundation as a separate, testable slice; first establish the user/role/credential model and configuration contract from the SRS.
+2. Add tests for unauthenticated access, invalid/expired tokens, Staff vs Admin role restrictions, and actor identity sourced only from claims.
+3. Then migrate shift/session commands to use `ICurrentUser` and server-resolved current shift; remove StaffUserId/ShiftId/EndShiftId from public request bodies wherever they represent the caller's identity or active shift.
+4. Keep payment/POS and inventory merge blocked until authentication, cash-ledger ownership, idempotency, and persistence integration gates are addressed.
