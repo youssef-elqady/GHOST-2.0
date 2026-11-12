@@ -100,3 +100,19 @@ Current sprint: 01 - Foundation review (codebase review in progress)
 - Foundation EF configuration, initial migration, model snapshot, UnitOfWork, and current unit-test structure: reviewed at source level.
 - SQL Server migration application, schema-vs-model validation, real concurrency tests, auth, cash ledger/payment integration, and full test execution: still pending.
 - The inventory branch remains a review-only source branch; no merge approved.
+
+## Sprint 01 business-rule mismatch found (2026-11-12)
+
+### Critical: session billing rounding contradicts approved BD-04
+- SRS BD-04 requires `GamingAmount = Ceiling(RawCost)`: round the total gaming charge upward to the next whole EGP exactly once after summing all session segments.
+- `SessionBillingCalculator.CalculateTotalAmount` currently rounds to 2 decimal places with `MidpointRounding.AwayFromZero`, not to a whole EGP.
+- `SessionBillingCalculatorTests.RoundsOnlyAfterSummingAllSegments` explicitly expects `0.01m` for two one-second segments at 18 EGP/hour; under approved BD-04 the expected final charge is `1.00m`.
+- This is a confirmed SRS/code/test mismatch and affects every session invoice. Treat BD-04 as authoritative unless the product owner explicitly changes it. Correct the calculator and tests together before POS/payment integration; do not silently change the SRS.
+- Ensure the live session amount shown to Staff uses exactly the same server-side rounding rule as the final invoice.
+
+### Cancellation rule still incomplete
+- SRS BD-03 requires a configurable 300-second cancellation window, reason selection, zero gaming charge, event/audit records, and Admin-only void after the window.
+- The Session domain currently exposes `CancelSession(endShiftId, reason)` without enforcing elapsed time or role; the inspected lifecycle handler/controller path does not yet expose the complete cancellation/void workflow.
+- `IsWithinGracePeriod` currently measures from `CreatedAt`; it is not a substitute for a configurable policy based on the authoritative session start time and authenticated role.
+- Enforce the policy in an application service using server time and authenticated claims, then persist the session state and audit/event records atomically.
+
