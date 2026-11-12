@@ -271,3 +271,30 @@ The assistant is the engineering lead/reviewer and should choose the next safe t
 - Approved detailed policy and AUTH-01..AUTH-07 acceptance criteria: `docs/AUTHENTICATION-DECISIONS.md`.
 - Current branch tip before this documentation update: `ba0461fc6533eda4c63cb174e6bd28f84ccc2ec1`.
 - Next implementation gate: inspect Identity EF Core table mapping and migration strategy against the existing Guid-based `Shift.StaffUserId` and current SQL Server schema; then implement AUTH-01 without changing existing business behavior.
+
+
+## AUTH-01 Identity persistence foundation drafted (2026-11-12)
+
+### Changes committed on `feature/products-inventory-billing`
+
+- Added `GHOST.Infrastructure.Identity.ApplicationUser`, based on `IdentityUser<Guid>`, with `FullName`, `IsActive`, `MustChangePassword`, `CreatedAt`, `UpdatedAt`, and `CreatedByAdminId`.
+- Added `Microsoft.AspNetCore.Identity.EntityFrameworkCore` version `10.0.12` to Infrastructure, matching the existing EF Core 10.0.12 packages.
+- Changed `GHOSTDbContext` to derive from `IdentityDbContext<ApplicationUser, IdentityRole<Guid>, Guid>`.
+- Mapped Identity tables to the SRS names: `Users`, `Roles`, `UserRoles`, `UserClaims`, `UserLogins`, `RoleClaims`, and `UserTokens`.
+- Added required `Shift.StaffUserId -> Users.Id` relationship with `DeleteBehavior.Restrict`, preserving historical shift attribution.
+
+### Important verification gate (not yet passed)
+
+- No build, tests, migration generation, migration review, or database application has been run for these changes. Do not claim AUTH-01 complete yet.
+- Existing `StaffUserId` values in any local/deployed database must be checked before applying the migration. The new FK will correctly reject orphaned shift user IDs; do not disable the FK to make a migration pass. Backfill/map legacy shift actors to valid user accounts under an explicit migration plan.
+- Generate the migration locally using EF tooling, inspect both Up/Down and the updated model snapshot, and verify that no existing business tables/indexes/rowversions are dropped or altered unexpectedly.
+- Do not apply the migration to a live/valuable database before a verified backup and restore test.
+- Next local verification: restore/build the API and test project, then generate and inspect the Identity migration. After the migration is reviewed, implement Identity DI configuration and role/bootstrap provisioning as AUTH-02/03.
+
+### Commits
+
+- `d15ce731` — add persisted Identity user model.
+- `e775dd98` — add Identity EF Core package.
+- `d13dc98a` — integrate Identity into GHOSTDbContext and map SRS table names.
+- `78bfc326` — add the required Shift-to-User relationship.
+- `0520520c` — explicitly initialize Guid identity IDs and security/concurrency stamps.
