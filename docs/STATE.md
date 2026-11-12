@@ -205,3 +205,33 @@ The assistant is expected to act as a careful senior engineering reviewer/implem
 
 ### Working agreement
 The assistant is the engineering lead/reviewer and should choose the next safe task, inspect current code before editing, make small testable commits, and keep this file current. The user executes local PowerShell commands and returns exact output. Never claim local tests/builds/database migrations passed unless the user/tool output proves it.
+
+## Test baseline confirmed and BD-04 implementation update (2026-11-12)
+
+### Baseline verification
+- User synchronized local `feature/products-inventory-billing` to commit `2bdf598`.
+- User ran `dotnet test .\\backend\\tests\\GHOST.Tests\\GHOST.Tests.csproj --configuration Release` on that commit.
+- Result: **40 total, 40 passed, 0 failed, 0 skipped**; build succeeded. No compiler warnings were reported in the supplied output.
+- Local Git status was clean and HEAD matched origin at `2bdf598` before the next changes.
+
+### BD-04 code change now committed; local verification pending
+- Updated `SessionBillingCalculator.CalculateTotalAmount` to sum all unrounded segment costs, then return `decimal.Ceiling(rawTotal)` exactly once for the whole session.
+- The same shared calculator is used by both live session amount snapshots and completed-session amount snapshots; no separate client-side billing formula was introduced.
+- Updated calculator tests to cover:
+  - Existing proportional billing and captured rates.
+  - Fractional final totals ceiling to the next whole EGP.
+  - Multiple segments summed before ceiling (preventing per-segment overcharging).
+  - Tiny positive totals becoming 1 EGP.
+  - Exact whole-EGP totals remaining unchanged.
+  - Empty segments returning zero and invalid duration/rate rejection.
+- Commits:
+  - `751886c8dfaf6101fd8812c37b31407565e20d18` — `fix: apply BD-04 ceiling to total session charge`
+  - `34fe476b934d649f9e4037c582a0d16942d2cf50` — `test: cover BD-04 session billing ceiling boundaries`
+- These commits are on `feature/products-inventory-billing`. User has not yet pulled or run tests against them. Do not mark BD-04 verified until local test output confirms it.
+- Implementation retains decimal arithmetic over TimeSpan ticks and uses no floating-point arithmetic. If the product later enforces whole-second-only timestamps at the domain boundary, revisit the calculator input contract alongside that change; do not silently truncate sub-second durations here.
+
+### Immediate next action
+1. User should run `git pull --ff-only origin feature/products-inventory-billing`.
+2. Confirm HEAD is `34fe476` and working tree is clean.
+3. Run `dotnet test .\\backend\\tests\\GHOST.Tests\\GHOST.Tests.csproj --configuration Release`.
+4. If all tests pass, review the resulting shared billing path and proceed to the next high-risk gap (authentication/actor and shift scoping) before payment/POS or inventory integration.
