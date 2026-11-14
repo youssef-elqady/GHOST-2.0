@@ -388,3 +388,13 @@ The assistant is the engineering lead/reviewer and should choose the next safe t
 - Build emitted NU1902 and NU1903 warnings for transitive `System.Security.Cryptography.Pkcs` version 9.0.11, corresponding to GHSA-2fmv-rv2c-59x7 (moderate) and GHSA-846f-f764-76mx (high). These remain unresolved and must be investigated separately; do not ignore or suppress them.
 - Migration contents have NOT yet been reviewed. Do not apply it or commit it until its full Up/Down and snapshot changes are inspected for unexpected destructive operations, especially drops/renames, existing business columns/indexes, rowversion, and the required Shifts -> Users FK.
 - Immediate next action: inspect the complete generated migration file `20261114053406_AddIdentityPersistence.cs` (the Up and Down methods) and send its output. Then review designer/snapshot diff before any database operation.
+
+
+## AUTH-01 migration review — awaiting file contents (2026-11-14)
+- The next requested inspection command was shared, but no command output or migration source was provided in the latest message.
+- The generated migration `20261114053406_AddIdentityPersistence.cs` remains unreviewed; do not commit it or run `dotnet ef database update` yet.
+- Immediate next action: run the PowerShell command below and paste its output so the migration Up/Down operations can be reviewed:
+  ```powershell
+  Get-Content .\backend\src\GHOST.Infrastructure\Persistence\Migrations\20261114053406_AddIdentityPersistence.cs
+  ```
+- Latest STATE baseline before this note: commit `4a8b2555b2483cc86fff061987c60022d9d892a3`.
