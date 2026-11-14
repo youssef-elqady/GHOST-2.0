@@ -419,3 +419,31 @@ The assistant is the engineering lead/reviewer and should choose the next safe t
 - Attempted to fetch `backend/src/GHOST.Infrastructure/Persistence/Migrations/20261114053406_AddIdentityPersistence.Designer.cs` from GitHub; it is not present on the remote branch (404), consistent with the previously reported untracked local generated file. Do not assume remote access to uncommitted local files.
 - Remaining review: inspect the local generated Designer file; compare its target model metadata with the snapshot and main migration. No migration has been committed or applied.
 - Immediate next action: user runs `Get-Content .\backend\src\GHOST.Infrastructure\Persistence\Migrations\20261114053406_AddIdentityPersistence.Designer.cs` locally and pastes the output.
+
+
+
+## AUTH-01 generated Designer reviewed; next verification gate (2026-11-14)
+
+### Designer / target model review
+- User supplied the complete local file `20261114053406_AddIdentityPersistence.Designer.cs`; it is generated locally and is not yet present on the GitHub branch.
+- Reviewed its `BuildTargetModel` against the supplied migration Up/Down and the supplied `GHOSTDbContextModelSnapshot.cs` diff.
+- The Designer contains the unchanged existing business entities and their existing indexes/rowversion metadata, plus the expected `ApplicationUser` and six standard Identity entity types.
+- Identity PKs, unique normalized username/role indexes, email index, claim/login/role/token relationships, and cascade behavior align with the migration and snapshot.
+- `Shift.StaffUserId -> ApplicationUser.Id` is required and uses Restrict delete in both target model and migration, matching the source configuration.
+- No unexpected business entity/property/index changes were visible in the supplied Designer or Snapshot diff.
+- Combined source review of the three locally generated files (main migration, Designer, snapshot diff) is now complete at source level. The migration creates the seven expected Identity tables and adds only the Shift-to-Users FK; Down removes only that FK and those Identity tables.
+- This is not proof that the database has been updated or that the generated SQL has been applied. No `database update`, backup, migration commit, or SQL Server schema change has been reported.
+
+### Repository and documentation handoff check
+- Confirmed GitHub branch `feature/products-inventory-billing` exists and currently points to `909c5cbe8652ba47e5f8633c3c1c4434329969ff` (`docs: record AUTH-01 snapshot review`), parent `e5b42e7b2a77d845a3cd45906616e1ec58dc8e71`.
+- The latest commit changes only `docs/STATE.md`; combined commit status currently reports no status entries. Branch protection is not enabled.
+- Read the current branch versions of this STATE file, `docs/GHOST — SRS + ERD v0.2.md`, and `ai/GHOST-master-prompt.md`. SRS/master invariants retained: backend-authoritative money/time/permissions/stock; BD-03 300-second cancel policy; BD-04 ceiling once on total session charge; BD-13 whole-pound product sale prices; BD-14 categorized staff drawer withdrawals; transactions, append-only ledgers, idempotency, concurrency, audit, recovery, real SQL Server integration tests, and preserve the existing Next.js frontend.
+- AUTH policy already approved in this STATE remains authoritative: one-time secure server-side first-Admin bootstrap, Admin-managed Staff accounts, temporary random password reset shown once + mandatory change, Admin self-change, server-side recovery command for the only Admin, refresh-session revocation, and audit without passwords/raw tokens.
+- Known gaps remain: API authentication/authorization not yet wired; request-supplied StaffUserId/ShiftId/EndShiftId must not be trusted; no cash ledger/payment on session completion; no SQL Server integration/concurrency test project; inventory branch remains divergent and unapproved; Pkcs 9.0.11 vulnerability warnings remain to investigate.
+- The generated migration files and Snapshot change are still local/uncommitted per the last user-reported status; do not assume they exist on GitHub.
+
+### Immediate next action
+1. On the local checkout, run `dotnet test .\\backend\\tests\\GHOST.Tests\\GHOST.Tests.csproj --configuration Release` and share the complete output. The Identity context/migration generation succeeded in a build, but the full test suite has not yet been re-run after AUTH-01 source changes.
+2. Also share `git status -sb` so we can confirm only the two new migration files and Snapshot are modified/untracked; do not stage or commit yet.
+3. If tests pass, generate and inspect the SQL migration script (without applying it), then take a verified backup of Development DB `GHOST2`; only after SQL script review and explicit user approval may the migration be applied.
+4. Do not begin AUTH-02, merge inventory, or implement payment/POS until AUTH-01 persistence is safely verified and the related auth/cash/idempotency gates are addressed.
