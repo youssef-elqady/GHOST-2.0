@@ -298,3 +298,48 @@ The assistant is the engineering lead/reviewer and should choose the next safe t
 - `d13dc98a` — integrate Identity into GHOSTDbContext and map SRS table names.
 - `78bfc326` — add the required Shift-to-User relationship.
 - `0520520c` — explicitly initialize Guid identity IDs and security/concurrency stamps.
+
+
+## AUTH-01 local database and migration inspection update (2026-11-14)
+
+### Local environment and database inspection (user-reported)
+- Local working branch: `feature/products-inventory-billing`; user reported `git status -sb` clean and tracking `origin/feature/products-inventory-billing` before this documentation update.
+- Local API connection string resolves to SQL Server `localhost`, database `GHOST2`, using Windows/Trusted Connection. User explicitly confirmed this is a Development/test database, not production.
+- Read-only inspection of `GHOST2` found:
+  - `__EFMigrationsHistory`: one applied migration, `20261007095934_InitialPersistence`, EF ProductVersion `10.0.12`.
+  - `BusinessDays`: 1 row, `IsClosed = 0`, `OpenedAt = 2026-10-19 15:07:06 +00:00`, `ClosedAt = NULL`. It has no associated Shift. Do not close/delete it automatically; it may be a test fixture but that has not been confirmed.
+  - `Devices`: 1 row (`PS4 TEST VIP 1`); `DeviceRates`: 2 rows (60.00 and 80.00).
+  - `Shifts`, `Sessions`, `SessionPauses`, and `SessionSegments`: 0 rows.
+  - Identity table `dbo.Users` does not exist yet.
+  - Existing FK list includes DeviceRates -> Devices, Sessions -> Shifts (start/end shift), SessionSegments -> Devices/Sessions, SessionPauses -> SessionSegments, and Shifts -> BusinessDays.
+- These are read-only inspection results only. No database schema/data changes were made.
+
+### Migration source/history verification
+- Initial inspection using a PowerShell `Get-ChildItem` filter showed only the model snapshot; this was a misleading result, not proof that migration source files were missing.
+- Git history shows commit `6dde87a` added all three migration source files.
+- User then verified both `HEAD` and `6dde87a` contain:
+  - `20261007095934_InitialPersistence.cs`
+  - `20261007095934_InitialPersistence.Designer.cs`
+  - `GHOSTDbContextModelSnapshot.cs`
+- `dotnet ef migrations list --project .\\backend\\src\\GHOST.Infrastructure\\GHOST.Infrastructure.csproj --startup-project .\\backend\\src\\GHOST.API\\GHOST.API.csproj --context GHOSTDbContext` succeeded, connected to `GHOST2`, and reported only `20261007095934_InitialPersistence` as applied.
+- `dotnet ef migrations has-pending-model-changes` with the same project/startup/context succeeded in building but reported: `Changes have been made to the model since the last migration. Add a new migration.`
+- This pending model change is expected to include the new Identity model/table mappings and required `Shift.StaffUserId -> Users.Id` relationship, but the exact diff has NOT yet been inspected. Do not assume the pending changes are limited to those items until source/snapshot comparison is reviewed.
+- EF commands emitted NU1902 and NU1903 warnings for transitive `System.Security.Cryptography.Pkcs 9.0.11` in API and Infrastructure. Vulnerability remediation is a separate pending task; identify the dependency path and patched compatible version before changing packages.
+- No new migration has been generated, reviewed, or applied. No `Update-Database` has been run.
+
+### Current AUTH-01 safety assessment
+- Because `Shifts` contains zero rows, there are currently no existing Shift.StaffUserId values in this Development database requiring legacy-user backfill. This does NOT prove other schema changes are safe or that the database contains no useful test data.
+- Preserve the existing BusinessDay, Device, and DeviceRates records.
+- Before applying a migration, inspect the full initial migration, designer, current model snapshot, `GHOSTDbContext`, `ApplicationUser`, and `ShiftConfiguration`; identify every generated operation and confirm existing business tables, indexes, constraints, and rowversion columns are not unexpectedly dropped/rebuilt.
+- Take a database backup before applying the reviewed migration, even in Development.
+
+### Immediate next action
+1. Review the current `20261007095934_InitialPersistence.cs`, its designer, and `GHOSTDbContextModelSnapshot.cs` alongside current Identity model/configuration source. Determine exactly which model changes are pending and whether any existing schema objects would be altered.
+2. Only after review, create a dedicated AUTH-01 Identity migration locally, inspect its complete Up/Down operations and snapshot diff, then build/test.
+3. Back up `GHOST2`; apply only after explicit migration review, then verify Identity tables, FK, indexes, and preservation of existing BusinessDay/Device/DeviceRates rows.
+4. Do not begin AUTH-02 (Identity service/JWT/DI/bootstrap) until AUTH-01 persistence is reviewed and verified.
+5. Separately trace `System.Security.Cryptography.Pkcs 9.0.11` using dependency-tree tooling; do not add an arbitrary direct package reference or upgrade without compatibility/advisory verification.
+
+### Chat handoff instruction
+- The user explicitly requires `docs/STATE.md` to be updated after every meaningful project response/decision/verification so a new chat can resume without asking them to repeat context.
+- After each future STATE update committed to GitHub, tell the user the documentation commit was made and that their local checkout may need `git pull --ff-only` before the next local command.
