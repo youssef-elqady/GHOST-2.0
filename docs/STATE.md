@@ -375,3 +375,16 @@ The assistant is the engineering lead/reviewer and should choose the next safe t
 - This command changes local source files only; it does not update the SQL Server database. After generation, inspect the new migration's complete Up/Down and designer/snapshot diff. Reject any unexpected DropTable/DropColumn, altered business index/rowversion, or data-destructive operation.
 - Do NOT run `dotnet ef database update` / `Update-Database` until the generated migration is reviewed, a backup is taken, and the user explicitly confirms application to Development DB.
 - The user requires STATE to be updated after every meaningful project decision/result. This review and next action are recorded here.
+
+
+## AUTH-01 migration generated locally (2026-11-14)
+
+- User successfully ran `dotnet ef migrations add AddIdentityPersistence` against GHOSTDbContext. Build succeeded and EF generated:
+  - `20261114053406_AddIdentityPersistence.cs`
+  - `20261114053406_AddIdentityPersistence.Designer.cs`
+  - updated `GHOSTDbContextModelSnapshot.cs`
+- User's `git status -sb` confirms these are the only local changes: two new migration files and the modified snapshot. Branch is `feature/products-inventory-billing` tracking origin; no other modifications were shown.
+- This command generated source files only. No database update was run; Development DB `GHOST2` has not been changed by this step.
+- Build emitted NU1902 and NU1903 warnings for transitive `System.Security.Cryptography.Pkcs` version 9.0.11, corresponding to GHSA-2fmv-rv2c-59x7 (moderate) and GHSA-846f-f764-76mx (high). These remain unresolved and must be investigated separately; do not ignore or suppress them.
+- Migration contents have NOT yet been reviewed. Do not apply it or commit it until its full Up/Down and snapshot changes are inspected for unexpected destructive operations, especially drops/renames, existing business columns/indexes, rowversion, and the required Shifts -> Users FK.
+- Immediate next action: inspect the complete generated migration file `20261114053406_AddIdentityPersistence.cs` (the Up and Down methods) and send its output. Then review designer/snapshot diff before any database operation.
