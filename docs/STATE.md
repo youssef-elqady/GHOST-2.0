@@ -343,3 +343,35 @@ The assistant is the engineering lead/reviewer and should choose the next safe t
 ### Chat handoff instruction
 - The user explicitly requires `docs/STATE.md` to be updated after every meaningful project response/decision/verification so a new chat can resume without asking them to repeat context.
 - After each future STATE update committed to GitHub, tell the user the documentation commit was made and that their local checkout may need `git pull --ff-only` before the next local command.
+
+
+## AUTH-01 migration source review completed (2026-11-14)
+
+### Source-level comparison
+- Reviewed on `feature/products-inventory-billing`:
+  - `20261007095934_InitialPersistence.cs`
+  - `20261007095934_InitialPersistence.Designer.cs`
+  - `GHOSTDbContextModelSnapshot.cs`
+  - `GHOSTDbContext.cs`
+  - `Identity/ApplicationUser.cs`
+  - `Persistence/Configurations/ShiftConfiguration.cs`
+  - `GHOST.Infrastructure.csproj`
+- Confirmed the current initial migration and its designer/snapshot contain only the original business entities: BusinessDays, Devices, DeviceRates, Shifts, Sessions, SessionSegments, SessionPauses. They contain no ASP.NET Core Identity entities/tables and no Shift -> ApplicationUser relationship.
+- Confirmed current GHOSTDbContext now derives from `IdentityDbContext<ApplicationUser, IdentityRole<Guid>, Guid>`, maps the seven Identity tables to `Users`, `Roles`, `UserRoles`, `UserClaims`, `UserLogins`, `RoleClaims`, and `UserTokens`, and configures ApplicationUser profile fields.
+- Confirmed current ShiftConfiguration adds a required FK from `Shifts.StaffUserId` to `Users.Id` with `DeleteBehavior.Restrict`. The initial migration currently has only the StaffUserId index and no FK to Users.
+- Therefore the pending model changes are explained by the Identity schema + Shift-to-User FK, consistent with the current AUTH-01 source changes. The exact generated migration still must be inspected; do not assume EF generates only the expected operations until its output is reviewed.
+- No existing business columns or indexes were observed being intentionally changed in the current source diff. Existing initial migration includes the filtered unique indexes and rowversion columns; they must remain intact in the generated migration and after application.
+- `ApplicationUser.CreatedByAdminId` is currently a nullable scalar property and has no configured FK; do not add one in this migration unless a separately approved relationship is designed.
+- The existing initial migration's `Down()` drops all original business tables; never edit/re-run that initial migration against the existing database. Add a new incremental migration only.
+
+### Database state remains as user-reported in prior entry
+- Development DB `GHOST2` has one open BusinessDay, one Device, two DeviceRates, and zero Shifts/Sessions/SessionSegments/SessionPauses. Preserve these rows.
+- The open BusinessDay is not to be automatically closed or deleted.
+
+### Next action authorized
+- It is safe to generate (but NOT apply) a new incremental migration locally for AUTH-01, because the existing database already has the initial migration applied and the new FK targets an empty Shifts table in the confirmed Development database.
+- User should run:
+  `dotnet ef migrations add AddIdentityPersistence --project .\\backend\\src\\GHOST.Infrastructure\\GHOST.Infrastructure.csproj --startup-project .\\backend\\src\\GHOST.API\\GHOST.API.csproj --context GHOSTDbContext --output-dir Persistence/Migrations`
+- This command changes local source files only; it does not update the SQL Server database. After generation, inspect the new migration's complete Up/Down and designer/snapshot diff. Reject any unexpected DropTable/DropColumn, altered business index/rowversion, or data-destructive operation.
+- Do NOT run `dotnet ef database update` / `Update-Database` until the generated migration is reviewed, a backup is taken, and the user explicitly confirms application to Development DB.
+- The user requires STATE to be updated after every meaningful project decision/result. This review and next action are recorded here.
