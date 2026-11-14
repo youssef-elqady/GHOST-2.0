@@ -398,3 +398,14 @@ The assistant is the engineering lead/reviewer and should choose the next safe t
   Get-Content .\backend\src\GHOST.Infrastructure\Persistence\Migrations\20261114053406_AddIdentityPersistence.cs
   ```
 - Latest STATE baseline before this note: commit `4a8b2555b2483cc86fff061987c60022d9d892a3`.
+
+
+## AUTH-01 migration Up/Down reviewed (2026-11-14)
+- User provided the complete source for `20261114053406_AddIdentityPersistence.cs`.
+- `Up()` creates the seven expected ASP.NET Core Identity tables: Roles, Users, RoleClaims, UserClaims, UserLogins, UserRoles, UserTokens; includes expected PKs, FKs, cascade rules and standard Identity indexes.
+- Adds the expected required relationship `Shifts.StaffUserId -> Users.Id` with Restrict delete. It does not add/drop/alter business columns or business indexes.
+- `Down()` removes that FK and the seven Identity tables only. No business table is dropped.
+- Review finding: migration source shows no destructive operation against existing business data. The current Development DB has zero Shift rows, so the new required StaffUserId FK should not block solely because of existing shift rows; nevertheless, no migration has been applied.
+- This is a review of the main migration file only. Still need inspect the generated Designer and the model snapshot diff to verify metadata/model alignment before considering database update.
+- Immediate next action: user pulls latest STATE and shares `git diff -- backend/src/GHOST.Infrastructure/Persistence/Migrations/GHOSTDbContextModelSnapshot.cs` plus the generated Designer file.
+- Do not run `dotnet ef database update` or commit migration files until the remaining review and a DB backup/explicit approval.
