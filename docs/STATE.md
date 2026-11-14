@@ -409,3 +409,13 @@ The assistant is the engineering lead/reviewer and should choose the next safe t
 - This is a review of the main migration file only. Still need inspect the generated Designer and the model snapshot diff to verify metadata/model alignment before considering database update.
 - Immediate next action: user pulls latest STATE and shares `git diff -- backend/src/GHOST.Infrastructure/Persistence/Migrations/GHOSTDbContextModelSnapshot.cs` plus the generated Designer file.
 - Do not run `dotnet ef database update` or commit migration files until the remaining review and a DB backup/explicit approval.
+
+
+## AUTH-01 model snapshot reviewed; Designer remains local (2026-11-14)
+- User supplied the complete diff for `GHOSTDbContextModelSnapshot.cs`.
+- Snapshot adds ApplicationUser with expected custom fields and Identity fields/indexes, the six standard Identity entity types/tables, and their expected relationships.
+- Snapshot adds the required `Shifts.StaffUserId -> ApplicationUser` relationship with Restrict delete, matching the reviewed migration Up operation.
+- No changes to existing business entity property definitions or business indexes are visible in the supplied diff.
+- Attempted to fetch `backend/src/GHOST.Infrastructure/Persistence/Migrations/20261114053406_AddIdentityPersistence.Designer.cs` from GitHub; it is not present on the remote branch (404), consistent with the previously reported untracked local generated file. Do not assume remote access to uncommitted local files.
+- Remaining review: inspect the local generated Designer file; compare its target model metadata with the snapshot and main migration. No migration has been committed or applied.
+- Immediate next action: user runs `Get-Content .\backend\src\GHOST.Infrastructure\Persistence\Migrations\20261114053406_AddIdentityPersistence.Designer.cs` locally and pastes the output.
