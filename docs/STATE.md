@@ -801,3 +801,35 @@ The user pulled the documentation update through commit `8c1a2f7` and executed t
 - `RESTORE VERIFYONLY ... WITH CHECKSUM` reports: "The backup set on file 1 is valid."
 
 This satisfies the live preflight gate for the previously approved `AddIdentityPersistence` migration. The migration has NOT yet been applied. Before issuing the update command, confirm the exact local migration files/name are present and inspect working-tree status. Then apply only `AddIdentityPersistence` to `GHOST2`; do not run unrelated migrations or destructive cleanup. After successful application, verify migration history, all seven Identity tables, the Shifts-to-Users FK, and unchanged business-table row counts. Preserve the scratch restore database and backup.
+
+
+## AUTH-01 migration readiness confirmed; awaiting apply (2026-11-17)
+
+After the live preflight passed, the user ran `dotnet ef dbcontext info` with `GHOSTDbContext`. Observed output confirms:
+- Context: `GHOST.Infrastructure.Persistence.GHOSTDbContext`
+- Provider: `Microsoft.EntityFrameworkCore.SqlServer`
+- Database: `GHOST2`
+- Data source: `localhost`
+- Build succeeded.
+
+The user then ran `dotnet ef migrations list` using the Infrastructure project, API startup project, and `GHOSTDbContext`. EF successfully connected and read `__EFMigrationsHistory`. Exact result:
+- `20261007095934_InitialPersistence` — applied
+- `20261114053406_AddIdentityPersistence` — Pending
+
+Therefore the exact approved AUTH-01 migration is present and pending against the intended original `GHOST2` database. Preflight and backup validation have passed; no migration has been applied yet.
+
+### Next action (not yet executed)
+
+The next step is to apply only the pending migration using:
+
+```powershell
+dotnet ef database update 20261114053406_AddIdentityPersistence --project .\backend\src\GHOST.Infrastructure\GHOST.Infrastructure.csproj --startup-project .\backend\src\GHOST.API\GHOST.API.csproj --context GHOSTDbContext
+```
+
+The user has already explicitly approved this migration. Ask them to run the command and provide the complete output. Do not claim success until the output confirms it. Then perform read-only verification of:
+1. `__EFMigrationsHistory` contains `20261114053406_AddIdentityPersistence`.
+2. All seven Identity tables exist: Roles, Users, RoleClaims, UserClaims, UserLogins, UserRoles, UserTokens.
+3. FK `FK_Shifts_Users_StaffUserId` exists with expected relationship.
+4. Original business row counts remain BusinessDays=1, Devices=1, DeviceRates=2, Shifts=0, Sessions=0, SessionSegments=0, SessionPauses=0.
+
+Do not apply any other migration, do not drop the scratch restore database, and do not remove the backup. The NU1902/NU1903 warnings for `System.Security.Cryptography.Pkcs 9.0.11` were present during successful EF build/connection and remain a separate dependency-security task.
