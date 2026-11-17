@@ -643,3 +643,24 @@ The assistant is the engineering lead/reviewer and should choose the next safe t
 - Proposed restore will use `MOVE N'GHOST2' TO ...GHOST2_AUTH01_RestoreTest.mdf` and `MOVE N'GHOST2_log' TO ...GHOST2_AUTH01_RestoreTest_log.ldf`, creating a separate scratch database only. Obtain explicit user approval before executing the restore because it creates a database and physical files.
 - After approved restore, validate preserved row counts and run `DBCC CHECKDB` on the scratch database. Do not run migration against original `GHOST2` until this gate and separate explicit migration approval are complete.
 - No restore has been run; no migration applied; original database remains untouched.
+
+
+## AUTH-01 scratch restore target preflight passed (2026-11-17)
+
+### User-reported execution results
+- User pulled documentation commit 6ef40c4 successfully; local branch fast-forwarded from 9f01a45 to 6ef40c4.
+- SQL Server query for database GHOST2_AUTH01_RestoreTest returned (0 rows affected): no database with that name currently exists.
+- SQL Server instance default data and log paths both resolve to:
+  C:\\Program Files\\Microsoft SQL Server\\MSSQL17.MSSQLSERVER\\MSSQL\\DATA\\
+- PowerShell Test-Path returned False for both proposed distinct target files:
+  - C:\\Program Files\\Microsoft SQL Server\\MSSQL17.MSSQLSERVER\\MSSQL\\DATA\\GHOST2_AUTH01_RestoreTest.mdf
+  - C:\\Program Files\\Microsoft SQL Server\\MSSQL17.MSSQLSERVER\\MSSQL\\DATA\\GHOST2_AUTH01_RestoreTest_log.ldf
+- Previously reported free space on C: is 11,330,404,352 bytes (~10.55 GiB).
+- The pasted output includes an earlier Get-Item access-denied attempt and an earlier malformed sqlcmd path, but those were superseded by the successful file metadata check and successful RESTORE VERIFYONLY recorded above. They do not negate the later SQL Server verification.
+
+### Assessment and next gate
+- The proposed scratch database name and both target filenames are currently unused according to the reported checks. The SQL Server default data/log directory is known.
+- A restore command can now be prepared with explicit MOVE clauses from logical names GHOST2 and GHOST2_log to the two distinct scratch filenames above. It must not use REPLACE, and must not target original GHOST2 or its MDF/LDF files.
+- Do not execute the restore until the user explicitly approves creating the separate scratch database and files. This is a write operation, although it leaves the original GHOST2 database untouched.
+- After approved restore, query row counts for BusinessDays, Devices, DeviceRates, Shifts, Sessions, SessionSegments, and SessionPauses, compare against the known pre-migration baseline (1, 1, 2, 0, 0, 0, 0 respectively), and run DBCC CHECKDB on the scratch database.
+- No restore has yet been executed; AUTH-01 migration remains unapplied and uncommitted; original GHOST2 remains untouched.
