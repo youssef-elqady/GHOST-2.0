@@ -49,11 +49,27 @@ namespace GHOST.Infrastructure.Persistence.Migrations
                 name: "IX_AuditLogs_UserId_At",
                 table: "AuditLogs",
                 columns: new[] { "UserId", "At" });
+
+            migrationBuilder.Sql("""
+                CREATE TRIGGER [dbo].[TR_AuditLogs_AppendOnly]
+                ON [dbo].[AuditLogs]
+                AFTER UPDATE, DELETE
+                AS
+                BEGIN
+                    SET NOCOUNT ON;
+                    THROW 51000, 'AuditLogs is append-only.', 1;
+                END;
+                """);
         }
 
         /// <inheritdoc />
         protected override void Down(MigrationBuilder migrationBuilder)
         {
+            migrationBuilder.Sql("""
+                IF OBJECT_ID(N'[dbo].[TR_AuditLogs_AppendOnly]', N'TR') IS NOT NULL
+                    DROP TRIGGER [dbo].[TR_AuditLogs_AppendOnly];
+                """);
+
             migrationBuilder.DropTable(
                 name: "AuditLogs");
         }
