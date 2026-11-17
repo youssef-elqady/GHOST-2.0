@@ -725,3 +725,36 @@ The assistant is the engineering lead/reviewer and should choose the next safe t
 - Completed: migration source/designer/snapshot review; generated SQL script review; unit tests (43/43 pass); COPY_ONLY CHECKSUM backup; backup file metadata check; RESTORE VERIFYONLY success; isolated scratch restore success; row-count comparison success.
 - Pending: explicit DBCC CHECKDB summary; then a separate explicit user approval to apply AUTH-01 to original GHOST2; apply only the reviewed migration; verify migration history/schema and ensure existing business data remains intact; implement/test the remaining Identity runtime (DI, bootstrap, login/JWT, password lifecycle, authorization and audit) as separate work.
 - Important scope distinction: applying AUTH-01 only creates Identity persistence tables and the StaffUserId FK. It does not by itself deliver a working authentication system or finish the broader AUTH feature.
+
+
+## AUTH-01 isolated restore integrity check passed (2026-11-17)
+
+### User-reported SQL Server verification
+- User pulled documentation commit `c56678a` successfully; local fast-forward completed from `cd4b862` to `c56678a`.
+- Executed read-only:
+  `DBCC CHECKDB (N'GHOST2_AUTH01_RestoreTest') WITH ALL_ERRORMSGS;`
+- SQL Server explicit summary:
+  `CHECKDB found 0 allocation errors and 0 consistency errors in database 'GHOST2_AUTH01_RestoreTest'.`
+- DBCC execution completed without reported errors. The output also enumerated the expected restored business tables and system objects.
+- Combined evidence now passes the isolated backup/restore gate:
+  - COPY_ONLY + CHECKSUM backup of original `GHOST2` completed (714 pages).
+  - Backup file exists and is 5,951,488 bytes.
+  - `RESTORE VERIFYONLY ... WITH CHECKSUM` reported: `The backup set on file 1 is valid.`
+  - Restore to separate `GHOST2_AUTH01_RestoreTest` completed successfully (714 pages), using distinct MDF/LDF paths and no REPLACE.
+  - Business table row counts match the pre-backup baseline exactly: BusinessDays 1, Devices 1, DeviceRates 2, Shifts 0, Sessions 0, SessionSegments 0, SessionPauses 0.
+  - `DBCC CHECKDB` reports zero allocation and consistency errors.
+- This evidence concerns the restored scratch copy. It does not mean AUTH-01 has been applied to the original database.
+- Original `GHOST2` remains the target development database and has not been restored over, migrated, or intentionally modified by these backup/restore checks. Scratch database and its MDF/LDF files must be retained; do not drop them without explicit approval.
+
+### Current AUTH-01 gate and next action
+- Backup and isolated restore verification: **PASSED**.
+- Migration source/designer/snapshot and generated `artifacts/AUTH-01.sql` review: previously completed at source level; intended changes are seven ASP.NET Identity tables plus FK `Shifts.StaffUserId -> Users.Id`; no business-table drops or unrelated data operations were found.
+- Unit-test evidence: 43/43 passed in the previously reported local run. This is unit-test coverage only, not SQL Server integration or authentication-flow coverage.
+- No migration has been applied or committed. Do not execute `dotnet ef database update` or `artifacts/AUTH-01.sql` until the user gives a separate, explicit approval for applying AUTH-01 to the original `GHOST2` database.
+- Immediate next action: present the exact migration scope and request that separate approval. If approved, first re-check the live target database identity/state and current backup presence, then apply only the reviewed migration in a controlled step and verify `__EFMigrationsHistory`, the seven Identity tables, the FK, and the unchanged business-table row counts. Stop on any unexpected schema/data difference.
+- After persistence is applied, continue AUTH implementation separately: Identity DI/configuration, secure initial Admin bootstrap, login/token lifecycle, staff account lifecycle, server-side role/resource authorization, trusted actor/shift resolution, audit events, and SQL Server integration/concurrency/idempotency tests. AUTH-01 persistence alone is not a completed authentication system.
+
+### Repository handoff verification
+- Current working branch checked: `feature/products-inventory-billing`; GitHub branch search returned that branch.
+- Latest branch commit confirmed from the user's successful pull and GitHub commit inspection: `c56678a518ac563d507027175c00627705abbf6e` (`docs: record scratch restore row counts and remaining checks`).
+- GitHub combined status returned no status entries, and the commit workflow-run lookup returned no workflow runs. This is **no CI evidence**, not a CI pass.
