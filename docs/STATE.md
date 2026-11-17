@@ -500,3 +500,11 @@ The assistant is the engineering lead/reviewer and should choose the next safe t
 - Before choosing a backup destination, inspect the SQL Server service account and SQL Server's configured default backup directory using read-only commands. Then create a backup in a directory writable by the SQL Server service and verify it (preferably restore to a separate test DB).
 - User explicitly requires every meaningful project response to append a detailed, resumable progress entry to `docs/STATE.md`, including completed work, evidence, files/commits, outstanding gates, and exact next commands.
 - Current next gate remains: verified backup of Development DB `GHOST2`; do not apply AUTH-01 until backup verification and explicit approval.
+
+
+## AUTH-01 backup prep: sqlcmd certificate trust diagnostic (2026-11-17)
+
+- User confirmed SQL Server service identity: `NT Service\\MSSQLSERVER`; service state Running.
+- First sqlcmd metadata query using ODBC Driver 18 failed before connecting because the local SQL Server certificate chain is not trusted. This is a client TLS trust configuration issue; it does not indicate a database failure.
+- Next read-only diagnostic: rerun the same local trusted-Windows-authentication query with sqlcmd `-C` (TrustServerCertificate) to accept the local server certificate for this diagnostic connection. Do not change server-wide encryption/certificate settings.
+- No backup created; no database/schema/data changes; AUTH-01 not applied.
