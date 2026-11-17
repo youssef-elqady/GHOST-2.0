@@ -6,6 +6,7 @@ using GHOST.Domain.Entities;
 using GHOST.Infrastructure.Identity;
 using GHOST.Infrastructure.Persistence;
 using Microsoft.AspNetCore.Identity;
+using Microsoft.Data.SqlClient;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Storage;
 using Microsoft.Extensions.DependencyInjection;
@@ -25,6 +26,23 @@ if (string.IsNullOrWhiteSpace(connectionString))
     return 2;
 }
 
+SqlConnectionStringBuilder sqlConnection;
+try
+{
+    sqlConnection = new SqlConnectionStringBuilder(connectionString);
+}
+catch
+{
+    Console.Error.WriteLine("GHOST_CONNECTION_STRING is not a valid SQL Server connection string. No changes were made.");
+    return 2;
+}
+
+if (string.IsNullOrWhiteSpace(sqlConnection.InitialCatalog))
+{
+    Console.Error.WriteLine("The connection string must explicitly name its target database. No changes were made.");
+    return 2;
+}
+
 string userName;
 string fullName;
 string password;
@@ -33,9 +51,11 @@ string passwordConfirmation;
 try
 {
     Console.WriteLine("GHOST — one-time first Admin bootstrap");
+    Console.WriteLine($"Target SQL Server: {sqlConnection.DataSource}");
+    Console.WriteLine($"Target database: {sqlConnection.InitialCatalog}");
     Console.WriteLine("This command does not run migrations. The AuditLogs schema must already exist.");
-    Console.Write("Type BOOTSTRAP to confirm you intend to provision the first administrator: ");
-    if (!string.Equals(Console.ReadLine(), "BOOTSTRAP", StringComparison.Ordinal))
+    Console.Write($"Type BOOTSTRAP {sqlConnection.InitialCatalog} to confirm this exact target: ");
+    if (!string.Equals(Console.ReadLine(), $"BOOTSTRAP {sqlConnection.InitialCatalog}", StringComparison.Ordinal))
     {
         Console.WriteLine("Confirmation not provided. No changes were made.");
         return 2;
@@ -46,9 +66,10 @@ try
     Console.Write("Admin full name: ");
     fullName = (Console.ReadLine() ?? string.Empty).Trim();
 
-    if (string.IsNullOrWhiteSpace(userName) || string.IsNullOrWhiteSpace(fullName))
+    if (string.IsNullOrWhiteSpace(userName) || userName.Length > 256 ||
+        string.IsNullOrWhiteSpace(fullName) || fullName.Length > 150)
     {
-        Console.Error.WriteLine("Username and full name are required. No changes were made.");
+        Console.Error.WriteLine("Username is required (max 256 characters) and full name is required (max 150 characters). No changes were made.");
         return 2;
     }
 
@@ -170,7 +191,7 @@ try
     await transaction.CommitAsync();
 
     Console.WriteLine($"First Admin created successfully: {admin.UserName} ({admin.Id:D}).");
-    Console.WriteLine("The account is active and must change its password after the first successful sign-in.");
+    Console.WriteLine("The account is active and is flagged to require a password change; sign-in enforcement will be implemented in the authentication flow.");
     Console.WriteLine("No database migration was executed.");
     return 0;
 }
@@ -182,7 +203,7 @@ catch (Exception exception)
 }
 finally
 {
-    // Reduce the lifetime of the plaintext password in this process.
+    // Drop references; immutable .NET strings cannot be reliably zeroed.
     password = string.Empty;
     passwordConfirmation = string.Empty;
 }
