@@ -1056,3 +1056,38 @@ The user authorized proceeding with the assistant's recommended security design.
 
 ### Immediate next action
 Implement the AuditLog entity and EF configuration, generate and inspect the additive migration locally (including SQL Server trigger), then build the CLI bootstrap on top of the reviewed persistence model. Add SQL Server integration tests against a disposable database. Do not apply the migration to live GHOST2.
+
+
+## AUTH-02 implementation — AuditLog model foundation (2026-11-17)
+
+### Changes committed and re-fetched from GitHub
+- `backend/src/GHOST.Domain/Entities/AuditLog.cs`
+  - Creation-only entity with private constructor/setters and static factory.
+  - Enforces System/User actor consistency, non-empty required action/entity type, bounded entity ID, 16 KiB UTF-16 JSON payload size, generated Guid, and UTC timestamp.
+- `backend/src/GHOST.Infrastructure/Persistence/Configurations/AuditLogConfiguration.cs`
+  - Maps dbo.AuditLogs.
+  - Adds actor-kind and actor/user consistency check constraints.
+  - Adds SQL Server ISJSON + 16 KiB checks for old/new payloads.
+  - Adds restricted FK to ApplicationUser.
+  - Adds entity-history and actor-history indexes.
+- `backend/src/GHOST.Infrastructure/Persistence/GHOSTDbContext.cs`
+  - Registers DbSet<AuditLog>; existing Identity/business mappings remain present.
+- Detailed approved design remains in `docs/AUTH-02-IMPLEMENTATION-DESIGN.md`.
+
+### Observed Git evidence
+- Design document commit: `d67980ff464ca569478b84775215999e283b3419`
+- AuditLog entity commit: `ae7a3cbce661da078c32cd6de6dea9c721cc1b15`
+- AuditLog configuration commit: `15efc7a7cdabf66c4bce17faa81fc06edb6c4c8c`
+- DbContext registration / current branch HEAD: `eca7be9423372d659ab338251a55db283877b5df`
+- All four changed/new files were independently fetched from the branch after commit.
+
+### Not yet complete / safety notes
+- No build or tests were run: this environment only provided GitHub source access, not the user's local .NET runtime or SQL Server.
+- The EF model snapshot has intentionally not been hand-edited. It is now expected to differ from the model until a local EF Core migration is generated.
+- No migration source or SQL Server trigger exists yet. The next local step is to generate the additive migration with EF tooling, then add/review the SQL Server append-only trigger in that migration.
+- No database was queried or changed. No migration was applied. Live GHOST2 remains untouched.
+- The bootstrap CLI, transaction-scoped application lock, Identity DI registration in the CLI host, and SQL Server integration tests are not implemented yet.
+- Do not run API migrations or expose the API while the model/snapshot are temporarily out of sync. Generate and review the migration before considering this persistence slice ready.
+
+### Immediate next action
+Synchronize the local branch to `eca7be9423372d659ab338251a55db283877b5df`, generate the AuditLogs migration using the installed EF Core 10.0.12 tooling, and share the generated migration output/files for review. Do not apply it to GHOST2. After reviewing generated Up/Down operations, add the append-only trigger and proceed to the CLI bootstrap and disposable SQL Server tests.
