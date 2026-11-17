@@ -703,3 +703,25 @@ The assistant is the engineering lead/reviewer and should choose the next safe t
 - User reran the guarded restore command and SQL Server again reported a successful restore of 714 pages to GHOST2_AUTH01_RestoreTest. The guard did not abort, so at the time of that execution SQL Server did not find a database with that name; the restore succeeded and scratch DB is expected to exist now.
 - The subsequent read-only row-count + DBCC command failed at parse time with: `Msg 156 ... Incorrect syntax near the keyword 'RowCount'.` The first SELECT used `AS RowCount`, which SQL Server parses as a reserved keyword. Therefore no row counts or DBCC CHECKDB result were produced by that command; do not infer integrity failure or success from it.
 - Next: rerun the same read-only scratch database verification, changing the alias to `TotalRows` (or bracketed `[RowCount]`), then capture the output including DBCC CHECKDB. No migration applied; original GHOST2 remains untouched.
+
+
+## AUTH-01 scratch restore row-count comparison passed; CHECKDB output needs explicit confirmation (2026-11-17)
+
+### User-reported verification
+- User pulled documentation commit cd4b862 successfully.
+- The corrected read-only SQL query ran against GHOST2_AUTH01_RestoreTest and returned these row counts:
+  - BusinessDays: 1
+  - Devices: 1
+  - DeviceRates: 2
+  - Shifts: 0
+  - Sessions: 0
+  - SessionSegments: 0
+  - SessionPauses: 0
+- These exactly match the known pre-backup baseline, so the scratch restore preserved the expected records/counts for the inspected business tables.
+- The command also invoked `DBCC CHECKDB (N'GHOST2_AUTH01_RestoreTest') WITH NO_INFOMSGS`, but the pasted output contains no DBCC summary. Because NO_INFOMSGS suppresses informational output, the absence of a summary alone is not sufficient evidence to record a confirmed CHECKDB pass. Re-run CHECKDB without NO_INFOMSGS (or with an output-capturing wrapper) and capture the explicit summary/errors.
+- No AUTH-01 migration has been applied or committed. Original GHOST2 remains untouched. Scratch database GHOST2_AUTH01_RestoreTest exists and should be retained until migration verification/rollback planning is complete; do not drop it without explicit approval.
+
+### Overall AUTH-01 progress and remaining gates
+- Completed: migration source/designer/snapshot review; generated SQL script review; unit tests (43/43 pass); COPY_ONLY CHECKSUM backup; backup file metadata check; RESTORE VERIFYONLY success; isolated scratch restore success; row-count comparison success.
+- Pending: explicit DBCC CHECKDB summary; then a separate explicit user approval to apply AUTH-01 to original GHOST2; apply only the reviewed migration; verify migration history/schema and ensure existing business data remains intact; implement/test the remaining Identity runtime (DI, bootstrap, login/JWT, password lifecycle, authorization and audit) as separate work.
+- Important scope distinction: applying AUTH-01 only creates Identity persistence tables and the StaffUserId FK. It does not by itself deliver a working authentication system or finish the broader AUTH feature.
