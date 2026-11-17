@@ -520,3 +520,13 @@ The assistant is the engineering lead/reviewer and should choose the next safe t
 - SQL Server service identity remains `NT Service\\MSSQLSERVER` (service Running).
 - Next: verify the backup directory exists and inspect its ACL for the SQL Server service identity before issuing a BACKUP DATABASE command. Prefer a unique timestamped .bak name; do not assume the service can write until ACL/path checks succeed.
 - No backup created; no database/schema/data changed; AUTH-01 remains unapplied.
+
+
+## AUTH-01 backup folder ACL check blocked by current shell permissions (2026-11-17)
+
+- User pulled `b518607` successfully.
+- `Test-Path` confirms SQL Server default backup directory exists:
+  `C:\\Program Files\\Microsoft SQL Server\\MSSQL17.MSSQLSERVER\\MSSQL\\Backup`.
+- User's non-elevated PowerShell received `Access is denied` from `icacls` on that directory; this does not establish whether the SQL Server service account can write there.
+- Next: inspect the directory ACL from an elevated PowerShell (Run as Administrator) using read-only `icacls`. Do not grant broad permissions or change ACLs yet. If the service account lacks write access, prefer a dedicated backup folder with narrowly scoped Modify permission for `NT SERVICE\\MSSQLSERVER`, after confirming an appropriate volume/path.
+- No backup created; no database/schema/data changes; AUTH-01 not applied.
