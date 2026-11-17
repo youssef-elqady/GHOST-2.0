@@ -1210,3 +1210,28 @@ GHOST.API
 
 ### Next action
 - Continue on the AUTH-02 branch for any AUTH-02 source/STATE changes. Before local AUTH-02 work, switch to `feature/auth-02-auditlog-append-only` and confirm `git status -sb`; preserve the untracked `artifacts/` directory. Next engineering gate is isolated SQL Server integration testing for AuditLogs constraints/append-only trigger and bootstrap transaction/app-lock atomicity. Do not run against live `GHOST2` or apply the migration without separate explicit approval.
+
+
+## AUTH-02 — Static source review before SQL Server integration tests (2026-11-17)
+
+### Files reviewed at current AUTH-02 branch tip
+- `backend/src/GHOST.Bootstrap/Program.cs` and its README/project file.
+- `GHOSTDbContext`, Identity `ApplicationUser`, AuditLog entity/configuration, and `20261117213727_AddAuditLogs` migration.
+- API `Program.cs` and the current `GHOST.Tests.csproj`.
+
+### Source-level observations (not runtime verification)
+- Bootstrap registers `AddIdentityCore<ApplicationUser>().AddRoles<IdentityRole<Guid>>().AddEntityFrameworkStores<GHOSTDbContext>()`, resolves `ILookupNormalizer`, and uses one scoped `GHOSTDbContext` for Identity stores and AuditLogs.
+- Bootstrap begins a Serializable EF transaction, acquires `sp_getapplock` with `LockOwner = Transaction` using that transaction, then performs user creation, role membership, audit insert, and commit through the same scoped context. Negative app-lock return codes fail closed.
+- CLI requires an explicit SQL Server Initial Catalog and exact database-specific confirmation; it does not run migrations. It refuses redirected input/output and reads the password without echoing it.
+- AuditLog has application-level factory validation plus SQL check constraints for actor consistency, actor type, JSON validity, and 16 KiB payload limits. The migration adds an AFTER UPDATE, DELETE trigger that throws SQL error 51000.
+- No obvious transaction/context mismatch was identified by static inspection. This is not proof of SQL Server runtime behavior, lock serialization, rollback atomicity, or trigger enforcement.
+
+### Required integration-test work
+- Current `GHOST.Tests.csproj` references only `GHOST.Application`; it has no Infrastructure project reference or SQL Server integration-test fixture.
+- Bootstrap orchestration is currently embedded in top-level `Program.cs`, so it is not directly callable from tests. Extract the provisioning operation into a testable service while keeping the CLI as a thin interactive input/confirmation shell.
+- Add SQL Server integration coverage for: migration creates AuditLogs and trigger; INSERT succeeds; UPDATE and DELETE fail with SQL error 51000; actor/JSON/size constraints reject invalid rows; first-admin creation persists user + roles + audit atomically; duplicate/concurrent bootstrap cannot create a second Admin; failures roll back all related rows.
+- Integration tests must require an explicitly configured, dedicated disposable test database and fail closed if the catalog is not the designated test database. Never point tests at `GHOST2`. Applying migrations to the dedicated test database requires separate explicit operator approval.
+- No source code or database was changed as part of this static review; no SQL Server integration tests were run.
+
+### Immediate next action
+Obtain explicit approval to provision/use a dedicated SQL Server test database (separate from `GHOST2`) before adding/running migration-backed integration tests. Keep PR #3 draft until those tests and runtime gates pass.
