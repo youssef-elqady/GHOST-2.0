@@ -530,3 +530,13 @@ The assistant is the engineering lead/reviewer and should choose the next safe t
 - User's non-elevated PowerShell received `Access is denied` from `icacls` on that directory; this does not establish whether the SQL Server service account can write there.
 - Next: inspect the directory ACL from an elevated PowerShell (Run as Administrator) using read-only `icacls`. Do not grant broad permissions or change ACLs yet. If the service account lacks write access, prefer a dedicated backup folder with narrowly scoped Modify permission for `NT SERVICE\\MSSQLSERVER`, after confirming an appropriate volume/path.
 - No backup created; no database/schema/data changes; AUTH-01 not applied.
+
+
+## AUTH-01 backup directory permissions confirmed (2026-11-17)
+
+- User inspected the SQL Server backup directory from an elevated PowerShell.
+- Directory ACL confirms `NT SERVICE\\MSSQLSERVER` has inherited `(OI)(CI)(F)` Full Control on:
+  `C:\\Program Files\\Microsoft SQL Server\\MSSQL17.MSSQLSERVER\\MSSQL\\Backup`.
+- SYSTEM and local Administrators also have Full Control. No ACL change is needed for SQL Server to write a backup there.
+- Next: check that the planned unique backup filename does not already exist, then create a full SQL Server backup of Development DB `GHOST2` using SQLCMD with Windows authentication and `-C`. Afterward run `RESTORE VERIFYONLY`; ideally restore to a separate test database before any production-targeting decision.
+- No backup has been created yet; no schema/data changes; AUTH-01 not applied.
