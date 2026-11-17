@@ -864,3 +864,32 @@ Ask the user to pull this STATE update, then run the read-only SQLCMD verificati
 - Confirm business row counts remain BusinessDays=1, Devices=1, DeviceRates=2, Shifts=0, Sessions=0, SessionSegments=0, SessionPauses=0.
 
 Keep the pre-migration backup and scratch restore database. The NU1902/NU1903 warnings for `System.Security.Cryptography.Pkcs 9.0.11` remain a separate dependency-security issue. No Admin user has been bootstrapped and authentication/login flows are not yet implemented merely by adding Identity persistence tables.
+
+
+## AUTH-01 database persistence verified complete (2026-11-17)
+
+The user pulled the prior STATE update and ran the read-only post-migration SQLCMD verification against `GHOST2`. Observed output confirms all checks passed:
+
+1. `__EFMigrationsHistory` contains:
+   - `20261007095934_InitialPersistence` (ProductVersion 10.0.12)
+   - `20261114053406_AddIdentityPersistence` (ProductVersion 10.0.12)
+2. All seven Identity tables exist: Users, Roles, UserClaims, UserLogins, UserRoles, UserTokens, RoleClaims.
+3. FK `FK_Shifts_Users_StaffUserId` exists: `dbo.Shifts.StaffUserId` references `dbo.Users.Id`, delete action `NO_ACTION`.
+4. Original business table counts are unchanged from the pre-migration baseline:
+   - BusinessDays=1
+   - Devices=1
+   - DeviceRates=2
+   - Shifts=0
+   - Sessions=0
+   - SessionSegments=0
+   - SessionPauses=0
+
+AUTH-01 (Identity persistence schema migration) is now applied and post-apply verified on the original `GHOST2` SQL Server database. The pre-migration backup and scratch restore database remain preserved; do not remove either without explicit approval.
+
+### Important boundary / next phase
+
+This completes database persistence only. It does NOT mean an Admin account exists, Identity services are registered/configured, login/JWT/refresh-token flows work, or endpoint/resource authorization is implemented.
+
+Next phase is AUTH-02: inspect the current branch's actual Identity user/role models, `Program.cs` DI/auth pipeline, configuration/secrets handling, and existing endpoint authorization before implementing Identity runtime services and a safe first-Admin bootstrap. Re-fetch current repository files and review current `docs/STATE.md` before starting. Do not seed a default password, expose credentials in source/control output, or trust client-supplied `StaffUserId`; authenticated principal must become the source of staff identity. Keep the existing Shifts FK and consider the pre-existing BusinessDays/Devices/rates records in all test and bootstrap decisions. Run tests/builds only with observed output; do not mark AUTH-02 complete until integration/security tests demonstrate it.
+
+Separate outstanding issue: NU1902/NU1903 warnings for `System.Security.Cryptography.Pkcs 9.0.11` remain a dependency-security task and should be assessed/upgraded independently.
