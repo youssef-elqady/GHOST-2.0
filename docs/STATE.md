@@ -788,3 +788,16 @@ The assistant is the engineering lead/reviewer and should choose the next safe t
 - User should run the supplied SQLCMD preflight against `master` to verify original `GHOST2` is ONLINE, confirm the expected pre-migration business-table counts, confirm AUTH-01 tables/history are not already present, and verify the exact backup file is still present/readable with `RESTORE VERIFYONLY ... WITH CHECKSUM`.
 - Review the full output before issuing the single migration-application command. If database identity/state, counts, migration history, or backup verification differs from expectations, STOP and investigate; do not proceed automatically.
 - No migration has yet been applied. Original GHOST2 remains unchanged by this workflow; retain `GHOST2_AUTH01_RestoreTest` and its files.
+
+
+## AUTH-01 live preflight passed; migration not yet applied (2026-11-17)
+
+The user pulled the documentation update through commit `8c1a2f7` and executed the approved read-only SQLCMD preflight against the original `GHOST2` database. Observed output:
+
+- `GHOST2` exists and is `ONLINE`.
+- Business-table baseline is unchanged: BusinessDays=1, Devices=1, DeviceRates=2, Shifts=0, Sessions=0, SessionSegments=0, SessionPauses=0.
+- All seven target ASP.NET Identity tables are absent: Users, Roles, UserClaims, UserLogins, UserRoles, UserTokens, RoleClaims.
+- `__EFMigrationsHistory` contains only `20261007095934_InitialPersistence` (ProductVersion 10.0.12).
+- `RESTORE VERIFYONLY ... WITH CHECKSUM` reports: "The backup set on file 1 is valid."
+
+This satisfies the live preflight gate for the previously approved `AddIdentityPersistence` migration. The migration has NOT yet been applied. Before issuing the update command, confirm the exact local migration files/name are present and inspect working-tree status. Then apply only `AddIdentityPersistence` to `GHOST2`; do not run unrelated migrations or destructive cleanup. After successful application, verify migration history, all seven Identity tables, the Shifts-to-Users FK, and unchanged business-table row counts. Preserve the scratch restore database and backup.
