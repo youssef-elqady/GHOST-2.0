@@ -1129,3 +1129,6 @@ Review the append-only trigger PR, then implement the dedicated bootstrap CLI an
 - Added CLI README with invocation, safety constraints, and exit codes.
 - Not yet built or executed. No database was connected to, queried, migrated, or modified. Do not run against live `GHOST2`; disposable SQL Server integration tests and local build review remain required.
 - Review notes before build: verify the console host's Identity DI registrations, SQL Server app-lock command behavior, and the EF transaction-sharing behavior on the local SQL Server test instance. The current code does not attempt migrations.
+
+- Hardening refinement: CLI now parses and displays the SQL Server/data source and requires the exact database-specific confirmation `BOOTSTRAP <database-name>`; it rejects connection strings without an explicit Initial Catalog. This reduces accidental execution against the wrong database.
+- The CLI has not been compiled or run in this environment. Immutable .NET password strings cannot be reliably zeroed; the tool avoids writing them to logs, arguments, environment variables, configuration, and audit payloads.
