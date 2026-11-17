@@ -929,3 +929,31 @@ Fresh source review performed on branch `feature/products-inventory-billing` aft
 
 ### Immediate next action
 Complete the AUTH-02 design review, including a second independent security review if available, then implement the smallest tested bootstrap slice on a dedicated feature branch or reviewed PR. Before implementation, inspect the exact current role/user EF model and available test infrastructure. After every meaningful implementation/test result, update this STATE file with observed evidence. AUTH-02 is NOT implemented; no Admin user exists; login/JWT/refresh and endpoint authorization remain unimplemented.
+
+
+## AUTH-02 audit correction: AUTH-01 migration source is not committed (2026-11-17)
+
+A deeper review of the actual GitHub branch tree uncovered a release-blocking repository consistency issue that must be resolved before AUTH-02 implementation:
+
+- The original `GHOST2` SQL Server database has AUTH-01 applied and post-apply verified (as documented above).
+- However, the current GitHub branch tree `feature/products-inventory-billing` does NOT contain `20261114053406_AddIdentityPersistence.cs` or its `.Designer.cs`.
+- The remote `GHOSTDbContextModelSnapshot.cs` also does not include the Identity entity metadata (it contains only the business entities).
+- This matches the user's earlier local `git status --short`, which showed the migration and designer as untracked and the snapshot modified. The user has not yet supplied evidence of committing/pushing these files.
+- Consequence: the live local database schema is ahead of the migration history represented in source control. A fresh clone/CI/other environment cannot reliably reproduce the current schema, and EF migration discovery from the branch will not include AUTH-01. This is a blocker; do not start AUTH-02 or generate later migrations until reconciled.
+
+### Immediate required action: preserve AUTH-01 migration source in Git
+
+On the user's local working tree, inspect and stage ONLY these three source files:
+- `backend/src/GHOST.Infrastructure/Persistence/Migrations/20261114053406_AddIdentityPersistence.cs`
+- `backend/src/GHOST.Infrastructure/Persistence/Migrations/20261114053406_AddIdentityPersistence.Designer.cs`
+- `backend/src/GHOST.Infrastructure/Persistence/Migrations/GHOSTDbContextModelSnapshot.cs`
+
+Do NOT stage the entire `artifacts/` directory or `artifacts/AUTH-01.sql` unless separately reviewed and deliberately decided. Do not regenerate the migration or modify the already-applied migration. Then review the staged diff and commit/push these three files to `feature/products-inventory-billing`. After push, fetch the exact three files and snapshot from GitHub and confirm the branch tree contains them before resuming AUTH-02.
+
+### Additional AUTH-02 audit corrections
+- `GHOST.Application.Abstractions.CurrentUser.ICurrentUser` already exists with `UserId`, `IsAuthenticated`, `IsAdmin`, and `IsStaff`. The previous broad statement that no current-user abstraction exists would be inaccurate. No implementation or DI registration was found in the reviewed API/Program.cs and Infrastructure Identity directory; confirm repository-wide usage before implementing.
+- `ShiftConfiguration` already maps `Shift.StaffUserId` to `ApplicationUser` with Restrict deletion; the FK was verified live after AUTH-01.
+- SRS v0.2 explicitly defines a general `AuditLogs` table (Id, UserId, Action, EntityType, EntityId, OldValues, NewValues, At) and states audit records must not be updated/deleted. Prefer designing the general append-only AuditLog to serve bootstrap and future operational/security events, with a carefully modelled nullable/system actor for bootstrap before the first Admin exists, rather than introducing a duplicate one-off security-audit table without product approval.
+- Current controllers still have no authorization attributes/middleware; `BusinessDaysController` accepts `StaffUserId` and `SessionsController` accepts `ShiftId`/`EndShiftId` from request bodies. Keep these as explicit AUTH-05/AUTH-06 security blockers; do not expose the API to untrusted networks before server-side authorization is implemented.
+
+AUTH-02 remains unimplemented. Next step is source-control reconciliation of the already-applied AUTH-01 migration, not bootstrap coding.
