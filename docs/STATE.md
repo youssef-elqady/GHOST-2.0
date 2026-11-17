@@ -623,3 +623,23 @@ The assistant is the engineering lead/reviewer and should choose the next safe t
 - The scratch restore creates a new database and files; obtain explicit user approval before executing it. After approval, verify expected preserved row counts and run `DBCC CHECKDB` on the scratch database.
 - Only after successful isolated restore verification should the user be asked for explicit approval to apply AUTH-01 to `GHOST2`. Do not run `dotnet ef database update` or execute `artifacts/AUTH-01.sql` yet.
 - No migration has been applied or committed; no original database schema/business data has been changed.
+
+
+## AUTH-01 isolated restore preflight: FILELISTONLY and disk space (2026-11-17)
+
+### User-reported results
+- User pulled documentation commit `9f01a45` successfully; local branch fast-forwarded from `1cdd71d` to `9f01a45`.
+- `RESTORE FILELISTONLY` completed successfully for backup `GHOST2_AUTH01_PreMigration_20261117.bak` and returned exactly two logical files:
+  - Data logical name: `GHOST2`; original path: `C:\\Program Files\\Microsoft SQL Server\\MSSQL17.MSSQLSERVER\\MSSQL\\DATA\\GHOST2.mdf`; Type `D`; reported size 8,388,608 bytes.
+  - Log logical name: `GHOST2_log`; original path: `C:\\Program Files\\Microsoft SQL Server\\MSSQL17.MSSQLSERVER\\MSSQL\\DATA\\GHOST2_log.ldf`; Type `L`; reported size 8,388,608 bytes.
+- PowerShell `Get-PSDrive C` reported 11,330,404,352 bytes free (about 10.55 GiB) and 109,622,833,152 bytes used.
+- The backup's logical names are now known. Do not restore to the original physical filenames or overwrite the existing `GHOST2` database.
+
+### Next read-only preflight
+- Query SQL Server's configured default data and log directories and check whether scratch database name `GHOST2_AUTH01_RestoreTest` already exists.
+- Check whether the proposed distinct physical paths exist before using them:
+  - `C:\\Program Files\\Microsoft SQL Server\\MSSQL17.MSSQLSERVER\\MSSQL\\DATA\\GHOST2_AUTH01_RestoreTest.mdf`
+  - `C:\\Program Files\\Microsoft SQL Server\\MSSQL17.MSSQLSERVER\\MSSQL\\DATA\\GHOST2_AUTH01_RestoreTest_log.ldf`
+- Proposed restore will use `MOVE N'GHOST2' TO ...GHOST2_AUTH01_RestoreTest.mdf` and `MOVE N'GHOST2_log' TO ...GHOST2_AUTH01_RestoreTest_log.ldf`, creating a separate scratch database only. Obtain explicit user approval before executing the restore because it creates a database and physical files.
+- After approved restore, validate preserved row counts and run `DBCC CHECKDB` on the scratch database. Do not run migration against original `GHOST2` until this gate and separate explicit migration approval are complete.
+- No restore has been run; no migration applied; original database remains untouched.
