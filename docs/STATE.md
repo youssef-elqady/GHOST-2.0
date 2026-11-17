@@ -447,3 +447,24 @@ The assistant is the engineering lead/reviewer and should choose the next safe t
 2. Also share `git status -sb` so we can confirm only the two new migration files and Snapshot are modified/untracked; do not stage or commit yet.
 3. If tests pass, generate and inspect the SQL migration script (without applying it), then take a verified backup of Development DB `GHOST2`; only after SQL script review and explicit user approval may the migration be applied.
 4. Do not begin AUTH-02, merge inventory, or implement payment/POS until AUTH-01 persistence is safely verified and the related auth/cash/idempotency gates are addressed.
+
+
+
+## AUTH-01 unit test gate passed; generated migration remains local (2026-11-17)
+
+### Local verification reported by user
+- User pulled the documentation commit `c489910a528893baf2a57deaee9d1922fee61c17` successfully.
+- User ran `dotnet test .\\backend\\tests\\GHOST.Tests\\GHOST.Tests.csproj --configuration Release`.
+- Result: **43 total, 43 passed, 0 failed, 0 skipped**; all reported project builds succeeded on .NET 10.0.12.
+- This confirms the current Application/Domain unit-test project passes after AUTH-01 model/migration generation. It does not prove SQL Server persistence, migration application, authentication flows, or database FK behavior; the test project does not provide SQL Server integration coverage.
+- User's `git status -sb` confirms branch `feature/products-inventory-billing` is synchronized with origin and exactly these local changes remain:
+  - Modified `backend/src/GHOST.Infrastructure/Persistence/Migrations/GHOSTDbContextModelSnapshot.cs`
+  - Untracked `backend/src/GHOST.Infrastructure/Persistence/Migrations/20261114053406_AddIdentityPersistence.Designer.cs`
+  - Untracked `backend/src/GHOST.Infrastructure/Persistence/Migrations/20261114053406_AddIdentityPersistence.cs`
+- No other local changes were reported. Migration files are still not committed/pushed. No database update has been run.
+
+### Immediate next action
+1. Generate a SQL script for only `20261007095934_InitialPersistence` -> `20261114053406_AddIdentityPersistence`, using the existing API startup project, Infrastructure project, and `GHOSTDbContext`. Save it under a local ignored/temp artifacts directory (create the directory if needed). This is script generation only; do not execute the script or run `database update`.
+2. Review the complete generated SQL for only the seven Identity table creates, the Shift-to-Users FK, expected indexes/constraints, and absence of business table drops/alters or data-destructive operations. If script output is long, inspect it in sections or attach the file.
+3. Before any application to Development database `GHOST2`, take a SQL Server backup to a verified writable path and verify the backup file and restore viability. Confirm the target is still the Development database and ask for explicit approval before applying the migration.
+4. Do not stage/commit migration files until SQL script review is complete. Keep AUTH-02 and inventory/payment work blocked until AUTH-01 persistence and authentication integration gates are properly implemented and tested.
