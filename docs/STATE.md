@@ -540,3 +540,31 @@ The assistant is the engineering lead/reviewer and should choose the next safe t
 - SYSTEM and local Administrators also have Full Control. No ACL change is needed for SQL Server to write a backup there.
 - Next: check that the planned unique backup filename does not already exist, then create a full SQL Server backup of Development DB `GHOST2` using SQLCMD with Windows authentication and `-C`. Afterward run `RESTORE VERIFYONLY`; ideally restore to a separate test database before any production-targeting decision.
 - No backup has been created yet; no schema/data changes; AUTH-01 not applied.
+
+
+## AUTH-01 backup filename check + handoff re-read (2026-11-17)
+
+### Latest user-reported local verification
+- User successfully pulled the previous documentation commit `de339a1` on `feature/products-inventory-billing`; local fast-forward completed.
+- User checked the planned backup path:
+  `C:\\Program Files\\Microsoft SQL Server\\MSSQL17.MSSQLSERVER\\MSSQL\\Backup\\GHOST2_AUTH01_PreMigration_20261117.bak`
+- PowerShell `Test-Path` returned `False`: no file currently exists at that exact path, so the planned filename is available and no existing backup will be overwritten.
+- This is only a filename existence check. No backup has been created and no database/schema/data changes have occurred.
+
+### Handoff documents re-read from the current branch
+- Re-read `docs/STATE.md` (543 lines), `docs/GHOST — SRS + ERD v0.2.md` (398 lines), and `ai/GHOST-master-prompt.md` (739 lines) from `feature/products-inventory-billing`.
+- Reconfirmed controlling invariants: backend is authoritative for money/time/permissions/stock; cash and stock changes are transactional, idempotent, auditable, concurrency-safe and append-only; preserve Next.js frontend; no destructive DB/Git action without review; real SQL Server integration and restore tests are required.
+- Reconfirmed business rules BD-03 (300-second cancellation window), BD-04 (ceiling once on total session amount), BD-13 (whole-pound product sale price), and BD-14 (categorized staff drawer withdrawals without pre-approval).
+- Reconfirmed AUTH-01 migration and generated SQL were reviewed and found to create the seven Identity tables plus the Shift-to-Users FK, with no unexpected business-table drops/alterations.
+- Current AUTH-01 gate remains backup + backup verification/restore before any migration application. Do not run `dotnet ef database update` or execute `artifacts/AUTH-01.sql` yet.
+- Existing Development DB data to preserve: one open BusinessDay, one Device, two DeviceRates; zero Shifts/Sessions/SessionSegments/SessionPauses. Do not close/delete the open BusinessDay automatically.
+
+### Immediate next action — create a full COPY_ONLY backup (not a migration)
+- Confirmed SQL Server default instance `localhost`, service `MSSQLSERVER` running as `NT SERVICE\\MSSQLSERVER`; the service account has Full Control on the default Backup directory.
+- Use Windows authentication and client-side `-C` only for this local SQLCMD connection because ODBC Driver 18 otherwise rejects the local untrusted certificate.
+- Run the explicit BACKUP DATABASE command below with `sqlcmd -b`; it targets only `GHOST2`, uses the confirmed unused filename, `COPY_ONLY`, and `CHECKSUM`. This creates a backup file but does not change the database schema or business data:
+  ```powershell
+  & "C:\\Program Files\\Microsoft SQL Server\\Client SDK\\ODBC\\180\\Tools\\Binn\\SQLCMD.EXE" -S localhost -E -C -d master -b -Q "IF DB_ID(N'GHOST2') IS NULL THROW 50000, 'GHOST2 database not found', 1; SELECT name, state_desc FROM sys.databases WHERE name = N'GHOST2'; BACKUP DATABASE [GHOST2] TO DISK = N'C:\\Program Files\\Microsoft SQL Server\\MSSQL17.MSSQLSERVER\\MSSQL\\Backup\\GHOST2_AUTH01_PreMigration_20261117.bak' WITH COPY_ONLY, INIT, CHECKSUM, STATS = 10;"
+  ```
+- After the command, verify the exact file exists and has non-zero size using PowerShell `Get-Item`; then run SQL Server `RESTORE VERIFYONLY ... WITH CHECKSUM`. A VERIFYONLY success is not the same as a full restore test; ideally restore to a separate scratch database and compare preserved row counts before migration approval.
+- No backup, migration application, migration commit, or schema/data change has occurred as of this entry.
