@@ -1184,3 +1184,29 @@ GHOST.API
 ### Immediate next action
 - Synchronize local branch to latest remote commit, then run: `dotnet restore .\\backend\\GHOST.slnx`; `dotnet list .\\backend\\GHOST.slnx package --vulnerable --include-transitive`; `dotnet build .\\backend\\GHOST.slnx --configuration Release`; `dotnet test .\\backend\\GHOST.slnx --configuration Release`.
 - Confirm the resolved SQL Server dependency graph contains a patched `System.Security.Cryptography.Pkcs 10.0.13` or later and that vulnerability scan has no remaining findings. Capture all warnings and test results. No Bootstrap execution, migration application, or live GHOST2 database access.
+
+
+## AUTH-02 — Local dependency remediation verification and branch recovery (2026-11-17)
+
+### Local verification reported by user
+- After syncing the AUTH-02 commits, the user ran `dotnet restore .\\backend\\GHOST.slnx`: succeeded.
+- User ran `dotnet list .\\backend\\GHOST.slnx package --vulnerable --include-transitive`: all six projects (API, Application, Bootstrap, Domain, Infrastructure, Tests) reported no vulnerable packages from the configured NuGet sources.
+- User ran `dotnet build .\\backend\\GHOST.slnx --configuration Release`: succeeded; all six projects compiled, including the previously unverified GHOST.Bootstrap project.
+- User ran `dotnet test .\\backend\\GHOST.slnx --configuration Release`: 43 passed, 0 failed, 0 skipped.
+- This verifies restore, vulnerability scan, Release compilation, and the existing unit-test suite on the user's local environment. The output did not print the exact resolved System.Security.Cryptography.Pkcs version; record the clean vulnerability scan, but do not infer a specific resolved version from it.
+- No Bootstrap execution, SQL Server integration test, migration application, or database connection/change was performed. These remain separate verification gates.
+
+### Local branch recovery confirmed
+- A mistaken pull had fast-forwarded the local `feature/products-inventory-billing` branch to the AUTH-02 tip. The user safely created local `feature/auth-02-auditlog-append-only` tracking `origin/feature/auth-02-auditlog-append-only`, then restored the local products branch pointer to `origin/feature/products-inventory-billing`.
+- User's latest `git status -sb`: `feature/products-inventory-billing...origin/feature/products-inventory-billing`, clean tracked working tree, with only untracked `artifacts/`.
+- Local branch tips reported:
+  - `feature/products-inventory-billing` = `d57c349`, tracking `origin/feature/products-inventory-billing`.
+  - `feature/auth-02-auditlog-append-only` = `b785823`, tracking `origin/feature/auth-02-auditlog-append-only`.
+- The untracked `artifacts/` directory was not deleted, staged, or committed. Keep it untouched unless the user explicitly asks to manage it.
+
+### PR status at review time
+- PR #3, `AUTH-02: AuditLog append-only enforcement and first Admin bootstrap`, was still open and draft when checked. GitHub reported `mergeable=true` at that moment; this is not approval to merge and does not establish that required checks or runtime gates passed.
+- Do not mark the PR ready or merge it yet. Bootstrap runtime behavior, disposable SQL Server integration coverage, and migration/trigger execution remain unverified.
+
+### Next action
+- Continue on the AUTH-02 branch for any AUTH-02 source/STATE changes. Before local AUTH-02 work, switch to `feature/auth-02-auditlog-append-only` and confirm `git status -sb`; preserve the untracked `artifacts/` directory. Next engineering gate is isolated SQL Server integration testing for AuditLogs constraints/append-only trigger and bootstrap transaction/app-lock atomicity. Do not run against live `GHOST2` or apply the migration without separate explicit approval.
