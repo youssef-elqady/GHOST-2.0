@@ -758,3 +758,33 @@ The assistant is the engineering lead/reviewer and should choose the next safe t
 - Current working branch checked: `feature/products-inventory-billing`; GitHub branch search returned that branch.
 - Latest branch commit confirmed from the user's successful pull and GitHub commit inspection: `c56678a518ac563d507027175c00627705abbf6e` (`docs: record scratch restore row counts and remaining checks`).
 - GitHub combined status returned no status entries, and the commit workflow-run lookup returned no workflow runs. This is **no CI evidence**, not a CI pass.
+
+
+## AUTH-01 application approval received; runtime preflight pending (2026-11-17)
+
+### User approval
+- User explicitly approved applying migration `AddIdentityPersistence` to the original `GHOST2` database.
+- This approval is for AUTH-01 persistence migration only. It does not authorize unrelated schema changes, destructive cleanup, or dropping the scratch restore database.
+- Do not execute the migration until the immediate read-only live-target/backup preflight is completed and reviewed. User must provide the resulting SQLCMD output; the assistant has no direct SQL Server execution session.
+
+### Current repository implementation audit (branch: feature/products-inventory-billing)
+- Reviewed SRS v0.2 and current frontend/backend files on this branch.
+- Frontend exists as a Next.js foundation:
+  - `frontend/components/staff-dashboard.tsx`: Staff dashboard shell and navigation exist. It fetches active devices from `GET /api/devices`. Session-start modal is present but its Start button is explicitly disabled pending authenticated staff identity and active-shift resolution. Products and invoices views explicitly state they are not connected; Shift view says it needs current-shift/cash read endpoints; messages and activity history are placeholders.
+  - `frontend/components/admin-dashboard.tsx`: Admin navigation/shell exists for overview, devices, shifts/cash, staff/permissions, inventory, reports, and settings. The overview and all sections except device management explicitly state that live data/endpoints are not connected. It warns login is not enabled and `/admin` is not protected.
+  - `frontend/components/admin-device-manager.tsx`: device list/default-device seeding and Single/Multi rate editing are connected to API. This is the current meaningful Admin workflow.
+  - `frontend/lib/ghost-api.ts`: only device API calls are currently defined (GET devices, POST seed defaults, PUT device rates).
+  - `frontend/README.md`: confirms unconnected workflows: shifts, session lifecycle, products/inventory, payments, persistent staff messages, activity history, and authentication.
+- Backend API controllers present under `backend/src/GHOST.API/Controllers`: `BusinessDaysController`, `DevicesController`, `SessionsController`.
+  - BusinessDaysController exposes business-day open and shift open/close endpoints. Its shift-open request currently accepts `StaffUserId` from the request body; this is not a trusted authenticated identity and must be replaced/secured before operational use.
+  - SessionsController exposes start, pause, resume, transfer, and complete endpoints. Requests currently carry ShiftId/EndShiftId in payloads; these must be bound to the authenticated staff member's authorized current shift before production use. No evidence of cancel endpoint in this controller.
+  - DevicesController exposes list/create/default seeding/rate update.
+- `GHOST.API/Program.cs` currently registers EF SQL Server, repositories and handlers for business days, devices, sessions and shifts. It does not currently register ASP.NET Identity authentication/JWT/authorization or inventory/sales/report services.
+- `GHOSTDbContext` currently has business DbSets for Devices, DeviceRates, BusinessDays, Shifts, Sessions, SessionSegments, SessionPauses and inherits IdentityDbContext. The AUTH migration is still only locally reviewed/planned; it has not been applied to the live database.
+- No Products/Inventory, POS/Sales/Payments/Invoices, Expenses/CashTransactions, analytics/report endpoints or reporting dashboard data integration were found in the inspected current API controller set.
+- Therefore, do not describe the Staff/Admin frontends as completed dashboards. They are visual/interaction foundations with limited device/rate integration; core operational flows and financial reporting remain to be implemented and tested.
+
+### Immediate next action — read-only preflight before applying approved migration
+- User should run the supplied SQLCMD preflight against `master` to verify original `GHOST2` is ONLINE, confirm the expected pre-migration business-table counts, confirm AUTH-01 tables/history are not already present, and verify the exact backup file is still present/readable with `RESTORE VERIFYONLY ... WITH CHECKSUM`.
+- Review the full output before issuing the single migration-application command. If database identity/state, counts, migration history, or backup verification differs from expectations, STOP and investigate; do not proceed automatically.
+- No migration has yet been applied. Original GHOST2 remains unchanged by this workflow; retain `GHOST2_AUTH01_RestoreTest` and its files.
