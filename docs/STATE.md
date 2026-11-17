@@ -957,3 +957,37 @@ Do NOT stage the entire `artifacts/` directory or `artifacts/AUTH-01.sql` unless
 - Current controllers still have no authorization attributes/middleware; `BusinessDaysController` accepts `StaffUserId` and `SessionsController` accepts `ShiftId`/`EndShiftId` from request bodies. Keep these as explicit AUTH-05/AUTH-06 security blockers; do not expose the API to untrusted networks before server-side authorization is implemented.
 
 AUTH-02 remains unimplemented. Next step is source-control reconciliation of the already-applied AUTH-01 migration, not bootstrap coding.
+
+
+## AUTH-01 source-control reconciliation verified (2026-11-17)
+
+The user committed and pushed the already-applied AUTH-01 migration source. The push output was supplied in chat, then the exact remote branch and files were independently fetched from GitHub.
+
+### Observed Git evidence
+- Commit: `fc831cca0c51efef623919e289e78912b96d9655`
+- Commit message: `feat(auth): add identity persistence migration`
+- Branch: `feature/products-inventory-billing`
+- Fetched branch HEAD: `fc831cca0c51efef623919e289e78912b96d9655`
+- Commit changes exactly these three files:
+  - Added `backend/src/GHOST.Infrastructure/Persistence/Migrations/20261114053406_AddIdentityPersistence.cs`
+  - Added `backend/src/GHOST.Infrastructure/Persistence/Migrations/20261114053406_AddIdentityPersistence.Designer.cs`
+  - Updated `backend/src/GHOST.Infrastructure/Persistence/Migrations/GHOSTDbContextModelSnapshot.cs`
+- Each of the three exact paths was fetched successfully from the remote branch.
+- The migration source contains the seven expected Identity table create/drop operations: Roles, Users, RoleClaims, UserClaims, UserLogins, UserRoles, UserTokens, and the FK operation. The Designer and Snapshot both contain mappings for all seven tables.
+- The user's commit output reports exactly 3 files changed, 1194 insertions(+), and the push advanced the remote branch from `67023ac` to `fc831cc`.
+- The previously reported untracked `artifacts/` directory was not part of this commit; GitHub commit metadata lists only the three intended migration source files.
+
+AUTH-01 is now reconciled across the live GHOST2 database (migration applied and post-apply verified in the earlier section) and the GitHub source branch (migration, designer, and Identity model snapshot fetched and confirmed). This closes the source-control blocker. No new migration was generated or applied during this reconciliation.
+
+### Next phase: AUTH-02 design review — not yet implemented
+Resume AUTH-02 planning, not coding blindly. Re-fetch and inspect the exact current branch files before any implementation, with particular attention to:
+1. `ApplicationUser`, role key generation/normalization, `GHOSTDbContext`, and Identity EF model configuration.
+2. Existing test projects, package references, test seams, and SQL Server integration-test strategy.
+3. General append-only `AuditLogs` design from SRS: actor nullability/system actor for first-Admin bootstrap, payload constraints, and database-level append-only enforcement.
+4. Safe one-time CLI bootstrap: interactive password input (never CLI args or logs), explicit operator confirmation, refuse if Admin exists, atomic role/user/audit persistence, and a SQL Server concurrency strategy that prevents two simultaneous bootstrap attempts.
+5. Confirm all repository usages of `ICurrentUser` before adding an implementation or DI registration.
+
+Do not implement JWT/login, endpoint authorization, staff lifecycle, or shift/session identity binding as part of the bootstrap slice; those belong to later AUTH phases. Do not modify the already-applied AUTH-01 migration. Any additional schema change for AuditLogs must be proposed as a separate reviewed migration and must not be applied without explicit user approval.
+
+### Immediate next action
+Perform a fresh AUTH-02 source/design audit on the now-reconciled branch. Inspect the exact role/user EF model and available test infrastructure, and produce a concrete threat model and minimal implementation/test plan for first-Admin bootstrap plus the SRS-compliant AuditLog. Do not start implementation or create/apply a migration until the design and schema impact are reviewed. AUTH-02 remains NOT implemented; no Admin account has been confirmed as provisioned; login/JWT/refresh and endpoint authorization remain outstanding.
