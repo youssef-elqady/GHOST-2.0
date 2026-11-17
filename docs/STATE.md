@@ -664,3 +664,16 @@ The assistant is the engineering lead/reviewer and should choose the next safe t
 - Do not execute the restore until the user explicitly approves creating the separate scratch database and files. This is a write operation, although it leaves the original GHOST2 database untouched.
 - After approved restore, query row counts for BusinessDays, Devices, DeviceRates, Shifts, Sessions, SessionSegments, and SessionPauses, compare against the known pre-migration baseline (1, 1, 2, 0, 0, 0, 0 respectively), and run DBCC CHECKDB on the scratch database.
 - No restore has yet been executed; AUTH-01 migration remains unapplied and uncommitted; original GHOST2 remains untouched.
+
+
+## AUTH-01 scratch restore explicitly approved; execution pending (2026-11-17)
+
+- User explicitly approved creating the isolated scratch database GHOST2_AUTH01_RestoreTest from the verified COPY_ONLY backup.
+- Approval is limited to this separate restore test. It is not approval to modify/restore over GHOST2, apply AUTH-01, or execute any migration.
+- Exact backup source: C:\\Program Files\\Microsoft SQL Server\\MSSQL17.MSSQLSERVER\\MSSQL\\Backup\\GHOST2_AUTH01_PreMigration_20261117.bak
+- Restore target database: GHOST2_AUTH01_RestoreTest
+- Logical-to-physical mappings: GHOST2 -> C:\\Program Files\\Microsoft SQL Server\\MSSQL17.MSSQLSERVER\\MSSQL\\DATA\\GHOST2_AUTH01_RestoreTest.mdf; GHOST2_log -> C:\\Program Files\\Microsoft SQL Server\\MSSQL17.MSSQLSERVER\\MSSQL\\DATA\\GHOST2_AUTH01_RestoreTest_log.ldf.
+- Preflight found no existing database with the target name and neither target file existed. C: had 11,330,404,352 bytes free. SQL Server default data/log directory is the target directory.
+- Execution is still pending user-side SQLCMD command. The command must check DB_ID is NULL and use explicit MOVE clauses, CHECKSUM and STATS; no REPLACE clause.
+- After execution, capture exact SQLCMD output. If successful, validate table row counts against baseline (BusinessDays 1, Devices 1, DeviceRates 2, Shifts 0, Sessions 0, SessionSegments 0, SessionPauses 0) and run DBCC CHECKDB on the scratch database.
+- Original GHOST2 remains untouched. AUTH-01 migration has not been applied or committed.
