@@ -1116,3 +1116,16 @@ Synchronize the local branch to `eca7be9423372d659ab338251a55db283877b5df`, gene
 
 ### Immediate next action
 Review the append-only trigger PR, then implement the dedicated bootstrap CLI and isolated SQL Server integration tests. Keep the live `GHOST2` database untouched until a separate migration-application approval.
+
+
+## AUTH-02 — Bootstrap CLI implementation started (2026-11-17)
+
+- Added dedicated `backend/src/GHOST.Bootstrap` .NET 10 console project and registered it in `backend/GHOST.slnx`.
+- The CLI requires an explicit `GHOST_CONNECTION_STRING`; it does not inherit the API's development `GHOST2` connection string and does not run migrations.
+- Requires an interactive terminal, explicit `BOOTSTRAP` confirmation, username/full name, and hidden password entry twice. Password is not accepted through command-line arguments, environment variables, or configuration.
+- Uses existing ASP.NET Core Identity stores and the same scoped `GHOSTDbContext`; password policy is length 12, four unique characters, uppercase/lowercase/digit/non-alphanumeric; new account is active and marked `MustChangePassword`.
+- Uses a transaction-owned exclusive `sp_getapplock` before checking Admin membership. Only nonnegative lock return codes are accepted.
+- Creates only `Admin` and `Staff` roles, one Admin, and a sanitized `Admin.Bootstrapped` AuditLog row in one EF transaction. No Staff account is created.
+- Added CLI README with invocation, safety constraints, and exit codes.
+- Not yet built or executed. No database was connected to, queried, migrated, or modified. Do not run against live `GHOST2`; disposable SQL Server integration tests and local build review remain required.
+- Review notes before build: verify the console host's Identity DI registrations, SQL Server app-lock command behavior, and the EF transaction-sharing behavior on the local SQL Server test instance. The current code does not attempt migrations.
