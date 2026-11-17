@@ -477,3 +477,13 @@ The assistant is the engineering lead/reviewer and should choose the next safe t
 - EF tooling build succeeded. NU1902/NU1903 warnings remain for vulnerable `System.Security.Cryptography.Pkcs 9.0.11`; track and remediate separately.
 - SQL script contents have not yet been reviewed. No SQL script execution, database update, migration commit, or schema/data change is authorized or reported.
 - Next: pull latest docs, inspect the complete generated SQL script, then plan verified backup/restore before requesting explicit approval for any database update.
+
+
+## AUTH-01 generated SQL reviewed (2026-11-17)
+
+- User pulled docs through commit `baa31ea` and supplied the complete generated `artifacts/AUTH-01.sql` (3,881 bytes).
+- Reviewed complete SQL: creates the seven expected ASP.NET Identity tables (`Roles`, `Users`, `RoleClaims`, `UserClaims`, `UserLogins`, `UserRoles`, `UserTokens`), their expected PKs/FKs/indexes, adds `FK_Shifts_Users_StaffUserId` with `ON DELETE NO ACTION`, inserts the new migration history row, and wraps changes in a transaction.
+- No DROP statements, existing business-table column changes, or unexpected data operations found in the supplied script.
+- Previously read-only inspected Development DB `GHOST2`: `Shifts` had zero rows, so no existing shift rows were observed that could violate the new StaffUserId FK. This does not replace a backup.
+- No SQL has been executed; no database update or migration commit has occurred.
+- Next gate: take a SQL Server backup of `GHOST2`, verify the backup (preferably restore to a separate test database), then request explicit user approval before applying AUTH-01. Do not run `dotnet ef database update` before those gates.
