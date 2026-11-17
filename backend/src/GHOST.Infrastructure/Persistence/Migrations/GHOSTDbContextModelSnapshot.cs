@@ -22,6 +22,63 @@ namespace GHOST.Infrastructure.Persistence.Migrations
 
             SqlServerModelBuilderExtensions.UseIdentityColumns(modelBuilder);
 
+            modelBuilder.Entity("GHOST.Domain.Entities.AuditLog", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("Action")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
+
+                    b.Property<string>("ActorType")
+                        .IsRequired()
+                        .HasMaxLength(16)
+                        .HasColumnType("nvarchar(16)");
+
+                    b.Property<DateTimeOffset>("At")
+                        .HasColumnType("datetimeoffset(7)");
+
+                    b.Property<string>("EntityId")
+                        .HasMaxLength(128)
+                        .HasColumnType("nvarchar(128)");
+
+                    b.Property<string>("EntityType")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
+
+                    b.Property<string>("NewValues")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("OldValues")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<Guid?>("UserId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("UserId", "At")
+                        .HasDatabaseName("IX_AuditLogs_UserId_At");
+
+                    b.HasIndex("EntityType", "EntityId", "At")
+                        .HasDatabaseName("IX_AuditLogs_EntityType_EntityId_At");
+
+                    b.ToTable("AuditLogs", null, t =>
+                        {
+                            t.HasCheckConstraint("CK_AuditLogs_Actor", "(([ActorType] = N'System' AND [UserId] IS NULL) OR ([ActorType] = N'User' AND [UserId] IS NOT NULL))");
+
+                            t.HasCheckConstraint("CK_AuditLogs_ActorType", "[ActorType] IN (N'System', N'User')");
+
+                            t.HasCheckConstraint("CK_AuditLogs_NewValues_Json", "[NewValues] IS NULL OR (ISJSON([NewValues]) = 1 AND DATALENGTH([NewValues]) <= 16384)");
+
+                            t.HasCheckConstraint("CK_AuditLogs_OldValues_Json", "[OldValues] IS NULL OR (ISJSON([OldValues]) = 1 AND DATALENGTH([OldValues]) <= 16384)");
+                        });
+                });
+
             modelBuilder.Entity("GHOST.Domain.Entities.BusinessDay", b =>
                 {
                     b.Property<Guid>("Id")
@@ -535,6 +592,14 @@ namespace GHOST.Infrastructure.Persistence.Migrations
                     b.HasKey("UserId", "LoginProvider", "Name");
 
                     b.ToTable("UserTokens", (string)null);
+                });
+
+            modelBuilder.Entity("GHOST.Domain.Entities.AuditLog", b =>
+                {
+                    b.HasOne("GHOST.Infrastructure.Identity.ApplicationUser", null)
+                        .WithMany()
+                        .HasForeignKey("UserId")
+                        .OnDelete(DeleteBehavior.Restrict);
                 });
 
             modelBuilder.Entity("GHOST.Domain.Entities.DeviceRate", b =>
