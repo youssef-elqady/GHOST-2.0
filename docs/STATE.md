@@ -468,3 +468,12 @@ The assistant is the engineering lead/reviewer and should choose the next safe t
 2. Review the complete generated SQL for only the seven Identity table creates, the Shift-to-Users FK, expected indexes/constraints, and absence of business table drops/alters or data-destructive operations. If script output is long, inspect it in sections or attach the file.
 3. Before any application to Development database `GHOST2`, take a SQL Server backup to a verified writable path and verify the backup file and restore viability. Confirm the target is still the Development database and ask for explicit approval before applying the migration.
 4. Do not stage/commit migration files until SQL script review is complete. Keep AUTH-02 and inventory/payment work blocked until AUTH-01 persistence and authentication integration gates are properly implemented and tested.
+
+
+## AUTH-01 SQL script generated; pending review (2026-11-17)
+
+- User generated `artifacts/AUTH-01.sql` from `20261007095934_InitialPersistence` to `20261114053406_AddIdentityPersistence`.
+- File verification: `E:\\GHOST\\GHOST-2.0\\artifacts\\AUTH-01.sql`, length 3,881 bytes.
+- EF tooling build succeeded. NU1902/NU1903 warnings remain for vulnerable `System.Security.Cryptography.Pkcs 9.0.11`; track and remediate separately.
+- SQL script contents have not yet been reviewed. No SQL script execution, database update, migration commit, or schema/data change is authorized or reported.
+- Next: pull latest docs, inspect the complete generated SQL script, then plan verified backup/restore before requesting explicit approval for any database update.
