@@ -695,3 +695,11 @@ The assistant is the engineering lead/reviewer and should choose the next safe t
 - Query scratch database state and row counts for BusinessDays, Devices, DeviceRates, Shifts, Sessions, SessionSegments, SessionPauses; compare with pre-backup baseline 1, 1, 2, 0, 0, 0, 0.
 - Run DBCC CHECKDB (GHOST2_AUTH01_RestoreTest) WITH NO_INFOMSGS and capture its complete output. These are read-only checks.
 - Do not run any migration against original GHOST2 yet. After successful integrity/count checks, obtain a separate explicit approval before applying AUTH-01.
+
+
+## AUTH-01 scratch verification query syntax typo (2026-11-17)
+
+- User pulled commit 550210f successfully after the isolated restore step.
+- User reran the guarded restore command and SQL Server again reported a successful restore of 714 pages to GHOST2_AUTH01_RestoreTest. The guard did not abort, so at the time of that execution SQL Server did not find a database with that name; the restore succeeded and scratch DB is expected to exist now.
+- The subsequent read-only row-count + DBCC command failed at parse time with: `Msg 156 ... Incorrect syntax near the keyword 'RowCount'.` The first SELECT used `AS RowCount`, which SQL Server parses as a reserved keyword. Therefore no row counts or DBCC CHECKDB result were produced by that command; do not infer integrity failure or success from it.
+- Next: rerun the same read-only scratch database verification, changing the alias to `TotalRows` (or bracketed `[RowCount]`), then capture the output including DBCC CHECKDB. No migration applied; original GHOST2 remains untouched.
