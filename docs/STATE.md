@@ -677,3 +677,21 @@ The assistant is the engineering lead/reviewer and should choose the next safe t
 - Execution is still pending user-side SQLCMD command. The command must check DB_ID is NULL and use explicit MOVE clauses, CHECKSUM and STATS; no REPLACE clause.
 - After execution, capture exact SQLCMD output. If successful, validate table row counts against baseline (BusinessDays 1, Devices 1, DeviceRates 2, Shifts 0, Sessions 0, SessionSegments 0, SessionPauses 0) and run DBCC CHECKDB on the scratch database.
 - Original GHOST2 remains untouched. AUTH-01 migration has not been applied or committed.
+
+
+## AUTH-01 isolated scratch database restore succeeded (2026-11-17)
+
+### User-reported execution result
+- User pulled documentation commit e5dfea4 successfully; local branch fast-forwarded from 6ef40c4 to e5dfea4.
+- User executed the explicitly approved restore command with a guard that aborts if GHOST2_AUTH01_RestoreTest already exists, explicit MOVE clauses to new MDF/LDF names, CHECKSUM, and STATS. No REPLACE option was used.
+- SQL Server reported 10% through 100%, processed 712 data pages and 2 log pages, and completed:
+  `RESTORE DATABASE successfully processed 714 pages in 0.024 seconds (232.259 MB/sec).`
+- Scratch database created: GHOST2_AUTH01_RestoreTest.
+- New physical files: GHOST2_AUTH01_RestoreTest.mdf and GHOST2_AUTH01_RestoreTest_log.ldf under the SQL Server DATA directory.
+- This is a successful isolated restore operation. Integrity check and row-count comparison are still pending.
+- Original GHOST2 was not the restore target; no AUTH-01 migration was applied or committed.
+
+### Immediate next action — read-only verification of scratch restore
+- Query scratch database state and row counts for BusinessDays, Devices, DeviceRates, Shifts, Sessions, SessionSegments, SessionPauses; compare with pre-backup baseline 1, 1, 2, 0, 0, 0, 0.
+- Run DBCC CHECKDB (GHOST2_AUTH01_RestoreTest) WITH NO_INFOMSGS and capture its complete output. These are read-only checks.
+- Do not run any migration against original GHOST2 yet. After successful integrity/count checks, obtain a separate explicit approval before applying AUTH-01.
