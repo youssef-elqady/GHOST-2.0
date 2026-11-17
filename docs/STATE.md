@@ -568,3 +568,24 @@ The assistant is the engineering lead/reviewer and should choose the next safe t
   ```
 - After the command, verify the exact file exists and has non-zero size using PowerShell `Get-Item`; then run SQL Server `RESTORE VERIFYONLY ... WITH CHECKSUM`. A VERIFYONLY success is not the same as a full restore test; ideally restore to a separate scratch database and compare preserved row counts before migration approval.
 - No backup, migration application, migration commit, or schema/data change has occurred as of this entry.
+
+
+## AUTH-01 COPY_ONLY backup created (2026-11-17)
+
+### User-reported execution result
+- User pulled STATE commit `854144d` successfully before running the backup.
+- Executed SQLCMD against local default SQL Server instance using Windows authentication and `-C` for the local certificate:
+  `BACKUP DATABASE [GHOST2] ... WITH COPY_ONLY, INIT, CHECKSUM, STATS = 10`.
+- Pre-check confirmed `GHOST2` exists and is `ONLINE`.
+- SQL Server reported 10% through 100%, processed 712 database data pages and 2 log pages, and completed 714 pages successfully in 0.047 seconds.
+- SQLCMD exited back to PowerShell without a reported SQL error. This is evidence that SQL Server completed the backup command successfully.
+- Backup target:
+  `C:\\Program Files\\Microsoft SQL Server\\MSSQL17.MSSQLSERVER\\MSSQL\\Backup\\GHOST2_AUTH01_PreMigration_20261117.bak`
+- Backup is COPY_ONLY and CHECKSUM-enabled. It is a backup-only operation; no migration was applied and no database schema/business data was intentionally changed.
+
+### Remaining verification before any migration
+- File existence and non-zero size have not yet been confirmed from PowerShell.
+- SQL Server `RESTORE VERIFYONLY ... WITH CHECKSUM` has not yet been run.
+- A separate scratch-database restore test has not yet been performed. VERIFYONLY alone is not a full restore test.
+- Do not run `dotnet ef database update` or execute the generated SQL manually until backup verification and explicit user approval.
+- Immediate next action: inspect exact backup file metadata with `Get-Item`, then run `RESTORE VERIFYONLY` against the exact backup path.
