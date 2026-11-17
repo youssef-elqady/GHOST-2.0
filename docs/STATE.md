@@ -487,3 +487,16 @@ The assistant is the engineering lead/reviewer and should choose the next safe t
 - Previously read-only inspected Development DB `GHOST2`: `Shifts` had zero rows, so no existing shift rows were observed that could violate the new StaffUserId FK. This does not replace a backup.
 - No SQL has been executed; no database update or migration commit has occurred.
 - Next gate: take a SQL Server backup of `GHOST2`, verify the backup (preferably restore to a separate test database), then request explicit user approval before applying AUTH-01. Do not run `dotnet ef database update` before those gates.
+
+
+## AUTH-01 backup preparation: SQL Server environment identified (2026-11-17)
+
+- User pulled reviewed-state commit `0a636cc` successfully.
+- Local SQL Server default instance service `MSSQLSERVER` is Running.
+- `sqlcmd.exe` is installed at:
+  - `C:\\Program Files\\Microsoft SQL Server\\Client SDK\\ODBC\\180\\Tools\\Binn\\SQLCMD.EXE`
+  - `C:\\Program Files\\Microsoft SQL Server\\Client SDK\\ODBC\\170\\Tools\\Binn\\SQLCMD.EXE`
+- No backup has been created and no database/schema/data has been changed.
+- Before choosing a backup destination, inspect the SQL Server service account and SQL Server's configured default backup directory using read-only commands. Then create a backup in a directory writable by the SQL Server service and verify it (preferably restore to a separate test DB).
+- User explicitly requires every meaningful project response to append a detailed, resumable progress entry to `docs/STATE.md`, including completed work, evidence, files/commits, outstanding gates, and exact next commands.
+- Current next gate remains: verified backup of Development DB `GHOST2`; do not apply AUTH-01 until backup verification and explicit approval.
