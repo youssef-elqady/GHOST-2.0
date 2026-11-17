@@ -991,3 +991,38 @@ Do not implement JWT/login, endpoint authorization, staff lifecycle, or shift/se
 
 ### Immediate next action
 Perform a fresh AUTH-02 source/design audit on the now-reconciled branch. Inspect the exact role/user EF model and available test infrastructure, and produce a concrete threat model and minimal implementation/test plan for first-Admin bootstrap plus the SRS-compliant AuditLog. Do not start implementation or create/apply a migration until the design and schema impact are reviewed. AUTH-02 remains NOT implemented; no Admin account has been confirmed as provisioned; login/JWT/refresh and endpoint authorization remain outstanding.
+
+
+## AUTH-02 fresh source/design audit after AUTH-01 reconciliation (2026-11-17)
+
+Fresh files and repository tree were fetched from branch `feature/products-inventory-billing` at branch HEAD `2fd5b7a94a90f5710cd47783e689770ad08b8747`.
+
+### Confirmed source facts
+- `ApplicationUser` derives from `IdentityUser<Guid>`; its constructor explicitly generates Guid Id, SecurityStamp, and ConcurrencyStamp. It has FullName, IsActive, MustChangePassword, CreatedAt, UpdatedAt, CreatedByAdminId.
+- `GHOSTDbContext` derives from `IdentityDbContext<ApplicationUser, IdentityRole<Guid>, Guid>`; all seven Identity entities are mapped to the custom table names already present in the verified AUTH-01 migration.
+- The role type is framework `IdentityRole<Guid>`; no custom role type/entity was found in the repository tree. For bootstrap, explicitly assign a non-empty `Guid.NewGuid()` to each role ID and explicitly set Name/NormalizedName; do not depend on implicit key generation.
+- `Program.cs` currently registers DbContext and business handlers/repositories only. It does not register Identity Core managers, authentication, authorization, or middleware. Keep this bootstrap slice separate from login/JWT and endpoint authorization.
+- `ICurrentUser` exists with UserId/IsAuthenticated/IsAdmin/IsStaff. GitHub code search for repository usages returned zero results; no implementation or DI registration was found in the inspected source. Recheck with a local repository-wide search before adding any implementation, but do not pull AUTH-05 work into AUTH-02.
+- `GHOST.Tests.csproj` currently references only `GHOST.Application` and has xUnit/Test SDK/coverlet. It does not reference Infrastructure, API, EF SQL Server test setup, or Testcontainers. The tree contains unit test files only; no SQL Server integration-test project or AuditLog entity/configuration was found.
+- Infrastructure already references EF Core SQL Server 10.0.12 and ASP.NET Core Identity EF Core 10.0.12. API references Infrastructure. No new runtime packages are inherently required for a small CLI bootstrap host, though project shape/configuration still needs implementation design.
+- Existing `ShiftConfiguration` confirms required FK to `ApplicationUser` with Restrict deletion and a SQL Server rowversion; the existing applied FK remains important historical attribution.
+- SRS defines `AuditLogs(Id, UserId, Action, EntityType, EntityId, OldValues, NewValues, At)`, requires append-only behavior (no UPDATE/DELETE), and says enforcement should be at DB permissions or triggers. No AuditLog entity/table/configuration exists in the current repository/migration tree.
+
+### Security/design assessment (proposal, not implementation)
+1. Keep bootstrap in a dedicated server-side CLI project/command, not an API route and not API startup seeding. Password must be read interactively without echo and must never be supplied as a process argument, written to logs, or persisted except as the Identity hash. Require explicit operator confirmation and password confirmation.
+2. Use Identity `RoleManager<IdentityRole<Guid>>` and `UserManager<ApplicationUser>` with explicit Identity options (password policy, unique username, lockout configuration where relevant). Create exactly the approved roles `Admin` and `Staff`; assign explicit Guid IDs and normalized names. Create the first Admin only; no Staff account is created by bootstrap.
+3. Serialize bootstrap attempts in SQL Server using a transaction-scoped exclusive `sp_getapplock` resource dedicated to the GHOST first-admin bootstrap. Acquire the lock inside the same DB transaction before checking for an existing Admin. Then create/ensure roles, create user, assign Admin, persist audit event, and commit as one unit. A second invocation must fail closed after it acquires the lock and observes an Admin. A pre-check without serialization is not acceptable. Verify exact lock return codes and rollback behavior in real SQL Server integration tests.
+4. Audit must be committed in the same transaction as bootstrap. Proposed general AuditLogs design: nullable `UserId` for a pre-user system actor, explicit actor-kind/system marker (so null does not ambiguously mean missing data), Action/EntityType/EntityId, bounded JSON OldValues/NewValues, UTC timestamp, and no secrets/credential material. For the bootstrap event, actor is System and target EntityType/EntityId identifies the created Admin; never include password, password hash, security stamp, token, or temporary credential.
+5. AuditLogs is a new schema object absent from AUTH-01 and the live verified migration. It requires a separate additive migration, a reviewed FK/nullability/length/index design, and DB-level append-only enforcement (prefer explicit database permissions for the app principal or tested triggers; ordinary EF code conventions alone are insufficient). Do not generate/apply this migration until design approval and explicit user approval for the DB change.
+6. Add a dedicated SQL Server integration-test project or equivalent isolated harness. Use a disposable test database, never the user's live `GHOST2`. Required tests: successful first bootstrap; second-run refusal; two concurrent attempts produce exactly one Admin; invalid password leaves no partial user/role/audit state; injected failure after user creation rolls back all changes; audit row committed with no secrets; password input never appears in captured output/logs. Existing unit tests alone cannot prove SQL Server application-lock and transaction behavior.
+7. Recovery is separately approved by AUTHENTICATION-DECISIONS: implement as a separate server-side command, not as a bootstrap bypass. Define recovery proof/operator authorization and audit semantics before coding it; do not silently bundle it into first bootstrap.
+
+### Explicit boundaries
+- No code or project files changed in this audit.
+- No migration generated or applied; no database queried or mutated.
+- No Admin account existence check was run against live GHOST2 in this audit.
+- A second independent reviewer was not available in this session; the security review above is the current single-review threat assessment, not a claim of independent approval.
+- Existing dependency advisories for `System.Security.Cryptography.Pkcs 9.0.11` remain a separate task.
+
+### Immediate next action
+Review and approve/revise the proposed AUTH-02 design, especially the AuditLogs system-actor schema and append-only enforcement, and approve a separate additive AuditLogs migration before implementation. After design approval, implement only the dedicated CLI bootstrap + atomic audit persistence and SQL Server integration tests on a dedicated branch/PR. Do not add JWT/login, HTTP authorization, or shift/session actor binding in this slice. AUTH-02 remains NOT implemented.
