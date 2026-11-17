@@ -1153,3 +1153,34 @@ Review the append-only trigger PR, then implement the dedicated bootstrap CLI an
 - Verified branch: `feature/auth-02-auditlog-append-only`; HEAD at review time: `20b34c3acd052c6f62a863e73bfb423bbe07c361` (`Record successful Release solution build and dependency advisories`).
 - Next action: run `dotnet nuget why` for `System.Security.Cryptography.Pkcs` against both API and Infrastructure project files to identify the exact parent chain. Then choose the smallest compatible patched update, rebuild, rerun vulnerability scan and full tests. No dependency changes have been made.
 - Advisories: https://github.com/advisories/GHSA-846f-f764-76mx and https://github.com/advisories/GHSA-2fmv-rv2c-59x7.
+
+
+## AUTH-02 — Transitive SQL client vulnerability traced and dependency update prepared (2026-11-17)
+
+### Dependency path confirmed by user
+```text
+GHOST.API
+└── GHOST.Infrastructure
+    └── Microsoft.EntityFrameworkCore.SqlServer 10.0.12
+        └── Microsoft.Data.SqlClient 6.1.6
+            └── System.Security.Cryptography.Pkcs 9.0.11
+```
+
+### Package metadata review
+- NuGet metadata for `Microsoft.EntityFrameworkCore.SqlServer 10.0.15` (net10.0) confirms dependencies on `Microsoft.Data.SqlClient >= 6.1.7` and `System.Security.Cryptography.Pkcs >= 10.0.13`. Pkcs 10.0.13 is the patched .NET 10 line for both reported advisories.
+- `Microsoft.EntityFrameworkCore 10.0.15`, `Microsoft.EntityFrameworkCore.Design 10.0.15`, `Microsoft.AspNetCore.Identity.EntityFrameworkCore 10.0.15`, and `Microsoft.AspNetCore.OpenApi 10.0.15` are available stable .NET 10 packages. Keep the EF package family aligned rather than mixing patch versions.
+- No direct `Microsoft.Data.SqlClient` or `System.Security.Cryptography.Pkcs` PackageReference override is added. The SQL Server EF provider now supplies the patched Pkcs dependency through its own declared dependency graph.
+- Advisory evidence: GHSA-846f-f764-76mx and GHSA-2fmv-rv2c-59x7; package metadata: NuGet Microsoft.EntityFrameworkCore.SqlServer 10.0.15.
+
+### Source changes committed to this branch (not locally validated yet)
+- `backend/src/GHOST.Infrastructure/GHOST.Infrastructure.csproj`: all four EF/Identity package references updated from 10.0.12 to 10.0.15.
+- `backend/src/GHOST.API/GHOST.API.csproj`: Microsoft.AspNetCore.OpenApi and EF Design updated from 10.0.12 to 10.0.15.
+- Commits: Infrastructure `08b909df3e60c011b7f6bc79ff81ac48b2298eb2`; API `affd7cd6bd67fd83ba1c6d76f87dee98fda3276a`.
+- No source API, domain model, migration, database, or bootstrap behavior was changed. No database was accessed.
+
+### Important verification correction
+- The current `backend/GHOST.slnx` source includes six projects, including `GHOST.Bootstrap`. The earlier build summary recorded five compiled projects and did not list Bootstrap; the full local build must explicitly confirm all six projects compile. Do not count Bootstrap as verified until the new build output shows it.
+
+### Immediate next action
+- Synchronize local branch to latest remote commit, then run: `dotnet restore .\\backend\\GHOST.slnx`; `dotnet list .\\backend\\GHOST.slnx package --vulnerable --include-transitive`; `dotnet build .\\backend\\GHOST.slnx --configuration Release`; `dotnet test .\\backend\\GHOST.slnx --configuration Release`.
+- Confirm the resolved SQL Server dependency graph contains a patched `System.Security.Cryptography.Pkcs 10.0.13` or later and that vulnerability scan has no remaining findings. Capture all warnings and test results. No Bootstrap execution, migration application, or live GHOST2 database access.
