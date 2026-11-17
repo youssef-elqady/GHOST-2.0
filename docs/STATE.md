@@ -589,3 +589,20 @@ The assistant is the engineering lead/reviewer and should choose the next safe t
 - A separate scratch-database restore test has not yet been performed. VERIFYONLY alone is not a full restore test.
 - Do not run `dotnet ef database update` or execute the generated SQL manually until backup verification and explicit user approval.
 - Immediate next action: inspect exact backup file metadata with `Get-Item`, then run `RESTORE VERIFYONLY` against the exact backup path.
+
+
+## AUTH-01 backup file confirmed; VERIFYONLY command path typo (2026-11-17)
+
+### User-reported evidence
+- PowerShell `Get-Item` confirmed the exact backup file exists at:
+  `C:\\Program Files\\Microsoft SQL Server\\MSSQL17.MSSQLSERVER\\MSSQL\\Backup\\GHOST2_AUTH01_PreMigration_20261117.bak`
+- Reported file length: **5,951,488 bytes** (non-zero). The pasted table output did not visibly include a LastWriteTime value, so no timestamp is recorded here.
+- The user's first `RESTORE VERIFYONLY` attempt did not execute: PowerShell reported the sqlcmd executable path was not recognized because the command omitted the `Binn` directory. This is a command-path typo, not a SQL Server backup verification failure.
+
+### Immediate next action
+- Retry the read-only verification with the previously confirmed executable path including `Binn\\SQLCMD.EXE`:
+  ```powershell
+  & "C:\\Program Files\\Microsoft SQL Server\\Client SDK\\ODBC\\180\\Tools\\Binn\\SQLCMD.EXE" -S localhost -E -C -d master -b -Q "RESTORE VERIFYONLY FROM DISK = N'C:\\Program Files\\Microsoft SQL Server\\MSSQL17.MSSQLSERVER\\MSSQL\\Backup\\GHOST2_AUTH01_PreMigration_20261117.bak' WITH CHECKSUM;"
+  ```
+- Record the exact result. A successful VERIFYONLY is not a full restore test; next inspect FILELISTONLY and plan a separately named scratch-database restore, without overwriting GHOST2 and only after explicit user approval.
+- No migration has been applied; no schema/business-data changes have been made.
