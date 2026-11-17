@@ -833,3 +833,34 @@ The user has already explicitly approved this migration. Ask them to run the com
 4. Original business row counts remain BusinessDays=1, Devices=1, DeviceRates=2, Shifts=0, Sessions=0, SessionSegments=0, SessionPauses=0.
 
 Do not apply any other migration, do not drop the scratch restore database, and do not remove the backup. The NU1902/NU1903 warnings for `System.Security.Cryptography.Pkcs 9.0.11` were present during successful EF build/connection and remain a separate dependency-security task.
+
+
+## AUTH-01 migration applied successfully; post-apply verification pending (2026-11-17)
+
+The user executed the exact approved command against the confirmed `GHOST2` database:
+
+```powershell
+dotnet ef database update 20261114053406_AddIdentityPersistence --project .\backend\src\GHOST.Infrastructure\GHOST.Infrastructure.csproj --startup-project .\backend\src\GHOST.API\GHOST.API.csproj --context GHOSTDbContext
+```
+
+Observed output confirms:
+- Build succeeded.
+- EF acquired the migration application lock.
+- EF applied migration `20261114053406_AddIdentityPersistence`.
+- Created the seven Identity tables: Roles, Users, RoleClaims, UserClaims, UserLogins, UserRoles, UserTokens.
+- Created their indexes.
+- Added `FK_Shifts_Users_StaffUserId` from `Shifts.StaffUserId` to `Users.Id` with `ON DELETE NO ACTION`.
+- Inserted `20261114053406_AddIdentityPersistence` into `__EFMigrationsHistory` with ProductVersion `10.0.12`.
+- EF ended with `Done.`
+
+This is evidence that the migration command completed successfully. However, a separate read-only post-apply verification has NOT yet been run. Do not yet mark the data-preservation verification complete.
+
+### Immediate next step
+
+Ask the user to pull this STATE update, then run the read-only SQLCMD verification against `GHOST2`:
+- Confirm the migration history row.
+- Confirm all seven Identity tables exist.
+- Confirm FK `FK_Shifts_Users_StaffUserId` maps `Shifts.StaffUserId` to `Users.Id`.
+- Confirm business row counts remain BusinessDays=1, Devices=1, DeviceRates=2, Shifts=0, Sessions=0, SessionSegments=0, SessionPauses=0.
+
+Keep the pre-migration backup and scratch restore database. The NU1902/NU1903 warnings for `System.Security.Cryptography.Pkcs 9.0.11` remain a separate dependency-security issue. No Admin user has been bootstrapped and authentication/login flows are not yet implemented merely by adding Identity persistence tables.
