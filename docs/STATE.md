@@ -508,3 +508,15 @@ The assistant is the engineering lead/reviewer and should choose the next safe t
 - First sqlcmd metadata query using ODBC Driver 18 failed before connecting because the local SQL Server certificate chain is not trusted. This is a client TLS trust configuration issue; it does not indicate a database failure.
 - Next read-only diagnostic: rerun the same local trusted-Windows-authentication query with sqlcmd `-C` (TrustServerCertificate) to accept the local server certificate for this diagnostic connection. Do not change server-wide encryption/certificate settings.
 - No backup created; no database/schema/data changes; AUTH-01 not applied.
+
+
+## AUTH-01 backup destination identified (2026-11-17)
+
+- User pulled commit `e127ca6` successfully.
+- Read-only SQLCMD connection succeeded using Windows authentication and `-C` (trust local server certificate for this client connection).
+- SQL Server is the default instance (`SERVERPROPERTY('InstanceName') = NULL`); server name returned as `El-Qady`.
+- SQL Server default backup directory returned by `SERVERPROPERTY('InstanceDefaultBackupPath')`:
+  `C:\\Program Files\\Microsoft SQL Server\\MSSQL17.MSSQLSERVER\\MSSQL\\Backup`
+- SQL Server service identity remains `NT Service\\MSSQLSERVER` (service Running).
+- Next: verify the backup directory exists and inspect its ACL for the SQL Server service identity before issuing a BACKUP DATABASE command. Prefer a unique timestamped .bak name; do not assume the service can write until ACL/path checks succeed.
+- No backup created; no database/schema/data changed; AUTH-01 remains unapplied.
