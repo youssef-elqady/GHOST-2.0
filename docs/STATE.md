@@ -1,7 +1,7 @@
 # GHOST STATE
 
-Last updated: 2026-11-12
-Current sprint: 01 - Foundation review (codebase review in progress)
+Last updated: 2026-11-17
+Current phase: AUTH-02 — secure first Admin bootstrap (source audit in progress)
 
 ## Product and architecture decisions
 - Primary UI: **Next.js** for both Staff and Admin.
@@ -893,3 +893,39 @@ This completes database persistence only. It does NOT mean an Admin account exis
 Next phase is AUTH-02: inspect the current branch's actual Identity user/role models, `Program.cs` DI/auth pipeline, configuration/secrets handling, and existing endpoint authorization before implementing Identity runtime services and a safe first-Admin bootstrap. Re-fetch current repository files and review current `docs/STATE.md` before starting. Do not seed a default password, expose credentials in source/control output, or trust client-supplied `StaffUserId`; authenticated principal must become the source of staff identity. Keep the existing Shifts FK and consider the pre-existing BusinessDays/Devices/rates records in all test and bootstrap decisions. Run tests/builds only with observed output; do not mark AUTH-02 complete until integration/security tests demonstrate it.
 
 Separate outstanding issue: NU1902/NU1903 warnings for `System.Security.Cryptography.Pkcs 9.0.11` remain a dependency-security task and should be assessed/upgraded independently.
+
+
+## AUTH-02 source audit and implementation planning (2026-11-17)
+
+Fresh source review performed on branch `feature/products-inventory-billing` after AUTH-01 persistence was verified.
+
+### Reviewed authoritative project decisions
+- Read `docs/AUTHENTICATION-DECISIONS.md` (approved 2026-11-12) and relevant security/Identity portions of `docs/GHOST — SRS + ERD v0.2.md`.
+- Approved role names are exactly `Admin` and `Staff`; no public self-registration.
+- First Admin must be provisioned by a one-time secure server-side command, never an HTTP endpoint, with no hardcoded/default password. It must refuse if an Admin already exists.
+- Password storage must use ASP.NET Core Identity hashing/policy/lockout. Audit must never include passwords, raw tokens, or temporary credentials.
+- Authentication decisions prescribe implementation order: AUTH-02 bootstrap/recovery; AUTH-03 login/JWT/refresh; AUTH-04 password lifecycle/staff management; AUTH-05 claims-backed current user and authorization; AUTH-06 bind shifts/sessions to authenticated user; AUTH-07 SQL Server integration/security tests.
+- The first Admin bootstrap and all future auth flows require audit events. Current SRS includes AuditLogs, but the currently applied AUTH-01 migration created only Identity tables; no AuditLogs table has been added yet. Decide and implement the durable security-audit persistence as a reviewed schema slice before claiming audit compliance.
+
+### Current source facts confirmed
+- `backend/src/GHOST.Infrastructure/Identity/ApplicationUser.cs` exists and derives from `IdentityUser<Guid>`. It adds FullName, IsActive, MustChangePassword, CreatedAt, UpdatedAt, CreatedByAdminId. Constructor generates Guid Id and security/concurrency stamps.
+- No custom `ApplicationRole` was found in the Identity directory; current context uses framework `IdentityRole<Guid>`. Verify role key initialization and normalized role uniqueness before seeding Admin/Staff; do not assume role IDs are generated automatically.
+- `GHOSTDbContext` derives from `IdentityDbContext<ApplicationUser, IdentityRole<Guid>, Guid>`, maps standard Identity entities to Users/Roles/UserRoles/UserClaims/UserLogins/RoleClaims/UserTokens, and retains business entities. AUTH-01 schema migration is already applied and verified on the original GHOST2 database.
+- `backend/src/GHOST.API/Program.cs` currently registers controllers, CORS, SQL Server DbContext, business repositories and handlers. It does NOT register ASP.NET Core Identity services, authentication schemes/JWT bearer validation, authorization policies, or authentication/authorization middleware.
+- Current API controllers (`BusinessDaysController`, `SessionsController`, `DevicesController`) have no `[Authorize]` attributes. BusinessDaysController accepts caller-supplied `StaffUserId`; SessionsController accepts caller-supplied `ShiftId` and `EndShiftId`. These remain untrusted and must not be used as actor identity.
+- `appsettings.json` contains a local Windows trusted-connection SQL Server connection string to GHOST2. No JWT issuer/audience/signing configuration was found in the inspected appsettings files. Production secrets must be supplied through secure environment/server configuration and never committed.
+- `GHOST.Tests.csproj` references Application only; no Infrastructure/SQL Server integration-test setup is currently configured. Existing tests are unit/fake based.
+- The API project targets .NET 10; Infrastructure references EF Core, SQL Server, Identity EF Core 10.0.12. Existing NU1902/NU1903 warnings for System.Security.Cryptography.Pkcs 9.0.11 remain a separate dependency-security issue.
+
+### AUTH-02 design gates before implementation
+1. Confirm whether to introduce a custom `ApplicationRole` to guarantee non-empty Guid IDs and centralize allowed role names, or explicitly construct `IdentityRole<Guid>` with `Guid.NewGuid()` in the bootstrap. Verify actual Identity behavior; do not rely on assumption.
+2. Design the bootstrap as a one-time server-side CLI/command path with interactive secret input (password must not be passed as a command-line argument, echoed, logged, or committed). Require explicit operator intent and fail closed if any Admin already exists.
+3. Protect against two simultaneous bootstrap attempts using a database transaction and an appropriate serialization/locking strategy plus database uniqueness; a pre-check alone is not sufficient.
+4. Use Identity RoleManager/UserManager and the configured password hasher/policy; create only Admin and Staff roles with normalized names; ensure role assignment and user creation are atomic or compensating safely.
+5. Persist a durable append-only security audit event for bootstrap without storing secrets. Review whether a dedicated SecurityAuditEvents table is preferable to prematurely implementing the full general AuditLogs domain.
+6. Keep bootstrap out of HTTP endpoints. Do not create default credentials or seed an Admin automatically at API startup.
+7. Add tests for first bootstrap, second-run refusal, concurrent bootstrap race, invalid password, and absence of secrets in output/logs. SQL Server behavior requires integration tests, not only fake repositories.
+8. Only after source/design review should code and any required migration be proposed. Do not modify the existing AUTH-01 migration or rewrite applied migrations.
+
+### Immediate next action
+Complete the AUTH-02 design review, including a second independent security review if available, then implement the smallest tested bootstrap slice on a dedicated feature branch or reviewed PR. Before implementation, inspect the exact current role/user EF model and available test infrastructure. After every meaningful implementation/test result, update this STATE file with observed evidence. AUTH-02 is NOT implemented; no Admin user exists; login/JWT/refresh and endpoint authorization remain unimplemented.
