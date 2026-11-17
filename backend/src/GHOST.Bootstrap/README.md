@@ -8,7 +8,7 @@ This is a dedicated, interactive, one-time first-Admin provisioning tool.
 - Requires the SQL Server connection string in `GHOST_CONNECTION_STRING`.
 - Does not read the API's development connection string and does not run EF migrations.
 - Requires the `AuditLogs` table and append-only trigger to have been deployed separately.
-- Prompts for the exact confirmation word `BOOTSTRAP`.
+- Displays the SQL Server and database from the connection string, then requires the exact target-specific confirmation `BOOTSTRAP <database-name>`.
 - Reads the password without echoing it; the password is never accepted through arguments or environment variables.
 - Creates only the `Admin` and `Staff` roles and one Admin user.
 - Serializes attempts using a transaction-owned SQL Server application lock.
