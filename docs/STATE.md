@@ -1132,3 +1132,13 @@ Review the append-only trigger PR, then implement the dedicated bootstrap CLI an
 
 - Hardening refinement: CLI now parses and displays the SQL Server/data source and requires the exact database-specific confirmation `BOOTSTRAP <database-name>`; it rejects connection strings without an explicit Initial Catalog. This reduces accidental execution against the wrong database.
 - The CLI has not been compiled or run in this environment. Immutable .NET password strings cannot be reliably zeroed; the tool avoids writing them to logs, arguments, environment variables, configuration, and audit payloads.
+
+
+## AUTH-02 — Local solution build verified (2026-11-17)
+
+- User ran `dotnet build .\\backend\\GHOST.slnx --configuration Release` from the repository root.
+- Result: **Build succeeded**, all five projects compiled (Domain, Application, Infrastructure, Tests, API) with **0 errors**.
+- Restore/build reported **8 warnings**: NU1902 (moderate) and NU1903 (high) for transitive package `System.Security.Cryptography.Pkcs 9.0.11` in Infrastructure and API. These advisories remain unresolved and must be traced to the dependency chain and remediated with a compatible patched version; do not suppress the warnings.
+- This build confirms the solution as currently configured compiles, but it does not verify runtime bootstrap behavior, SQL Server app-lock semantics, transaction rollback, or the AuditLogs trigger.
+- No database connection, migration application, or bootstrap execution was performed as part of this build.
+- Next: add isolated SQL Server integration coverage for AuditLogs constraints/trigger and bootstrap atomicity/concurrency. Before that, inspect and remediate the vulnerable transitive package version, then rebuild and run the existing test suite.
