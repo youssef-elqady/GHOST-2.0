@@ -606,3 +606,20 @@ The assistant is the engineering lead/reviewer and should choose the next safe t
   ```
 - Record the exact result. A successful VERIFYONLY is not a full restore test; next inspect FILELISTONLY and plan a separately named scratch-database restore, without overwriting GHOST2 and only after explicit user approval.
 - No migration has been applied; no schema/business-data changes have been made.
+
+
+## AUTH-01 backup RESTORE VERIFYONLY passed (2026-11-17)
+
+### User-reported execution result
+- User ran SQL Server `RESTORE VERIFYONLY` against the confirmed COPY_ONLY backup using the correct SQLCMD executable path under `Tools\\Binn\\SQLCMD.EXE`, Windows authentication, and client-side `-C`.
+- Exact SQL Server output: `The backup set on file 1 is valid.`
+- The command included `WITH CHECKSUM` and returned to PowerShell without a reported error.
+- Combined with the earlier confirmed non-zero backup file length of 5,951,488 bytes and successful COPY_ONLY backup completion, this establishes that SQL Server can verify the backup set and its checksums.
+- This is not a full restore test and does not yet prove that the database can be restored and opened successfully.
+
+### Next gate — plan isolated restore test
+- Before any AUTH-01 migration application, inspect backup logical file names with `RESTORE FILELISTONLY`, inspect SQL Server data/log paths and available disk space, then prepare a restore plan to a new scratch database (e.g. `GHOST2_AUTH01_RestoreTest`) using distinct physical MDF/LDF paths.
+- Do not overwrite, rename, detach, or otherwise modify the original `GHOST2` database or its files.
+- The scratch restore creates a new database and files; obtain explicit user approval before executing it. After approval, verify expected preserved row counts and run `DBCC CHECKDB` on the scratch database.
+- Only after successful isolated restore verification should the user be asked for explicit approval to apply AUTH-01 to `GHOST2`. Do not run `dotnet ef database update` or execute `artifacts/AUTH-01.sql` yet.
+- No migration has been applied or committed; no original database schema/business data has been changed.
