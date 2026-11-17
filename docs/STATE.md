@@ -1026,3 +1026,33 @@ Fresh files and repository tree were fetched from branch `feature/products-inven
 
 ### Immediate next action
 Review and approve/revise the proposed AUTH-02 design, especially the AuditLogs system-actor schema and append-only enforcement, and approve a separate additive AuditLogs migration before implementation. After design approval, implement only the dedicated CLI bootstrap + atomic audit persistence and SQL Server integration tests on a dedicated branch/PR. Do not add JWT/login, HTTP authorization, or shift/session actor binding in this slice. AUTH-02 remains NOT implemented.
+
+
+## AUTH-02 implementation design approved (2026-11-17)
+
+The user authorized proceeding with the assistant's recommended security design. The detailed implementation design is committed at `docs/AUTH-02-IMPLEMENTATION-DESIGN.md`.
+
+### Approved decisions
+- Dedicated server-side console bootstrap; no HTTP endpoint, API startup seed, default password, or password command-line argument.
+- Reuse ASP.NET Core Identity EF Core already referenced by Infrastructure. Keep existing `ApplicationUser`, `IdentityRole<Guid>`, `GHOSTDbContext`, and all AUTH-01 mappings.
+- Create the approved `Admin` and `Staff` roles and only the first Admin account during bootstrap.
+- Add general SRS-aligned `AuditLogs` with nullable UserId and explicit ActorType System/User, bounded JSON payloads, UTC timestamp, entity/actor indexes, and a restricted FK to Users.
+- Enforce append-only at SQL Server level with an UPDATE/DELETE-rejecting trigger; additionally configure least-privilege permissions for the actual runtime database principal before production.
+- Commit roles, user, role assignment, and sanitized bootstrap audit event in one EF transaction.
+- Serialize concurrent bootstrap attempts with transaction-owned exclusive `sys.sp_getapplock` before checking for an existing Admin. Negative lock return codes fail closed.
+- Keep recovery separate. Do not include login/JWT/refresh, HTTP authorization, staff lifecycle, ICurrentUser, or shift/session actor binding in AUTH-02.
+
+### Implementation safety gates
+- Generate the additive AuditLogs migration locally with EF Core 10.0.12 tooling. Do not hand-author the model snapshot/designer.
+- Review migration Up/Down and SQL to prove it only adds AuditLogs, constraints, indexes, and the append-only trigger; do not modify AUTH-01 or existing business tables.
+- SQL Server integration tests must use a disposable database and explicitly reject the live database name `GHOST2`.
+- Required tests include first/second bootstrap, concurrent race (exactly one success), invalid password/rollback, injected failure rollback, SQL constraints/trigger, lock failures, and secret-leak checks.
+- No live GHOST2 migration application or bootstrap run is authorized by this general implementation approval. A separate explicit approval is required after migration review and backup/restore plan.
+- No live Admin-existence check has been run; do not claim an Admin is or is not present.
+
+### Observed documentation commits
+- Design document: `d67980ff464ca569478b84775215999e283b3419`
+- Branch: `feature/products-inventory-billing`
+
+### Immediate next action
+Implement the AuditLog entity and EF configuration, generate and inspect the additive migration locally (including SQL Server trigger), then build the CLI bootstrap on top of the reviewed persistence model. Add SQL Server integration tests against a disposable database. Do not apply the migration to live GHOST2.
