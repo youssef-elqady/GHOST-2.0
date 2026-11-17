@@ -1142,3 +1142,14 @@ Review the append-only trigger PR, then implement the dedicated bootstrap CLI an
 - This build confirms the solution as currently configured compiles, but it does not verify runtime bootstrap behavior, SQL Server app-lock semantics, transaction rollback, or the AuditLogs trigger.
 - No database connection, migration application, or bootstrap execution was performed as part of this build.
 - Next: add isolated SQL Server integration coverage for AuditLogs constraints/trigger and bootstrap atomicity/concurrency. Before that, inspect and remediate the vulnerable transitive package version, then rebuild and run the existing test suite.
+
+
+## AUTH-02 — Vulnerability advisory triage (2026-11-17)
+
+- User ran `dotnet list .\\backend\\GHOST.slnx package --vulnerable --include-transitive`. It confirms `System.Security.Cryptography.Pkcs 9.0.11` is transitive in `GHOST.API` and `GHOST.Infrastructure`; Application, Domain, and Tests report no vulnerable packages.
+- The report does not identify the parent dependency. Do not add a direct package override until the dependency path is known.
+- Reviewed GitHub-reviewed advisories GHSA-846f-f764-76mx (High, CVE-2026-84008) and GHSA-2fmv-rv2c-59x7 (Moderate, CVE-2026-70162). Both list `System.Security.Cryptography.Pkcs 9.0.21` as patched for the 9.x line; 10.x is patched at 10.0.13. Preserve the dependency's intended major line; do not upgrade major versions without evidence.
+- API directly references Microsoft.AspNetCore.OpenApi 10.0.12 and EF Design 10.0.12. Infrastructure directly references EF Core/SqlServer/Identity.EntityFrameworkCore 10.0.12. Neither project directly references Pkcs.
+- Verified branch: `feature/auth-02-auditlog-append-only`; HEAD at review time: `20b34c3acd052c6f62a863e73bfb423bbe07c361` (`Record successful Release solution build and dependency advisories`).
+- Next action: run `dotnet nuget why` for `System.Security.Cryptography.Pkcs` against both API and Infrastructure project files to identify the exact parent chain. Then choose the smallest compatible patched update, rebuild, rerun vulnerability scan and full tests. No dependency changes have been made.
+- Advisories: https://github.com/advisories/GHSA-846f-f764-76mx and https://github.com/advisories/GHSA-2fmv-rv2c-59x7.
