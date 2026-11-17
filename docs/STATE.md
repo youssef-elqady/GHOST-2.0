@@ -1091,3 +1091,28 @@ Implement the AuditLog entity and EF configuration, generate and inspect the add
 
 ### Immediate next action
 Synchronize the local branch to `eca7be9423372d659ab338251a55db283877b5df`, generate the AuditLogs migration using the installed EF Core 10.0.12 tooling, and share the generated migration output/files for review. Do not apply it to GHOST2. After reviewing generated Up/Down operations, add the append-only trigger and proceed to the CLI bootstrap and disposable SQL Server tests.
+
+
+## AUTH-02 AuditLogs migration generated and reviewed (2026-11-17)
+
+### Generated migration
+- Local EF Core CLI 10.0.12 generated `20261117213727_AddAuditLogs.cs`, its Designer, and updated `GHOSTDbContextModelSnapshot.cs`.
+- User committed and pushed the three generated files in commit `d57c349` on `feature/products-inventory-billing`.
+- Source review confirmed the migration is additive: it creates only `dbo.AuditLogs`, its primary key, actor/JSON check constraints, restricted FK to `Users`, and the two intended indexes. The generated `Down()` drops only `AuditLogs`.
+- Snapshot and Designer describe the same AuditLog model and FK. No existing business or Identity table changes appeared in the reviewed migration diff.
+- `git diff --check` returned no output on the user's local checkout.
+
+### Append-only enforcement added in review branch
+- Add SQL Server trigger `dbo.TR_AuditLogs_AppendOnly` after the AuditLogs indexes. It rejects UPDATE and DELETE with SQL error 51000; INSERT remains permitted.
+- Drop the trigger before dropping AuditLogs in `Down()`.
+- Trigger protection is defense in depth, not a substitute for a least-privilege runtime SQL principal. A principal with schema/DDL or db_owner rights can alter or remove the trigger; runtime grants still need a separately reviewed deployment plan.
+
+### Current verification and safety status
+- Migration source and snapshot were reviewed; trigger source is added in a separate review branch/PR.
+- No local build or SQL Server integration test was run by the assistant. User's earlier EF migration generation reported a successful build, but that does not test trigger execution.
+- No database was queried or modified by this review. Do not apply this migration to live `GHOST2`; separate explicit approval and backup/restore plan remain required.
+- The CLI bootstrap, transaction-owned `sp_getapplock`, atomic role/user/audit flow, and disposable SQL Server integration tests remain outstanding.
+- Existing NU1902/NU1903 advisories for `System.Security.Cryptography.Pkcs 9.0.11` remain a separate dependency-remediation task.
+
+### Immediate next action
+Review the append-only trigger PR, then implement the dedicated bootstrap CLI and isolated SQL Server integration tests. Keep the live `GHOST2` database untouched until a separate migration-application approval.
