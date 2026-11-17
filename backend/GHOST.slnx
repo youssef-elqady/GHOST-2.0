@@ -4,6 +4,7 @@
     <Project Path="src/GHOST.Application/GHOST.Application.csproj" />
     <Project Path="src/GHOST.Domain/GHOST.Domain.csproj" />
     <Project Path="src/GHOST.Infrastructure/GHOST.Infrastructure.csproj" />
+    <Project Path="src/GHOST.Bootstrap/GHOST.Bootstrap.csproj" />
   </Folder>
   <Folder Name="/tests/">
     <Project Path="tests/GHOST.Tests/GHOST.Tests.csproj" />
