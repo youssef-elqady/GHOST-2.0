@@ -74,36 +74,11 @@ namespace GHOST.Infrastructure.Persistence.Migrations
         /// <inheritdoc />
         protected override void Down(MigrationBuilder migrationBuilder)
         {
-            migrationBuilder.DropPrimaryKey(name: "PK_UserLogins", table: "UserLogins");
-            migrationBuilder.DropPrimaryKey(name: "PK_UserTokens", table: "UserTokens");
-
-            migrationBuilder.AlterColumn<string>(
-                name: "LoginProvider", table: "UserLogins",
-                type: "nvarchar(450)", nullable: false,
-                oldClrType: typeof(string), oldType: "nvarchar(128)", oldMaxLength: 128);
-
-            migrationBuilder.AlterColumn<string>(
-                name: "ProviderKey", table: "UserLogins",
-                type: "nvarchar(450)", nullable: false,
-                oldClrType: typeof(string), oldType: "nvarchar(128)", oldMaxLength: 128);
-
-            migrationBuilder.AlterColumn<string>(
-                name: "LoginProvider", table: "UserTokens",
-                type: "nvarchar(450)", nullable: false,
-                oldClrType: typeof(string), oldType: "nvarchar(128)", oldMaxLength: 128);
-
-            migrationBuilder.AlterColumn<string>(
-                name: "Name", table: "UserTokens",
-                type: "nvarchar(450)", nullable: false,
-                oldClrType: typeof(string), oldType: "nvarchar(128)", oldMaxLength: 128);
-
-            migrationBuilder.AddPrimaryKey(
-                name: "PK_UserLogins", table: "UserLogins",
-                columns: new[] { "LoginProvider", "ProviderKey" });
-
-            migrationBuilder.AddPrimaryKey(
-                name: "PK_UserTokens", table: "UserTokens",
-                columns: new[] { "UserId", "LoginProvider", "Name" });
+            // The previous composite primary keys exceed SQL Server's 900-byte
+            // primary-key limit (1800 and 1816 bytes). Restoring that schema is
+            // not a valid rollback. Restore a verified pre-migration backup instead.
+            throw new NotSupportedException(
+                "This migration is intentionally forward-only. Roll back by restoring a verified pre-migration database backup; EF Down cannot recreate the oversized Identity primary keys.");
         }
     }
 }
