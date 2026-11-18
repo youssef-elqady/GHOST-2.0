@@ -1590,3 +1590,15 @@ Reported by user after fast-forward pull to commit `761f98ce4ead4dead43af76f262e
 1. Resolve issue #7 in a focused branch/PR and pass Release build/tests/CI.
 2. Update issue #5's rollout procedure to use verified backup restore for rollback, then verify the exact `GHOST_AUTH02_IT` target, migration history, and data preflight.
 3. Only then consider a controlled migration window. Do not apply to production or `GHOST2`.
+
+
+## AUTH-02 — Forward-only migration correction in review (2026-11-18)
+
+- Follow-up issue #7 identified that the existing migration `Down` attempted to restore 1,800-byte and 1,816-byte composite primary keys, exceeding SQL Server's 900-byte primary-key limit.
+- Created branch `fix/auth-identity-migration-forward-only` from `feature/auth-02-auditlog-append-only`.
+- Changed `FixIdentityCompositeKeyLengths.Down` to throw `NotSupportedException` before adding any migration operations. The documented rollback is a verified pre-migration backup restore; the `Up` path and preflight locks/checks remain unchanged.
+- Added `IdentityMigrationRollbackTests` to assert the `Down` path fails closed and emits zero schema operations.
+- This branch has **not yet been built or tested in this environment**. A PR/CI review is required before merge. No database was accessed or changed; the Identity migration remains unapplied.
+
+### Immediate next action
+- Open PR against `feature/auth-02-auditlog-append-only`, wait for Backend CI, and review the test result. Do not merge until CI is green and the change is reviewed. Then continue issue #5's backup/restore and read-only preflight gates.
