@@ -1305,3 +1305,29 @@ Synchronize the local AUTH-02 branch and verify migration files/snapshot are pre
 
 ### Immediate next action
 - Implement the Application bootstrap contract/result codes and Infrastructure service extraction, then reduce the CLI to a thin host. Add tests for pure validation/result mapping first. After local build and unit tests pass, implement migration preflight and the dedicated SQL Server integration harness guarded to `GHOST_AUTH02_IT`. Only then apply migrations to that approved database.
+
+
+## AUTH-02 — Bootstrap service extraction milestone (2026-11-18)
+
+### Implemented on the branch
+- Added Application contracts under `GHOST.Application.Identity.Bootstrap`: `AdminBootstrapRequest`, `AdminBootstrapResult`, `AdminBootstrapStatus`, and `IAdminBootstrapService`.
+- Added `GHOST.Infrastructure.Identity.AdminBootstrapService`. It now owns the Serializable transaction, transaction-owned `sp_getapplock`, existing-Admin check, Admin/Staff role creation, Identity user creation, role assignment, and sanitized `Admin.Bootstrapped` audit insert.
+- The service returns explicit outcomes for success, existing Admin, Identity rejection, and role conflict. Identity error descriptions are no longer returned; only stable error codes are surfaced.
+- Reduced `GHOST.Bootstrap/Program.cs` to interactive input/confirmation, DI composition, service invocation, and process exit-code mapping. The CLI still does not run migrations.
+- The CLI and service use the same scoped DI graph; `GHOSTDbContext` is registered once and the Identity stores and bootstrap service resolve from that scope.
+
+### Review notes / verification boundary
+- Static source review confirms the transaction and lock logic moved into Infrastructure and the CLI calls the Application contract.
+- The existing disabled-Admin blocking behavior is preserved because the service still checks role membership without filtering `IsActive`.
+- Early non-success results leave the transaction uncommitted; disposal rolls it back. Identity and audit writes remain in the same scoped context/transaction.
+- No local .NET build or tests have been run after these changes. Do not treat this milestone as compile-verified.
+- No SQL connection, migration, or database operation was performed. The approved `GHOST_AUTH02_IT` database remains untouched.
+- The local `artifacts/` directory remains untracked and must be preserved.
+
+### Next implementation steps
+1. User pulls the latest branch and runs a Release build of `GHOST.Bootstrap` plus the existing test suite. Fix compile/test failures before adding more behavior.
+2. Add bounded 128-character hidden-secret input and reject overlength input without echoing it.
+3. Add fail-closed pending-migration preflight (read-only; never call `Migrate()`) before service invocation.
+4. Add the isolated SQL Server integration-test project guarded exclusively to `GHOST_AUTH02_IT`; then inspect AuditLogs indexes/collation before deciding on the filtered unique bootstrap-event index.
+5. Only after build, tests, and safety checks pass, apply the existing migrations to the explicitly approved test database. Never target `GHOST2`, drop/recreate a database, or clean existing data.
+
