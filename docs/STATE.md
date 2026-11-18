@@ -1545,3 +1545,14 @@ Reported by user after fast-forward pull to commit `761f98ce4ead4dead43af76f262e
 - Build and test outputs were user-reported from the correct AUTH-02 worktree. No migration was applied and no database schema was changed by these build/test commands.
 - `GHOST2` remains untouched. The separate authfix worktree and local artifacts remain preserved.
 - PR #4 remains draft/open/unmerged. Applying the Identity migration still requires separate explicit approval.
+
+## AUTH-02 — PR #4 merged (2026-11-18)
+
+- PR #4 was marked ready for review and squash-merged successfully into `feature/auth-02-auditlog-append-only`.
+- Merge commit: `171fbd216cfaf6221b1bf18bb89665e282d54e3c`; GitHub reports the PR closed and merged.
+- The merged commit includes the Identity composite-key length correction, runtime Identity option alignment, guarded corrective migration, model snapshot/test updates, SQL Client servicing update, and AUTH-02 verification documentation.
+- Latest PR-head Backend CI run #21 (run ID `44375104887`) completed successfully.
+- User-reported local verification from `E:\\GHOST\\GHOST-2.0-authfix`: Release solution build succeeded; 57 tests total, 54 passed, 0 failed, 3 skipped (the 3 live SQL Server tests were skipped in that full-suite invocation because the connection variable was absent).
+- Separate live SQL Server test run after the migration source correction: 13 passed, 0 failed, 0 skipped against the dedicated `GHOST_AUTH02_IT` target. This validated the SQL Server test harness and existing AuditLog behavior; it did not apply the Identity migration.
+- **Migration status: not applied.** No database schema was modified by the merge or test runs. Before applying, confirm the exact target database, take/verify a restorable backup, check preflight values, and schedule a controlled migration window. Do not target `GHOST2`.
+- The separate local authfix worktree and its artifacts remain preserved. No local worktree was altered by this GitHub merge.
