@@ -1267,3 +1267,41 @@ Obtain explicit approval to provision/use a dedicated SQL Server test database (
 
 ### Immediate next action
 Synchronize the local AUTH-02 branch and verify migration files/snapshot are present. Then implement the testable bootstrap service, migration preflight, and SQL Server integration-test harness before creating/applying migrations to the approved test database.
+
+
+## AUTH-02 — Bootstrap implementation deep review and execution plan (2026-11-18)
+
+### Current source baseline
+- Reviewed current branch HEAD `3119778d211ec1186ba265717ab8bff6b023d637` (confirmed from GitHub branch metadata).
+- User's local checkout is synchronized to the same commit; tracked worktree is clean and untracked `artifacts/` is intentionally preserved.
+- Re-read the current Bootstrap CLI, project references, `GHOSTDbContext`, `AuditLogConfiguration`, `AuditLog`, `ApplicationUser`, and test project.
+
+### Concrete source findings
+- Bootstrap orchestration is entirely in top-level `GHOST.Bootstrap/Program.cs`; the Infrastructure project is already referenced by the CLI, but the test project currently references Application only.
+- The CLI currently has no `Database.GetPendingMigrationsAsync` preflight. It prints that migrations are not run, but does not verify schema readiness before attempting Identity operations.
+- `ReadSecret()` accumulates an unbounded `StringBuilder`; there is no 128-character maximum. Enforce a bounded read while continuing to avoid echo, args, environment variables, and logs.
+- Identity failure paths currently include `IdentityError.Description` in exception messages. Replace this with stable error codes only; do not emit descriptions or raw exception messages to console.
+- The service must preserve one scoped `GHOSTDbContext` for UserManager, RoleManager, and AuditLogs so the EF transaction covers all writes.
+- The existing transaction-owned `sp_getapplock` is retained as the cross-process serialization mechanism. Its negative return codes are treated as failure. Integration tests must prove lock behavior on SQL Server.
+- Existing `AuditLogs` index names and SQL collation must be inspected before adding a filtered unique index for the one successful `Admin.Bootstrapped` action. The filtered predicate must match the actual Action column semantics and SQL Server provider.
+- `AuditLog.Create` generates UTC timestamps directly; `ApplicationUser.CreatedAt` also uses `DateTimeOffset.UtcNow`. Introducing a clock abstraction is a broader model/API decision; do not add it opportunistically unless needed for deterministic AUTH-02 tests and migration impact is understood.
+- The current Admin-existence check uses `GetUsersInRoleAsync("Admin")`, which includes disabled users; preserve the rule that a disabled Admin still blocks first-admin bootstrap. Test it explicitly.
+- Existing Identity options are currently configured in the CLI host only. Keep this slice's service independent of API authentication registration; AUTH-03 will centralize runtime Identity setup when sign-in is implemented.
+
+### Implementation decisions for this slice
+1. Extract an `IAdminBootstrapService` contract and result/failure codes into Application; implement it in Infrastructure.
+2. Keep terminal input, exact database confirmation, hidden password collection, and process exit-code mapping in the CLI.
+3. Add an explicit migration preflight before any bootstrap writes. Pending migrations or inability to read migration state must fail closed; the CLI must never invoke `Migrate()`.
+4. Bound secret input to 128 characters and reject excess input without echoing it. Return only stable Identity error codes to the operator.
+5. Retain the current `AuditLogs` table and sanitized `Admin.Bootstrapped` event. Do not add `SecurityAuditEvents`.
+6. Inspect collation/index behavior, then add a filtered unique index for exactly one successful bootstrap event in an additive migration if the predicate is robust. No hand-edited model snapshot.
+7. Add a dedicated SQL Server integration-test project. Its connection string must come only from `GHOST_AUTH02_TEST_CONNECTION_STRING`; validate server/database metadata and require Initial Catalog exactly `GHOST_AUTH02_IT`. No fallback to application configuration, no GHOST2, no automatic DROP/CREATE database, and no destructive fixture cleanup.
+8. Apply migrations only after an explicit safety preflight confirms the exact approved catalog. Preserve all existing data in the test database; tests must use unique usernames and non-destructive assertions. Repeated concurrency stress requiring database reset is deferred until an isolated reset strategy is separately approved.
+
+### Verification boundary
+- This was a GitHub source review only. No local build, tests, SQL Server connection, migration application, or database operation was performed in this step.
+- PR #3 remains open and draft. Do not mark ready or merge until SQL Server integration tests and runtime gates pass.
+- `GHOST2`, existing databases, backups, and the local untracked `artifacts/` directory remain untouched.
+
+### Immediate next action
+- Implement the Application bootstrap contract/result codes and Infrastructure service extraction, then reduce the CLI to a thin host. Add tests for pure validation/result mapping first. After local build and unit tests pass, implement migration preflight and the dedicated SQL Server integration harness guarded to `GHOST_AUTH02_IT`. Only then apply migrations to that approved database.
