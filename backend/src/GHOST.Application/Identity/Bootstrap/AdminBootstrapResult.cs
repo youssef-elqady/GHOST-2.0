@@ -3,6 +3,7 @@ namespace GHOST.Application.Identity.Bootstrap;
 public enum AdminBootstrapStatus
 {
     Succeeded,
+    InvalidRequest,
     AdminAlreadyExists,
     IdentityRejected,
     RoleConflict
