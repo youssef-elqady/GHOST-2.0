@@ -12,7 +12,7 @@ public sealed class AuditLogSqlServerTests
         command.CommandText = """
             SELECT DB_NAME(),
                    OBJECT_ID(N'dbo.AuditLogs', N'U'),
-                   OBJECT_ID(N'dbo.TR_AuditLogs_AppendOnly', N'T');
+                   OBJECT_ID(N'dbo.TR_AuditLogs_AppendOnly', N'TR');
             """;
 
         await using var reader = await command.ExecuteReaderAsync();
