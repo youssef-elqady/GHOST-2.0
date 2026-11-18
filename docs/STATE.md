@@ -1603,12 +1603,11 @@ Reported by user after fast-forward pull to commit `761f98ce4ead4dead43af76f262e
 
 ### Verification status / safety
 - Source diff is limited to the migration Down implementation, its focused unit test, and this state update.
-- Build, tests, and CI are pending; no success is claimed yet.
+- Backend CI run #32 (run ID `44377059343`) completed successfully; both Release Build and Test steps passed. The exact test count was not available from the workflow summary. No local test run was performed in this environment.
 - No migration script was executed, no database was connected to or modified, and no data was changed.
 - Issue #5 remains blocked until this fix is reviewed and green, then the exact `GHOST_AUTH02_IT` target and verified backup/restore rehearsal are independently confirmed. `GHOST2` and production remain excluded.
 
 ### Immediate next action
-1. Open a PR targeting `feature/auth-02-auditlog-append-only` and run Backend CI.
-2. Review the generated diff to confirm Up is byte-for-byte unchanged and Down emits no operations before throwing.
-3. After CI and local Release tests pass, merge this focused correction; then update Issue #5 to require verified backup restore as the only rollback mechanism.
-4. Do not apply the migration until all Issue #5 operational gates pass.
+1. PR #11 was squash-merged into `feature/auth-02-auditlog-append-only` as commit `d5fdf30ed1a5b6380feb372b3e8a599fbe58081d` after the Up/Down diff review and successful Backend CI.
+2. Issue #7 is resolved. Issue #5 remains open for the exact `GHOST_AUTH02_IT` target verification, verified backup/restore rehearsal, schema/history/data preflight, and controlled execution.
+3. Do not apply the migration until every Issue #5 operational gate passes; do not use EF Down as rollback.
