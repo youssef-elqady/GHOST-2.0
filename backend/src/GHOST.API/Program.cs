@@ -6,6 +6,7 @@ using GHOST.Application.BusinessDays.OpenShift;
 using GHOST.Application.Devices.CreateDevice;
 using GHOST.Application.Sessions;
 using GHOST.Application.Sessions.StartSession;
+using GHOST.Infrastructure.Identity;
 using GHOST.Infrastructure.Persistence;
 using GHOST.Infrastructure.Persistence.Repositories;
 using Microsoft.EntityFrameworkCore;
@@ -35,6 +36,8 @@ builder.Services.AddDbContext<GHOSTDbContext>(options =>
         builder.Configuration.GetConnectionString("DefaultConnection"),
         sqlOptions => sqlOptions.MigrationsAssembly(
             typeof(GHOSTDbContext).Assembly.FullName)));
+
+builder.Services.AddGhostIdentity();
 
 builder.Services.AddScoped<IBusinessDayRepository, BusinessDayRepository>();
 builder.Services.AddScoped<IDeviceRepository, DeviceRepository>();
