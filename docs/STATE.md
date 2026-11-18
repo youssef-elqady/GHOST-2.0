@@ -1590,3 +1590,25 @@ Reported by user after fast-forward pull to commit `761f98ce4ead4dead43af76f262e
 1. Resolve issue #7 in a focused branch/PR and pass Release build/tests/CI.
 2. Update issue #5's rollout procedure to use verified backup restore for rollback, then verify the exact `GHOST_AUTH02_IT` target, migration history, and data preflight.
 3. Only then consider a controlled migration window. Do not apply to production or `GHOST2`.
+
+
+## AUTH-02 — Identity migration made explicitly forward-only (2026-11-18)
+
+### Implemented on a focused fix branch
+- Branch: `fix/auth02-identity-migration-forward-only`, based on the latest AUTH-02 tip `e8cfdd3a75ecdb0d858280cfb051257e4997e27e`.
+- Updated only the `Down` method of `20261118190000_FixIdentityCompositeKeyLengths`: it now throws an explicit `InvalidOperationException` before adding any migration operations.
+- The exception explains that the old composite keys exceed SQL Server's 900-byte primary-key limit and that rollback requires restoring a verified pre-migration backup.
+- The `Up` path, its `SET XACT_ABORT ON`, both `TABLOCKX, HOLDLOCK` preflights, all four `nvarchar(128)` alterations, and primary-key recreation were left unchanged.
+- Added `IdentityMigrationRollbackTests`, which invokes the protected Down method through a test adapter and asserts that it throws and leaves `MigrationBuilder.Operations` empty.
+
+### Verification status / safety
+- Source diff is limited to the migration Down implementation, its focused unit test, and this state update.
+- Build, tests, and CI are pending; no success is claimed yet.
+- No migration script was executed, no database was connected to or modified, and no data was changed.
+- Issue #5 remains blocked until this fix is reviewed and green, then the exact `GHOST_AUTH02_IT` target and verified backup/restore rehearsal are independently confirmed. `GHOST2` and production remain excluded.
+
+### Immediate next action
+1. Open a PR targeting `feature/auth-02-auditlog-append-only` and run Backend CI.
+2. Review the generated diff to confirm Up is byte-for-byte unchanged and Down emits no operations before throwing.
+3. After CI and local Release tests pass, merge this focused correction; then update Issue #5 to require verified backup restore as the only rollback mechanism.
+4. Do not apply the migration until all Issue #5 operational gates pass.
