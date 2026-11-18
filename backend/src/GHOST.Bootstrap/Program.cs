@@ -97,6 +97,7 @@ services.AddDbContext<GHOSTDbContext>(options => options.UseSqlServer(connection
 services
     .AddIdentityCore<ApplicationUser>(options =>
     {
+        options.Stores.MaxLengthForKeys = 128;
         options.User.RequireUniqueEmail = false;
         options.Password.RequiredLength = 12;
         options.Password.RequiredUniqueChars = 4;

@@ -1417,3 +1417,131 @@ Synchronize the local AUTH-02 branch and verify migration files/snapshot are pre
 ### Pull request review note
 - PR #3 is still draft/open and currently targets `feature/products-inventory-billing` as its base branch, not `main`.
 - No base-branch change, merge, or PR readiness change was made. Confirm the intended integration target and review the full diff before any merge; keep the PR draft until SQL Server integration tests and remaining AUTH-02 gates pass.
+
+
+## AUTH-02 — Identity composite-key index correction (2026-11-18)
+
+### Root cause confirmed
+- EF Identity's design-time context reads `IdentityOptions` from the EF options service provider. When that provider is absent, it falls back to Identity schema version 1; that path does not apply the 128-character key-length default unless `MaxLengthForKeys` is explicitly supplied.
+- The design-time model therefore left the four composite-key strings unbounded, and the SQL Server provider mapped them to `nvarchar(450)`.
+- This produced oversized clustered primary keys: UserLogins (1800 bytes) and UserTokens (1816 bytes), above SQL Server's 900-byte clustered-index key limit.
+
+### Corrective change in progress
+- Explicitly cap `IdentityUserLogin<Guid>.LoginProvider`, `ProviderKey`, and `IdentityUserToken<Guid>.LoginProvider`, `Name` at 128 characters in `GHOSTDbContext.OnModelCreating`; this is the schema-level source of truth and does not depend on the host's DI configuration.
+- Set `IdentityOptions.Stores.MaxLengthForKeys = 128` in the Bootstrap host so runtime Identity options agree with the EF model.
+- Add a corrective migration that checks existing values before narrowing columns, drops/recreates the two composite primary keys around the ALTER COLUMN operations, and restores the previous schema on Down.
+- Add a no-database model test asserting all four max lengths and composite-key byte sizes remain below SQL Server's 900-byte limit.
+
+### Verification and safety boundary
+- Source-level root cause confirmed against the ASP.NET Core Identity EF implementation and the current migration/snapshot.
+- The existing `GHOST_AUTH02_IT` database already has the previous schema. This code change does not connect to or modify any database.
+- Migration is for review only; it must not be applied until its generated SQL and data preflight are reviewed and the user separately approves execution.
+- No build or tests have been run by this GitHub-only edit. CI and user-side Release tests remain required.
+- No changes to `GHOST2`, no branch merge, and no destructive database operation.
+
+### Next gate
+- Review the PR diff and generated migration SQL; run the backend CI workflow and local Release tests.
+- Only after those gates pass, request separate explicit approval before applying the new migration to `GHOST_AUTH02_IT`.
+
+
+## Dependency security follow-up (2026-11-18)
+- User ran Release build and tests from the PR worktree: build succeeded; 54 tests passed, 0 failed, 3 SQL Server integration tests skipped because `GHOST_AUTH02_TEST_CONNECTION_STRING` was not configured.
+- Restore reported `System.Security.Cryptography.Pkcs 9.0.4` with GHSA-2fmv-rv2c-59x7 (Moderate) and GHSA-846f-f764-76mx (High).
+- The vulnerable transitive dependency comes from the SQL Server test project's `Microsoft.Data.SqlClient 6.1.3` dependency graph. Upgrade to SqlClient 6.1.8, whose .NET 9 dependency group requires Pkcs 9.0.21, the patched release for both advisories.
+- This dependency update is a targeted servicing update; restore/build/tests must be rerun to verify the resolved graph and compatibility.
+- The three SQL Server tests remain unverified until run against the dedicated test database.
+
+
+## AUTH-02 — Identity key-length migration SQL review (2026-11-18)
+
+### User-side verification reported after the dependency update
+- `dotnet ef --version` reports EF Core Tools 10.0.15, aligned with EF Core runtime 10.0.15.
+- Release build succeeded and the complete solution test run reported 54 passed, 0 failed, 3 skipped (the SQL Server integration tests were skipped because the dedicated connection variable was absent).
+- With `GHOST_AUTH02_TEST_CONNECTION_STRING` configured for the dedicated `GHOST_AUTH02_IT` catalog, `GHOST.SqlServer.Tests` reported 13 passed, 0 failed, 0 skipped. This includes live verification of the AuditLogs table and append-only trigger rejecting UPDATE and DELETE, plus connection-target safety checks.
+- NuGet's vulnerable-package check for `GHOST.SqlServer.Tests` reported no vulnerable packages.
+- GitHub Actions Backend CI run [#44369739626](https://github.com/youssef-elqady/GHOST-2.0/actions/runs/44369739626) completed successfully for the reviewed branch head `5dd7a691ddf6883d12b621c789abd402f01002c9`.
+
+### Generated SQL review
+- User generated `FixIdentityCompositeKeyLengths.sql` with EF Tools 10.0.15 (3,057 bytes) in the separate local worktree `E:\\GHOST\\GHOST-2.0-authfix`; this path is outside the primary `E:\\GHOST\\GHOST-2.0` checkout and is intentionally preserved as a separate worktree artifact.
+- Reviewed the supplied script: it starts a transaction; checks `UserLogins` and `UserTokens` for values over 256 bytes using `DATALENGTH`; takes `TABLOCKX, HOLDLOCK` locks; drops the two primary keys; narrows the four Identity key columns to `nvarchar(128)`; recreates both primary keys; inserts only the corrective migration ID into `__EFMigrationsHistory`; and commits.
+- Calculated target composite-key widths are 512 bytes for `UserLogins` and 528 bytes for `UserTokens`, below SQL Server's 900-byte clustered-key limit.
+- No row-copy, table-drop, or explicit data-delete operation appears in the supplied SQL.
+
+### Blocking hardening item — preflight error transaction behavior
+- The generated script's transaction begins before the preflight, but the preflight raises `THROW` without an explicit `SET XACT_ABORT ON` or `TRY/CATCH` rollback path.
+- SQL Server documents `XACT_ABORT OFF` as the default and states that with it, some run-time errors roll back only the failing statement while the transaction remains active. Since `THROW` honors `XACT_ABORT`, a failed preflight may leave the script session's transaction and table locks open until explicitly rolled back or the connection closes. See Microsoft Learn: https://learn.microsoft.com/sql/t-sql/statements/set-xact-abort-transact-sql
+- This is a script-execution safety issue, not evidence that the successful migration path is incorrect. Do not execute the script yet. Harden and verify the failure path, then regenerate and review the SQL output.
+- No migration has been applied to `GHOST_AUTH02_IT`. No connection or operation against `GHOST2` was authorized or performed.
+
+### Immediate next action
+- Correct the migration's preflight failure handling without weakening the transaction/locking guarantee. Validate the generated script's success and failure paths before requesting any separate approval to apply it to `GHOST_AUTH02_IT`.
+- Keep PR #4 draft/open and unmerged. Preserve the local `artifacts/` directory and the separate authfix worktree.
+
+
+## AUTH-02 — Migration preflight rollback hardening (2026-11-18)
+
+- Updated `20261118190000_FixIdentityCompositeKeyLengths.Up` to execute `SET XACT_ABORT ON;` before either data preflight query, inside the migration's transaction.
+- Rationale: SQL Server defaults `XACT_ABORT` to OFF; `THROW` honors this setting. Enabling it ensures a runtime error from the preflight aborts and rolls back the active transaction rather than leaving the manual script session holding the table locks. Microsoft reference: https://learn.microsoft.com/sql/t-sql/statements/set-xact-abort-transact-sql
+- The existing `TABLOCKX, HOLDLOCK` protection remains in place, so the check-to-ALTER race is still guarded by transaction-held locks.
+- This is a source change only. It has not yet been built or tested locally, and the regenerated SQL has not yet been inspected.
+- No migration was applied; no database was accessed; `GHOST2` remains untouched.
+
+### Immediate next action
+- Pull the latest PR branch, rebuild/re-run tests, regenerate `FixIdentityCompositeKeyLengths.sql`, and send the regenerated SQL for review. Confirm it contains `SET XACT_ABORT ON;` after `BEGIN TRANSACTION` and before the preflight. Do not execute it yet.
+
+
+## AUTH-02 — Post-hardening local verification (2026-11-18)
+
+Reported by user after fast-forward pull to commit `761f98ce4ead4dead43af76f262e1ebda7b60a0d`:
+- `git pull --ff-only origin fix/auth-identity-composite-key-lengths`: succeeded; fast-forward from `5dd7a69` to `761f98c`.
+- `dotnet build backend/GHOST.slnx --configuration Release`: succeeded.
+- `dotnet test backend/GHOST.slnx --configuration Release`: 57 total, 54 passed, 0 failed, 3 skipped. The 3 skipped are the SQL Server integration tests because `GHOST_AUTH02_TEST_CONNECTION_STRING` was not set in this invocation.
+- Regenerated `FixIdentityCompositeKeyLengths.sql` after the `SET XACT_ABORT ON` source change; EF build succeeded. The regenerated SQL content has not yet been reviewed.
+- The dedicated SQL Server test project has not yet been rerun after this migration source change.
+- No migration was applied and no database was modified.
+
+### Immediate next action
+- Review the regenerated SQL output and confirm `SET XACT_ABORT ON;` appears after `BEGIN TRANSACTION;` and before both preflight checks. Then validate the SQL Server failure path safely without leaving an open transaction. Keep PR #4 draft and unmerged.
+
+
+## AUTH-02 — Identity migration preflight syntax correction (2026-11-18)
+
+- Reviewed the user's regenerated SQL output and found that both preflight checks used `;THROW` as the statement immediately following a single-line `IF`. This syntax is unsafe because the leading semicolon terminates an empty statement; the THROW is not reliably scoped as the IF body and can execute unconditionally.
+- Corrected the migration source `20261118190000_FixIdentityCompositeKeyLengths.cs`: both preflight checks now use explicit `BEGIN ... END` blocks around their respective `THROW 51001` / `THROW 51002` statements.
+- The migration source still includes `SET XACT_ABORT ON;` before both preflight checks, and retains `TABLOCKX, HOLDLOCK` on both tables.
+- The SQL pasted by the user did not include `SET XACT_ABORT ON;`, despite that statement being present in the GitHub migration source. Treat the pasted SQL as not matching the current source/branch output; regenerate it from the latest branch commit before any further review.
+- Source-only GitHub change committed as `b0dbc4c1a4505b24da7332fd2cd0c2bf11f6fae0`. No database was connected to or modified; no migration was applied; PR #4 remains draft/open and unmerged.
+- **Next action:** user pulls this commit in the separate `E:\\GHOST\\GHOST-2.0-authfix` worktree, regenerates `FixIdentityCompositeKeyLengths.sql`, and shares the complete output. Verify the generated script contains `SET XACT_ABORT ON;` after `BEGIN TRANSACTION;`, each `IF EXISTS` wraps its THROW in BEGIN/END, and the remaining DDL/history/COMMIT sequence is unchanged. Then rerun the SQL Server integration test project after this source change. Do not execute the migration script.
+
+
+## AUTH-02 — Regenerated Identity migration SQL review (2026-11-18)
+
+- User supplied the regenerated `FixIdentityCompositeKeyLengths.sql` from the latest source correction.
+- Verified the script starts its migration transaction, enables `SET XACT_ABORT ON` before either preflight, and scopes both `THROW 51001` / `THROW 51002` inside explicit `IF EXISTS ... BEGIN ... END` blocks.
+- Both preflights retain `TABLOCKX, HOLDLOCK` and check `DATALENGTH(...) > 256` before any schema changes.
+- Verified the script drops only `PK_UserLogins` and `PK_UserTokens`, narrows exactly the four intended columns to `nvarchar(128) NOT NULL`, recreates the same composite primary keys, inserts the corrective migration history row, and commits.
+- No table drops, explicit row deletes, or unrelated schema changes appear in the supplied script. Expected composite key widths remain 512 bytes for UserLogins and 528 bytes for UserTokens, below SQL Server's 900-byte clustered-index key limit.
+- Backend CI run #17 for source-fix commit `b0dbc4c1a4505b24da7332fd2cd0c2bf11f6fae0` completed successfully.
+- Remaining verification: rerun the dedicated SQL Server test project against the exact pre-approved `GHOST_AUTH02_IT` target after this latest source change. These tests validate the existing SQL Server harness and do not apply the Identity migration. Do not execute the migration SQL. Any migration application still requires separate explicit approval.
+
+
+## AUTH-02 — Dedicated SQL Server tests after migration source correction (2026-11-18)
+
+- User reran `backend/tests/GHOST.SqlServer.Tests/GHOST.SqlServer.Tests.csproj` in Release configuration from the separate `E:\\GHOST\\GHOST-2.0-authfix` worktree, with `GHOST_AUTH02_TEST_CONNECTION_STRING` configured for the approved dedicated `GHOST_AUTH02_IT` catalog.
+- Result: **13 passed, 0 failed, 0 skipped**; test duration 2.9 seconds; project build succeeded.
+- Live SQL Server checks passed for the AuditLog table and append-only trigger rejecting UPDATE and DELETE.
+- Connection-safety checks passed, including rejection of `master`, `GHOST2`, wrong catalog casing, missing/unsafe connection values, attach-file mode, and failover partner; exact dedicated catalog validation passed.
+- This run verifies the SQL Server integration-test harness and existing AuditLog behavior after the latest migration source correction. It does **not** execute or apply `20261118190000_FixIdentityCompositeKeyLengths`.
+- No Identity migration was applied and no schema change was performed by this test run. `GHOST2` remains untouched. Preserve the separate authfix worktree and local artifacts.
+- **Next gate:** optionally rerun the full solution Release build/test after the latest source correction if not already done on this exact commit; then review PR #4 status and remaining AUTH-02 exit criteria. Keep PR #4 draft/open and unmerged pending explicit user approval. Applying the Identity migration still requires separate explicit approval.
+
+## AUTH-02 — Full-solution Release verification after SQL migration correction (2026-11-18)
+
+- User ran both commands from the separate `E:\\GHOST\\GHOST-2.0-authfix` worktree:
+  - `dotnet build backend/GHOST.slnx --configuration Release`: succeeded; all solution projects compiled.
+  - `dotnet test backend/GHOST.slnx --configuration Release`: **57 total, 54 passed, 0 failed, 3 skipped**; test duration 6.0 seconds.
+- The three skipped tests are the live SQL Server integration tests because `GHOST_AUTH02_TEST_CONNECTION_STRING` was not configured in this full-solution invocation.
+- This full-solution run complements, and does not replace, the separate dedicated SQL Server test run recorded above: **13 passed, 0 failed, 0 skipped** against the approved `GHOST_AUTH02_IT` target after the latest migration source correction.
+- Build and test outputs were user-reported from the correct AUTH-02 worktree. No migration was applied and no database schema was changed by these build/test commands.
+- `GHOST2` remains untouched. The separate authfix worktree and local artifacts remain preserved.
+- PR #4 remains draft/open/unmerged. Applying the Identity migration still requires separate explicit approval.
