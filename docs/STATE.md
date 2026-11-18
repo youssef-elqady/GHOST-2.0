@@ -1601,3 +1601,10 @@ Reported by user after fast-forward pull to commit `761f98ce4ead4dead43af76f262e
 - Commits: `bb30e3405a462ccb0fbf1cbc1386e1319a25e867` (migration) and `177091ce869852a1e2fa89d4f92e9aebf3819a77` (test).
 - **Verification pending:** no local build/test was run in this environment. Backend CI must compile and execute the new test before this correction is considered verified. No database was connected to or modified; the migration was not applied; `GHOST2` remains untouched.
 - **Next action:** run Release solution build/tests and inspect the generated migration rollback script/operations. Then update Issue #5 to require verified backup restore as the only rollback path. Keep the rollout blocked until the correction is merged, target is verified, and restore rehearsal passes.
+
+
+### Review handoff — PR #9
+- Opened draft PR #9: https://github.com/youssef-elqady/GHOST-2.0/pull/9 targeting `feature/auth-02-auditlog-append-only`.
+- PR diff is limited to the migration `Down` implementation, one focused rollback test, and this state log. No Up-path change.
+- Updated Issue #7 with the PR link. Issue #5 now explicitly blocks execution until Issue #7 is resolved and specifies backup restore (not EF Down) as the only rollback method.
+- At handoff, no GitHub Actions run or commit status had yet appeared for the PR head; do not treat the change as CI-verified or merged. Keep PR #9 draft until CI and local Release verification pass.
