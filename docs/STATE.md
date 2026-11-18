@@ -1488,3 +1488,17 @@ Synchronize the local AUTH-02 branch and verify migration files/snapshot are pre
 
 ### Immediate next action
 - Pull the latest PR branch, rebuild/re-run tests, regenerate `FixIdentityCompositeKeyLengths.sql`, and send the regenerated SQL for review. Confirm it contains `SET XACT_ABORT ON;` after `BEGIN TRANSACTION` and before the preflight. Do not execute it yet.
+
+
+## AUTH-02 — Post-hardening local verification (2026-11-18)
+
+Reported by user after fast-forward pull to commit `761f98ce4ead4dead43af76f262e1ebda7b60a0d`:
+- `git pull --ff-only origin fix/auth-identity-composite-key-lengths`: succeeded; fast-forward from `5dd7a69` to `761f98c`.
+- `dotnet build backend/GHOST.slnx --configuration Release`: succeeded.
+- `dotnet test backend/GHOST.slnx --configuration Release`: 57 total, 54 passed, 0 failed, 3 skipped. The 3 skipped are the SQL Server integration tests because `GHOST_AUTH02_TEST_CONNECTION_STRING` was not set in this invocation.
+- Regenerated `FixIdentityCompositeKeyLengths.sql` after the `SET XACT_ABORT ON` source change; EF build succeeded. The regenerated SQL content has not yet been reviewed.
+- The dedicated SQL Server test project has not yet been rerun after this migration source change.
+- No migration was applied and no database was modified.
+
+### Immediate next action
+- Review the regenerated SQL output and confirm `SET XACT_ABORT ON;` appears after `BEGIN TRANSACTION;` and before both preflight checks. Then validate the SQL Server failure path safely without leaving an open transaction. Keep PR #4 draft and unmerged.
