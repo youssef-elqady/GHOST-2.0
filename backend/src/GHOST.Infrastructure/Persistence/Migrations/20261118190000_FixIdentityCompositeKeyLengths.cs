@@ -74,36 +74,10 @@ namespace GHOST.Infrastructure.Persistence.Migrations
         /// <inheritdoc />
         protected override void Down(MigrationBuilder migrationBuilder)
         {
-            migrationBuilder.DropPrimaryKey(name: "PK_UserLogins", table: "UserLogins");
-            migrationBuilder.DropPrimaryKey(name: "PK_UserTokens", table: "UserTokens");
-
-            migrationBuilder.AlterColumn<string>(
-                name: "LoginProvider", table: "UserLogins",
-                type: "nvarchar(450)", nullable: false,
-                oldClrType: typeof(string), oldType: "nvarchar(128)", oldMaxLength: 128);
-
-            migrationBuilder.AlterColumn<string>(
-                name: "ProviderKey", table: "UserLogins",
-                type: "nvarchar(450)", nullable: false,
-                oldClrType: typeof(string), oldType: "nvarchar(128)", oldMaxLength: 128);
-
-            migrationBuilder.AlterColumn<string>(
-                name: "LoginProvider", table: "UserTokens",
-                type: "nvarchar(450)", nullable: false,
-                oldClrType: typeof(string), oldType: "nvarchar(128)", oldMaxLength: 128);
-
-            migrationBuilder.AlterColumn<string>(
-                name: "Name", table: "UserTokens",
-                type: "nvarchar(450)", nullable: false,
-                oldClrType: typeof(string), oldType: "nvarchar(128)", oldMaxLength: 128);
-
-            migrationBuilder.AddPrimaryKey(
-                name: "PK_UserLogins", table: "UserLogins",
-                columns: new[] { "LoginProvider", "ProviderKey" });
-
-            migrationBuilder.AddPrimaryKey(
-                name: "PK_UserTokens", table: "UserTokens",
-                columns: new[] { "UserId", "LoginProvider", "Name" });
+            throw new InvalidOperationException(
+                "Migration 20261118190000_FixIdentityCompositeKeyLengths is forward-only. " +
+                "The previous Identity composite keys exceed SQL Server's 900-byte primary-key limit. " +
+                "To roll back, restore the verified pre-migration database backup; do not execute EF Down.");
         }
     }
 }
