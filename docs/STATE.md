@@ -1403,3 +1403,12 @@ Synchronize the local AUTH-02 branch and verify migration files/snapshot are pre
 - Added `.github/workflows/backend-ci.yml` to restore, Release-build, and test the full `.NET 10` solution on backend pull requests and the active AUTH-02 branch.
 - The workflow does not receive a SQL connection secret. Therefore the SQL Server integration tests remain skipped in CI by default while the connection-guard unit tests execute.
 - CI has been authored but its first GitHub Actions run has not yet been observed. Do not report it as green until the run completes successfully.
+
+
+### Backend CI verification (2026-11-18)
+- GitHub Actions run [#44324909301](https://github.com/youssef-elqady/GHOST-2.0/actions/runs/44324909301) completed successfully on commit `473d61b003867bc72771bd87503fb423389d3f18`.
+- Full `.NET 10` solution restore and Release build succeeded.
+- Existing unit suite: 43 passed, 0 failed.
+- SQL test project: 10 passed, 0 failed, 3 SQL integration tests skipped because no dedicated SQL connection was configured.
+- The first CI attempt exposed an incorrect test expectation: SqlClient normalizes trailing whitespace in the catalog value. The guard compares the parsed catalog actually used by SqlClient; the invalid expectation was removed, and the rerun passed.
+- This green CI proves compilation and the connection-guard unit tests. It does **not** prove live SQL Server trigger/constraint behavior because all 3 database integration tests were skipped.
