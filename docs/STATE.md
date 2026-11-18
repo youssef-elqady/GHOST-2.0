@@ -1523,3 +1523,14 @@ Reported by user after fast-forward pull to commit `761f98ce4ead4dead43af76f262e
 - No table drops, explicit row deletes, or unrelated schema changes appear in the supplied script. Expected composite key widths remain 512 bytes for UserLogins and 528 bytes for UserTokens, below SQL Server's 900-byte clustered-index key limit.
 - Backend CI run #17 for source-fix commit `b0dbc4c1a4505b24da7332fd2cd0c2bf11f6fae0` completed successfully.
 - Remaining verification: rerun the dedicated SQL Server test project against the exact pre-approved `GHOST_AUTH02_IT` target after this latest source change. These tests validate the existing SQL Server harness and do not apply the Identity migration. Do not execute the migration SQL. Any migration application still requires separate explicit approval.
+
+
+## AUTH-02 — Dedicated SQL Server tests after migration source correction (2026-11-18)
+
+- User reran `backend/tests/GHOST.SqlServer.Tests/GHOST.SqlServer.Tests.csproj` in Release configuration from the separate `E:\\GHOST\\GHOST-2.0-authfix` worktree, with `GHOST_AUTH02_TEST_CONNECTION_STRING` configured for the approved dedicated `GHOST_AUTH02_IT` catalog.
+- Result: **13 passed, 0 failed, 0 skipped**; test duration 2.9 seconds; project build succeeded.
+- Live SQL Server checks passed for the AuditLog table and append-only trigger rejecting UPDATE and DELETE.
+- Connection-safety checks passed, including rejection of `master`, `GHOST2`, wrong catalog casing, missing/unsafe connection values, attach-file mode, and failover partner; exact dedicated catalog validation passed.
+- This run verifies the SQL Server integration-test harness and existing AuditLog behavior after the latest migration source correction. It does **not** execute or apply `20261118190000_FixIdentityCompositeKeyLengths`.
+- No Identity migration was applied and no schema change was performed by this test run. `GHOST2` remains untouched. Preserve the separate authfix worktree and local artifacts.
+- **Next gate:** optionally rerun the full solution Release build/test after the latest source correction if not already done on this exact commit; then review PR #4 status and remaining AUTH-02 exit criteria. Keep PR #4 draft/open and unmerged pending explicit user approval. Applying the Identity migration still requires separate explicit approval.
