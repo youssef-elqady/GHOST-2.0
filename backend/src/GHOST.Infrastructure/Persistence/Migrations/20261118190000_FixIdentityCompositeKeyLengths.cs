@@ -74,36 +74,8 @@ namespace GHOST.Infrastructure.Persistence.Migrations
         /// <inheritdoc />
         protected override void Down(MigrationBuilder migrationBuilder)
         {
-            migrationBuilder.DropPrimaryKey(name: "PK_UserLogins", table: "UserLogins");
-            migrationBuilder.DropPrimaryKey(name: "PK_UserTokens", table: "UserTokens");
-
-            migrationBuilder.AlterColumn<string>(
-                name: "LoginProvider", table: "UserLogins",
-                type: "nvarchar(450)", nullable: false,
-                oldClrType: typeof(string), oldType: "nvarchar(128)", oldMaxLength: 128);
-
-            migrationBuilder.AlterColumn<string>(
-                name: "ProviderKey", table: "UserLogins",
-                type: "nvarchar(450)", nullable: false,
-                oldClrType: typeof(string), oldType: "nvarchar(128)", oldMaxLength: 128);
-
-            migrationBuilder.AlterColumn<string>(
-                name: "LoginProvider", table: "UserTokens",
-                type: "nvarchar(450)", nullable: false,
-                oldClrType: typeof(string), oldType: "nvarchar(128)", oldMaxLength: 128);
-
-            migrationBuilder.AlterColumn<string>(
-                name: "Name", table: "UserTokens",
-                type: "nvarchar(450)", nullable: false,
-                oldClrType: typeof(string), oldType: "nvarchar(128)", oldMaxLength: 128);
-
-            migrationBuilder.AddPrimaryKey(
-                name: "PK_UserLogins", table: "UserLogins",
-                columns: new[] { "LoginProvider", "ProviderKey" });
-
-            migrationBuilder.AddPrimaryKey(
-                name: "PK_UserTokens", table: "UserTokens",
-                columns: new[] { "UserId", "LoginProvider", "Name" });
+            throw new NotSupportedException(
+                "This migration is forward-only. Reverting to the previous Identity key lengths would recreate composite primary keys that exceed SQL Server's 900-byte limit. Restore a verified pre-migration database backup instead.");
         }
     }
 }
