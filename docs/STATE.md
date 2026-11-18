@@ -1616,7 +1616,7 @@ Reported by user after fast-forward pull to commit `761f98ce4ead4dead43af76f262e
 ## AUTH-03 — shared Identity registration slice rebased after AUTH-02 fix (2026-11-18)
 
 - Recreated the AUTH-03 working branch as `feature/auth-03-runtime-authentication-v2` from the updated AUTH-02 tip `bc042285179add3c0ca5217106251a6add409d92`, which includes the forward-only migration correction and its CI verification.
-- Reapplied the shared Identity registration slice: `AddGhostIdentity` centralizes the 128-character key setting, approved password complexity, 5-attempt/15-minute lockout, Roles, EF stores, and SignInManager.
+- Reapplied the shared Identity registration slice: `AddGhostIdentity` centralizes the 128-character key setting, approved password complexity, 5-attempt/15-minute lockout, Roles and EF stores.
 - API and Bootstrap now use the same registration; a focused options unit test is included.
 - This branch is a clean descendant of the updated AUTH-02 tip. The earlier PR #10 branch is retained but paused as stale; it is not to be merged.
 - Initial Backend CI run #36 exposed a compile error: `AddSignInManager()` is not available from the current Infrastructure package graph. Removed that unnecessary registration because this slice does not yet use SignInManager; login implementation will add only the required dependency. A new CI run after this correction is pending.
