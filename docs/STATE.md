@@ -1502,3 +1502,13 @@ Reported by user after fast-forward pull to commit `761f98ce4ead4dead43af76f262e
 
 ### Immediate next action
 - Review the regenerated SQL output and confirm `SET XACT_ABORT ON;` appears after `BEGIN TRANSACTION;` and before both preflight checks. Then validate the SQL Server failure path safely without leaving an open transaction. Keep PR #4 draft and unmerged.
+
+
+## AUTH-02 — Identity migration preflight syntax correction (2026-11-18)
+
+- Reviewed the user's regenerated SQL output and found that both preflight checks used `;THROW` as the statement immediately following a single-line `IF`. This syntax is unsafe because the leading semicolon terminates an empty statement; the THROW is not reliably scoped as the IF body and can execute unconditionally.
+- Corrected the migration source `20261118190000_FixIdentityCompositeKeyLengths.cs`: both preflight checks now use explicit `BEGIN ... END` blocks around their respective `THROW 51001` / `THROW 51002` statements.
+- The migration source still includes `SET XACT_ABORT ON;` before both preflight checks, and retains `TABLOCKX, HOLDLOCK` on both tables.
+- The SQL pasted by the user did not include `SET XACT_ABORT ON;`, despite that statement being present in the GitHub migration source. Treat the pasted SQL as not matching the current source/branch output; regenerate it from the latest branch commit before any further review.
+- Source-only GitHub change committed as `b0dbc4c1a4505b24da7332fd2cd0c2bf11f6fae0`. No database was connected to or modified; no migration was applied; PR #4 remains draft/open and unmerged.
+- **Next action:** user pulls this commit in the separate `E:\\GHOST\\GHOST-2.0-authfix` worktree, regenerates `FixIdentityCompositeKeyLengths.sql`, and shares the complete output. Verify the generated script contains `SET XACT_ABORT ON;` after `BEGIN TRANSACTION;`, each `IF EXISTS` wraps its THROW in BEGIN/END, and the remaining DDL/history/COMMIT sequence is unchanged. Then rerun the SQL Server integration test project after this source change. Do not execute the migration script.
