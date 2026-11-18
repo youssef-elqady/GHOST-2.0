@@ -14,6 +14,8 @@ namespace GHOST.Infrastructure.Persistence.Migrations
             // Refuse to narrow any existing value. DATALENGTH is measured in bytes;
             // nvarchar(128) supports at most 256 bytes.
             migrationBuilder.Sql("""
+                SET XACT_ABORT ON;
+
                 IF EXISTS
                 (
                     SELECT 1
