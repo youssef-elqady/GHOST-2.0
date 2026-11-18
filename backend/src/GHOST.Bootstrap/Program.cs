@@ -1,7 +1,6 @@
 using System.Text;
 using GHOST.Infrastructure.Identity;
 using GHOST.Infrastructure.Persistence;
-using Microsoft.AspNetCore.Identity;
 using Microsoft.Data.SqlClient;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
@@ -93,25 +92,7 @@ var services = new ServiceCollection();
 
 services.AddLogging();
 services.AddDbContext<GHOSTDbContext>(options => options.UseSqlServer(connectionString));
-
-services
-    .AddIdentityCore<ApplicationUser>(options =>
-    {
-        options.Stores.MaxLengthForKeys = 128;
-        options.User.RequireUniqueEmail = false;
-        options.Password.RequiredLength = 12;
-        options.Password.RequiredUniqueChars = 4;
-        options.Password.RequireDigit = true;
-        options.Password.RequireLowercase = true;
-        options.Password.RequireUppercase = true;
-        options.Password.RequireNonAlphanumeric = true;
-        options.Lockout.AllowedForNewUsers = true;
-        options.Lockout.MaxFailedAccessAttempts = 5;
-        options.Lockout.DefaultLockoutTimeSpan = TimeSpan.FromMinutes(15);
-    })
-    .AddRoles<IdentityRole<Guid>>()
-    .AddEntityFrameworkStores<GHOSTDbContext>();
-
+services.AddGhostIdentity();
 services.AddScoped<IAdminBootstrapService, AdminBootstrapService>();
 
 await using var provider = services.BuildServiceProvider();
