@@ -34,6 +34,27 @@ public sealed class AdminBootstrapService : IAdminBootstrapService
     {
         ArgumentNullException.ThrowIfNull(request);
 
+        if (string.IsNullOrWhiteSpace(request.UserName) || request.UserName.Length > 256)
+        {
+            return new AdminBootstrapResult(
+                AdminBootstrapStatus.InvalidRequest,
+                ErrorCodes: new[] { "InvalidUserName" });
+        }
+
+        if (string.IsNullOrWhiteSpace(request.FullName) || request.FullName.Length > 150)
+        {
+            return new AdminBootstrapResult(
+                AdminBootstrapStatus.InvalidRequest,
+                ErrorCodes: new[] { "InvalidFullName" });
+        }
+
+        if (string.IsNullOrEmpty(request.Password) || request.Password.Length > 128)
+        {
+            return new AdminBootstrapResult(
+                AdminBootstrapStatus.InvalidRequest,
+                ErrorCodes: new[] { "InvalidPasswordLength" });
+        }
+
         await using var transaction = await _db.Database.BeginTransactionAsync(
             IsolationLevel.Serializable,
             cancellationToken);
