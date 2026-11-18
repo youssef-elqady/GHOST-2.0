@@ -1619,7 +1619,8 @@ Reported by user after fast-forward pull to commit `761f98ce4ead4dead43af76f262e
 - Reapplied the shared Identity registration slice: `AddGhostIdentity` centralizes the 128-character key setting, approved password complexity, 5-attempt/15-minute lockout, Roles, EF stores, and SignInManager.
 - API and Bootstrap now use the same registration; a focused options unit test is included.
 - This branch is a clean descendant of the updated AUTH-02 tip. The earlier PR #10 branch is retained but paused as stale; it is not to be merged.
-- No build/test has yet run on this rebased branch. No JWT, login, refresh tokens, claims-backed actor identity, or endpoint authorization has been implemented yet. Keep API local/trusted-only.
+- Initial Backend CI run #36 exposed a compile error: `AddSignInManager()` is not available from the current Infrastructure package graph. Removed that unnecessary registration because this slice does not yet use SignInManager; login implementation will add only the required dependency. A new CI run after this correction is pending.
+- No JWT, login, refresh tokens, claims-backed actor identity, or endpoint authorization has been implemented yet. Keep API local/trusted-only.
 - No database connection or migration was performed; Issue #5 remains operationally blocked. `GHOST2` and production remain excluded.
 
 ### Immediate next action
