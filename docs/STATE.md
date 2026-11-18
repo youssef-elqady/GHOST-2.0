@@ -1331,3 +1331,31 @@ Synchronize the local AUTH-02 branch and verify migration files/snapshot are pre
 4. Add the isolated SQL Server integration-test project guarded exclusively to `GHOST_AUTH02_IT`; then inspect AuditLogs indexes/collation before deciding on the filtered unique bootstrap-event index.
 5. Only after build, tests, and safety checks pass, apply the existing migrations to the explicitly approved test database. Never target `GHOST2`, drop/recreate a database, or clean existing data.
 
+
+
+## AUTH-02 — Local build/test confirmation and safety gates (2026-11-18)
+
+### Verified by the user on the local checkout
+- Pulled the bootstrap-service extraction commit successfully.
+- `dotnet build backend/src/GHOST.Bootstrap/GHOST.Bootstrap.csproj --configuration Release`: succeeded.
+- `dotnet test backend/tests/GHOST.Tests/GHOST.Tests.csproj --configuration Release`: 43 passed, 0 failed, 0 skipped.
+- Tracked worktree clean; untracked `artifacts/` preserved.
+
+### Follow-up hardening added after that verification
+- Added `InvalidRequest` result status and defensive service validation: username required/max 256, full name required/max 150, password required/max 128.
+- Added hidden console password input bound of 128 characters. A 129th character aborts input without echoing the secret.
+- Added a read-only EF pending-migrations preflight before resolving/invoking the bootstrap service. If migrations are pending, CLI exits with code 4 and does not call `Migrate()`.
+- Changed the generic CLI exception message so it does not incorrectly claim a transaction was rolled back for failures that occur during the preflight.
+- These latest hardening edits have not yet been compiled or tested locally. The previously reported 43 passing tests and build apply to the prior extraction commit only.
+
+### Safety / execution status
+- The migration preflight will open a connection to the database named by `GHOST_CONNECTION_STRING` when the CLI is run. Do not run the CLI until the connection string is independently verified to target exactly `GHOST_AUTH02_IT`.
+- No CLI execution, SQL connection, migration application, or database mutation has occurred in this milestone.
+- `GHOST2` remains explicitly out of scope. No database drop/recreate or cleanup is authorized.
+- The untracked local `artifacts/` directory remains untouched.
+
+### Next action
+- Pull the latest branch, rerun the Bootstrap Release build and existing test suite. Inspect any compile/test failure before continuing.
+- Then add the dedicated SQL Server integration-test project and strict connection-string guard for exactly `GHOST_AUTH02_IT`. Keep test fixtures non-destructive and never run against `GHOST2`.
+- Before any database operation, inspect the configured connection metadata and confirm the exact target. Only then apply existing migrations to the approved test database.
+
