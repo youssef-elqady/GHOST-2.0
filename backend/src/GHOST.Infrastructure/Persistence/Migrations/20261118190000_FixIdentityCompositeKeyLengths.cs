@@ -21,7 +21,7 @@ namespace GHOST.Infrastructure.Persistence.Migrations
                     WHERE DATALENGTH([LoginProvider]) > 256
                        OR DATALENGTH([ProviderKey]) > 256
                 )
-                    THROW 51001, 'Identity UserLogins contains a key value longer than 128 characters; no schema changes were applied.', 1;
+                    ;THROW 51001, 'Identity UserLogins contains a key value longer than 128 characters; no schema changes were applied.', 1;
 
                 IF EXISTS
                 (
@@ -30,7 +30,7 @@ namespace GHOST.Infrastructure.Persistence.Migrations
                     WHERE DATALENGTH([LoginProvider]) > 256
                        OR DATALENGTH([Name]) > 256
                 )
-                    THROW 51002, 'Identity UserTokens contains a key value longer than 128 characters; no schema changes were applied.', 1;
+                    ;THROW 51002, 'Identity UserTokens contains a key value longer than 128 characters; no schema changes were applied.', 1;
                 """);
 
             migrationBuilder.DropPrimaryKey(name: "PK_UserLogins", table: "UserLogins");
