@@ -1598,10 +1598,11 @@ Reported by user after fast-forward pull to commit `761f98ce4ead4dead43af76f262e
 - Created branch `fix/auth-identity-migration-forward-only` from `feature/auth-02-auditlog-append-only`.
 - Changed `FixIdentityCompositeKeyLengths.Down` to throw `NotSupportedException` before adding any migration operations. The documented rollback is a verified pre-migration backup restore; the `Up` path and preflight locks/checks remain unchanged.
 - Added `IdentityMigrationRollbackTests` to assert the `Down` path fails closed and emits zero schema operations.
-- GitHub Actions Backend CI run #28 (run ID `44376402957`) completed successfully for head commit `119d4c3ebb9ea9ed8004ddc3c3fca62718adb923`; both Build and Test steps passed.
+- GitHub Actions Backend CI run #28 (run ID `44376402957`) completed successfully for head commit `119d4c3ebb9ea9ed8004ddc3c3fca62718adb923`; the `build-and-test` job completed successfully, including both Build and Test steps.
 - The focused rollback test is included in that successful CI test step. No local test run is claimed in this environment.
-- PR #8 is open and mergeable, but has no submitted human review. CodeRabbit skipped its automated review because the PR targets a non-default branch; this is not an approval.
+- Diff review confirms the change is limited to the migration `Down` method, the focused rollback test, and this STATE update. `Down` throws before emitting migration operations; `Up`, its preflight checks, `SET XACT_ABORT ON`, and `TABLOCKX, HOLDLOCK` protections are unchanged.
+- PR #8 is open and mergeable. No human review has been submitted. CodeRabbit explicitly skipped automated review because the PR targets a non-default branch; this is not an approval.
 - No database was accessed or changed; the Identity migration remains unapplied.
 
 ### Immediate next action
-- Complete a human review of PR #8 and obtain explicit approval before merging into `feature/auth-02-auditlog-append-only`. Then continue issue #5's backup/restore and read-only preflight gates.
+- Obtain an independent review of PR #8 and explicit user approval before merging into `feature/auth-02-auditlog-append-only`. Then continue issue #5's backup/restore and read-only preflight gates.
