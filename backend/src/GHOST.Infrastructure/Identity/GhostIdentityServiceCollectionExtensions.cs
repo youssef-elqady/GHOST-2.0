@@ -26,8 +26,7 @@ public static class GhostIdentityServiceCollectionExtensions
                 options.Lockout.DefaultLockoutTimeSpan = TimeSpan.FromMinutes(15);
             })
             .AddRoles<IdentityRole<Guid>>()
-            .AddEntityFrameworkStores<GHOSTDbContext>()
-            .AddSignInManager();
+            .AddEntityFrameworkStores<GHOSTDbContext>();
 
         return services;
     }
