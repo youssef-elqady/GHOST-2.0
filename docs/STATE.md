@@ -1372,3 +1372,28 @@ Synchronize the local AUTH-02 branch and verify migration files/snapshot are pre
 - No SQL Server connection, migration, schema mutation, database creation/drop/reset, or destructive test cleanup is authorized by this roadmap. Any specific database operation requires its own preflight and explicit confirmation.
 - Preserve local untracked `artifacts/`; no destructive Git operations or unreviewed branch merges.
 - After the SQL gate, prioritize a runnable Next.js application shell (Staff/Admin navigation, RTL layout, API connection state) so the product becomes visible and testable early, then proceed through AUTH-03 and the documented vertical workflows.
+
+
+## AUTH-02 — isolated SQL Server test harness foundation (2026-11-18)
+
+### Added to the branch
+- Added `backend/tests/GHOST.SqlServer.Tests` as a separate .NET 10 xUnit project and registered it in `backend/GHOST.slnx`.
+- Added a connection-string safety boundary that reads only `GHOST_AUTH02_TEST_CONNECTION_STRING`; it requires a non-empty server and exact ordinal catalog `GHOST_AUTH02_IT`, and rejects attached database files and failover partners.
+- Added always-runnable unit tests for the guard, including explicit rejection of `GHOST2`, `master`, wrong casing, whitespace differences, missing server/catalog, and unsafe connection modes.
+- Added an opt-in SQL Server Fact attribute: integration tests are skipped only when the dedicated environment variable is absent. If a value is present but unsafe, validation fails closed.
+- Added initial integration checks for the dedicated catalog, AuditLogs table, append-only trigger, and trigger rejection of UPDATE/DELETE. Mutation tests insert a uniquely identified row inside a transaction and roll back; they do not run cleanup DELETE statements.
+- Added project README with safe invocation guidance and the no-create/no-drop/no-migrate/no-reset boundary.
+
+### Verification status
+- Source files and solution registration have been committed to the active branch.
+- **Not yet compiled or executed locally.** Package restore, build, and test results remain pending user-side/local verification.
+- No SQL Server connection was opened. No database, schema, or migration was created/applied/changed.
+- SQL integration tests require the already-provisioned dedicated `GHOST_AUTH02_IT` database and its migrations; the harness does not provision or migrate it.
+- No test or source reads application configuration or `GHOST_CONNECTION_STRING`; the dedicated variable is the sole configured source.
+- Local untracked `artifacts/` remains outside GitHub edits and must be preserved.
+
+### Immediate next action
+1. Pull the latest active branch locally.
+2. Run `dotnet test backend/tests/GHOST.SqlServer.Tests/GHOST.SqlServer.Tests.csproj --configuration Release` with the AUTH-02 connection variable unset. Confirm the guard unit tests pass and SQL integration tests are skipped.
+3. Run the existing unit suite and Bootstrap Release build.
+4. Review any compile/test issue before setting a SQL connection string. Do not configure or run SQL integration tests until the parsed server/catalog preflight is reviewed.
