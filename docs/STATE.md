@@ -1564,3 +1564,30 @@ Reported by user after fast-forward pull to commit `761f98ce4ead4dead43af76f262e
 - No SQL Server database connection, backup inventory, or restore-verification capability is available in this execution environment. Therefore the exact target instance, backup existence/restorability, current migration history, and preflight data values could not be independently verified.
 - **Decision: do not apply the migration yet.** This is a deliberate safety hold, not a code defect or a claim that rollout is complete.
 - Issue #5 records the required preflight, backup/restore rehearsal, reviewed script, controlled execution, and post-migration verification steps. Target scope is only the dedicated `GHOST_AUTH02_IT`; `GHOST2` and production are explicitly excluded.
+
+
+## AUTH-03 — shared Identity runtime registration slice (2026-11-18)
+
+### Branch and scope
+- Created `feature/auth-03-runtime-authentication` from the verified AUTH-02 handoff tip `3392c23e697ddf18cc17973ed207b665d22fa0e4`.
+- This is a separate implementation branch. No merge to the AUTH-02 branch or `main` has been performed.
+
+### Implemented
+- Added `GhostIdentityServiceCollectionExtensions.AddGhostIdentity` in Infrastructure as the shared Identity registration entry point.
+- Centralized the approved Identity store key length (128), password requirements (12 chars, 4 unique, upper/lower/digit/non-alphanumeric), and lockout policy (5 failures, 15 minutes).
+- Registered Roles, EF Core stores, and SignInManager in the shared setup.
+- Updated the API host to register the shared Identity services.
+- Updated the one-time Bootstrap CLI to consume the same registration method, removing duplicated Identity policy configuration.
+- Added a unit test asserting the shared password and lockout options.
+
+### Verification and security status
+- GitHub compare against the AUTH-02 base reports exactly 4 commits ahead, 0 behind, and only the intended 4 files changed at this slice.
+- No build or test has yet been run for this feature branch. The new test is source-added but not yet verified by CI or a local Release run.
+- This slice does **not** yet add JWT bearer authentication, login/refresh/logout endpoints, token persistence, authorization policies, `ICurrentUser`, or endpoint protection. Existing business endpoints remain unsafe for untrusted network exposure. Keep the API local/trusted-only.
+- No migration was generated or applied. No database was connected to or modified. Issue #5 remains a separate database rollout gate; never target `GHOST2`.
+
+### Immediate next action
+1. Open a draft PR from this feature branch to `feature/auth-02-auditlog-append-only` and run Backend CI.
+2. Fix any build/test findings before adding further auth behavior.
+3. Then implement JWT configuration with fail-closed secret/issuer/audience validation, followed by login and short-lived access-token issuance. Keep refresh-token persistence/replay protection and endpoint authorization as separate reviewed slices with tests.
+4. Before any business endpoint is exposed, add anonymous-denial and role-boundary tests; remove caller-supplied actor IDs in favor of claims-backed identity before enabling shift/session writes.
