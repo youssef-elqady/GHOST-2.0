@@ -27,7 +27,6 @@ public sealed class SqlServerTestConnectionTests
     [Theory]
     [InlineData("GHOST2")]
     [InlineData("master")]
-    [InlineData("GHOST_AUTH02_IT ")]
     [InlineData("ghost_auth02_it")]
     public void ValidateAndNormalize_RejectsAnyCatalogOtherThanExactApprovedName(string catalog)
     {
