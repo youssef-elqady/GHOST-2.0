@@ -17,7 +17,7 @@ namespace GHOST.Infrastructure.Persistence.Migrations
                 IF EXISTS
                 (
                     SELECT 1
-                    FROM [dbo].[UserLogins]
+                    FROM [dbo].[UserLogins] WITH (TABLOCKX, HOLDLOCK)
                     WHERE DATALENGTH([LoginProvider]) > 256
                        OR DATALENGTH([ProviderKey]) > 256
                 )
@@ -26,7 +26,7 @@ namespace GHOST.Infrastructure.Persistence.Migrations
                 IF EXISTS
                 (
                     SELECT 1
-                    FROM [dbo].[UserTokens]
+                    FROM [dbo].[UserTokens] WITH (TABLOCKX, HOLDLOCK)
                     WHERE DATALENGTH([LoginProvider]) > 256
                        OR DATALENGTH([Name]) > 256
                 )
