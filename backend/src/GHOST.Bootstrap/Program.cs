@@ -68,9 +68,9 @@ try
     }
 
     Console.Write("Password (input hidden): ");
-    password = ReadSecret();
+    password = ReadSecret(maxLength: 128);
     Console.Write("Confirm password (input hidden): ");
-    passwordConfirmation = ReadSecret();
+    passwordConfirmation = ReadSecret(maxLength: 128);
 
     if (!string.Equals(password, passwordConfirmation, StringComparison.Ordinal))
     {
@@ -81,6 +81,11 @@ try
 catch (OperationCanceledException)
 {
     Console.Error.WriteLine("Input cancelled. No changes were made.");
+    return 2;
+}
+catch (SecretTooLongException)
+{
+    Console.Error.WriteLine("Password exceeds the 128-character maximum. No changes were made.");
     return 2;
 }
 
@@ -113,6 +118,16 @@ await using var scope = provider.CreateAsyncScope();
 
 try
 {
+    var db = scope.ServiceProvider.GetRequiredService<GHOSTDbContext>();
+    var pendingMigrations = (await db.Database.GetPendingMigrationsAsync()).ToArray();
+
+    if (pendingMigrations.Length > 0)
+    {
+        Console.Error.WriteLine("The database schema is not up to date. Apply the reviewed migrations separately; bootstrap will not run migrations.");
+        Console.Error.WriteLine($"Pending migration count: {pendingMigrations.Length}.");
+        return 4;
+    }
+
     var bootstrapService = scope.ServiceProvider.GetRequiredService<IAdminBootstrapService>();
     var result = await bootstrapService.BootstrapAsync(
         new AdminBootstrapRequest(userName, fullName, password));
@@ -124,6 +139,13 @@ try
             Console.WriteLine("The account is active and is flagged to require a password change; sign-in enforcement will be implemented in the authentication flow.");
             Console.WriteLine("No database migration was executed.");
             return 0;
+
+        case AdminBootstrapStatus.InvalidRequest:
+            var validationCodes = result.ErrorCodes is { Count: > 0 }
+                ? string.Join(", ", result.ErrorCodes)
+                : "InvalidRequest";
+            Console.Error.WriteLine($"Bootstrap input was rejected. Error codes: {validationCodes}.");
+            return 2;
 
         case AdminBootstrapStatus.AdminAlreadyExists:
             Console.Error.WriteLine("An Admin already exists. Bootstrap is one-time and has been refused.");
@@ -158,9 +180,9 @@ finally
     passwordConfirmation = string.Empty;
 }
 
-static string ReadSecret()
+static string ReadSecret(int maxLength)
 {
-    var buffer = new StringBuilder();
+    var buffer = new StringBuilder(maxLength);
 
     while (true)
     {
@@ -169,7 +191,9 @@ static string ReadSecret()
         if (key.Key == ConsoleKey.Enter)
         {
             Console.WriteLine();
-            return buffer.ToString();
+            var secret = buffer.ToString();
+            buffer.Clear();
+            return secret;
         }
 
         if (key.Key == ConsoleKey.Backspace)
@@ -184,6 +208,14 @@ static string ReadSecret()
             throw new OperationCanceledException();
 
         if (!char.IsControl(key.KeyChar))
+        {
+            if (buffer.Length >= maxLength)
+            {
+                buffer.Clear();
+                throw new SecretTooLongException();
+            }
+
             buffer.Append(key.KeyChar);
+        }
     }
 }
