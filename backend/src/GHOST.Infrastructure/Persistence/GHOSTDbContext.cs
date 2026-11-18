@@ -36,6 +36,21 @@ public sealed class GHOSTDbContext
         modelBuilder.Entity<IdentityRoleClaim<Guid>>().ToTable("RoleClaims");
         modelBuilder.Entity<IdentityUserToken<Guid>>().ToTable("UserTokens");
 
+        // Keep Identity's composite string keys below SQL Server's 900-byte index limit.
+        // Configure these explicitly because EF design-time model creation may not have
+        // the IdentityOptions service provider available.
+        modelBuilder.Entity<IdentityUserLogin<Guid>>(entity =>
+        {
+            entity.Property(login => login.LoginProvider).HasMaxLength(128);
+            entity.Property(login => login.ProviderKey).HasMaxLength(128);
+        });
+
+        modelBuilder.Entity<IdentityUserToken<Guid>>(entity =>
+        {
+            entity.Property(token => token.LoginProvider).HasMaxLength(128);
+            entity.Property(token => token.Name).HasMaxLength(128);
+        });
+
         modelBuilder.Entity<ApplicationUser>(entity =>
         {
             entity.Property(user => user.FullName)
