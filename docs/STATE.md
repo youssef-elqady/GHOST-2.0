@@ -1611,3 +1611,19 @@ Reported by user after fast-forward pull to commit `761f98ce4ead4dead43af76f262e
 1. PR #11 was squash-merged into `feature/auth-02-auditlog-append-only` as commit `d5fdf30ed1a5b6380feb372b3e8a599fbe58081d` after the Up/Down diff review and successful Backend CI.
 2. Issue #7 is resolved. Issue #5 remains open for the exact `GHOST_AUTH02_IT` target verification, verified backup/restore rehearsal, schema/history/data preflight, and controlled execution.
 3. Do not apply the migration until every Issue #5 operational gate passes; do not use EF Down as rollback.
+
+
+## AUTH-03 — shared Identity registration slice rebased after AUTH-02 fix (2026-11-18)
+
+- Recreated the AUTH-03 working branch as `feature/auth-03-runtime-authentication-v2` from the updated AUTH-02 tip `bc042285179add3c0ca5217106251a6add409d92`, which includes the forward-only migration correction and its CI verification.
+- Reapplied the shared Identity registration slice: `AddGhostIdentity` centralizes the 128-character key setting, approved password complexity, 5-attempt/15-minute lockout, Roles and EF stores.
+- API and Bootstrap now use the same registration; a focused options unit test is included.
+- This branch is a clean descendant of the updated AUTH-02 tip. The earlier PR #10 branch is retained but paused as stale; it is not to be merged.
+- Initial Backend CI run #36 exposed a compile error: `AddSignInManager()` is not available from the current Infrastructure package graph. Removed that unnecessary registration because this slice does not yet use SignInManager; login implementation will add only the required dependency. Corrected head passed Backend CI runs #39 and #40 (run IDs `44377914844` and `44377955129`): Release Build and Test steps succeeded in both.
+- No JWT, login, refresh tokens, claims-backed actor identity, or endpoint authorization has been implemented yet. Keep API local/trusted-only.
+- No database connection or migration was performed; Issue #5 remains operationally blocked. `GHOST2` and production remain excluded.
+
+### Immediate next action
+1. Open a draft PR to `feature/auth-02-auditlog-append-only` and run Backend CI for this rebased branch.
+2. Fix build/test findings before implementing JWT/login.
+3. Continue AUTH-03 in small slices: fail-closed JWT configuration, login/access-token issuance, refresh-token persistence/rotation/replay protection, then claims-backed current user and endpoint/resource authorization with integration tests.
