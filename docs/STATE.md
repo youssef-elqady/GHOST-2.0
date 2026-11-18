@@ -1417,3 +1417,28 @@ Synchronize the local AUTH-02 branch and verify migration files/snapshot are pre
 ### Pull request review note
 - PR #3 is still draft/open and currently targets `feature/products-inventory-billing` as its base branch, not `main`.
 - No base-branch change, merge, or PR readiness change was made. Confirm the intended integration target and review the full diff before any merge; keep the PR draft until SQL Server integration tests and remaining AUTH-02 gates pass.
+
+
+## AUTH-02 — Identity composite-key index correction (2026-11-18)
+
+### Root cause confirmed
+- The Identity EF model was created by design-time tooling without an Identity service provider carrying `IdentityOptions.Stores.MaxLengthForKeys`.
+- The Identity EF source defaults this setting to 128 when the option is available/defaulted, but its design-time path can receive no store options; the resulting model left composite key strings unbounded and SQL Server mapped them to `nvarchar(450)`.
+- This produced oversized clustered primary keys: UserLogins (1800 bytes) and UserTokens (1816 bytes), above SQL Server's 900-byte clustered-index key limit.
+
+### Corrective change in progress
+- Explicitly cap `IdentityUserLogin<Guid>.LoginProvider`, `ProviderKey`, and `IdentityUserToken<Guid>.LoginProvider`, `Name` at 128 characters in `GHOSTDbContext.OnModelCreating`; this is the schema-level source of truth and does not depend on the host's DI configuration.
+- Set `IdentityOptions.Stores.MaxLengthForKeys = 128` in the Bootstrap host so runtime Identity options agree with the EF model.
+- Add a corrective migration that checks existing values before narrowing columns, drops/recreates the two composite primary keys around the ALTER COLUMN operations, and restores the previous schema on Down.
+- Add a no-database model test asserting all four max lengths and composite-key byte sizes remain below SQL Server's 900-byte limit.
+
+### Verification and safety boundary
+- Source-level root cause confirmed against the ASP.NET Core Identity EF implementation and the current migration/snapshot.
+- The existing `GHOST_AUTH02_IT` database already has the previous schema. This code change does not connect to or modify any database.
+- Migration is for review only; it must not be applied until its generated SQL and data preflight are reviewed and the user separately approves execution.
+- No build or tests have been run by this GitHub-only edit. CI and user-side Release tests remain required.
+- No changes to `GHOST2`, no branch merge, and no destructive database operation.
+
+### Next gate
+- Review the PR diff and generated migration SQL; run the backend CI workflow and local Release tests.
+- Only after those gates pass, request separate explicit approval before applying the new migration to `GHOST_AUTH02_IT`.
