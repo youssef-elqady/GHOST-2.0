@@ -1623,7 +1623,14 @@ Reported by user after fast-forward pull to commit `761f98ce4ead4dead43af76f262e
 - No JWT, login, refresh tokens, claims-backed actor identity, or endpoint authorization has been implemented yet. Keep API local/trusted-only.
 - No database connection or migration was performed; Issue #5 remains operationally blocked. `GHOST2` and production remain excluded.
 
+### Merge and verification
+- PR #12 was squash-merged into `feature/auth-02-auditlog-append-only` as `3f04105dea4e785abd034c02a878d959ee9bc53b`.
+- Backend CI runs #39 and #40 passed on the corrected PR head; both Release Build and Test steps succeeded.
+- The earlier failed run #36 was fixed by removing the unnecessary `AddSignInManager()` registration. The shared Identity setup now registers IdentityCore, Roles, and EF stores only; SignInManager will be added with the actual login implementation if needed.
+- No migration was applied and no database was accessed or modified.
+
 ### Immediate next action
-1. Open a draft PR to `feature/auth-02-auditlog-append-only` and run Backend CI for this rebased branch.
-2. Fix build/test findings before implementing JWT/login.
-3. Continue AUTH-03 in small slices: fail-closed JWT configuration, login/access-token issuance, refresh-token persistence/rotation/replay protection, then claims-backed current user and endpoint/resource authorization with integration tests.
+1. Continue AUTH-03 with fail-closed JWT configuration: validate required issuer, audience, signing key, and lifetime settings at startup; never commit secrets or use a development fallback in production.
+2. Add login and short-lived access-token issuance using Identity password verification and lockout, rejecting disabled accounts and enforcing `MustChangePassword`.
+3. Then implement hashed refresh-token persistence/rotation/replay detection, claims-backed `ICurrentUser`, and endpoint/resource authorization with integration tests.
+4. Keep the API restricted to trusted local development until every mutating endpoint is protected and anonymous/role/ownership tests pass.
