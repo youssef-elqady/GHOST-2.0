@@ -1556,3 +1556,11 @@ Reported by user after fast-forward pull to commit `761f98ce4ead4dead43af76f262e
 - Separate live SQL Server test run after the migration source correction: 13 passed, 0 failed, 0 skipped against the dedicated `GHOST_AUTH02_IT` target. This validated the SQL Server test harness and existing AuditLog behavior; it did not apply the Identity migration.
 - **Migration status: not applied.** No database schema was modified by the merge or test runs. Before applying, confirm the exact target database, take/verify a restorable backup, check preflight values, and schedule a controlled migration window. Do not target `GHOST2`.
 - The separate local authfix worktree and its artifacts remain preserved. No local worktree was altered by this GitHub merge.
+
+## AUTH-02 — Database rollout gate (2026-11-18)
+
+- Created tracking issue #5: [Controlled rollout of Identity composite-key migration](https://github.com/youssef-elqady/GHOST-2.0/issues/5).
+- The migration source was reviewed after merge. Its preflight checks reject values whose `DATALENGTH` exceeds 256 bytes before the schema changes; it then narrows the four Identity key columns to `nvarchar(128)` and recreates the two composite primary keys.
+- No SQL Server database connection, backup inventory, or restore-verification capability is available in this execution environment. Therefore the exact target instance, backup existence/restorability, current migration history, and preflight data values could not be independently verified.
+- **Decision: do not apply the migration yet.** This is a deliberate safety hold, not a code defect or a claim that rollout is complete.
+- Issue #5 records the required preflight, backup/restore rehearsal, reviewed script, controlled execution, and post-migration verification steps. Target scope is only the dedicated `GHOST_AUTH02_IT`; `GHOST2` and production are explicitly excluded.
