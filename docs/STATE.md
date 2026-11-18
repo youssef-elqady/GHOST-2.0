@@ -1422,8 +1422,8 @@ Synchronize the local AUTH-02 branch and verify migration files/snapshot are pre
 ## AUTH-02 — Identity composite-key index correction (2026-11-18)
 
 ### Root cause confirmed
-- The Identity EF model was created by design-time tooling without an Identity service provider carrying `IdentityOptions.Stores.MaxLengthForKeys`.
-- The Identity EF source defaults this setting to 128 when the option is available/defaulted, but its design-time path can receive no store options; the resulting model left composite key strings unbounded and SQL Server mapped them to `nvarchar(450)`.
+- EF Identity's design-time context reads `IdentityOptions` from the EF options service provider. When that provider is absent, it falls back to Identity schema version 1; that path does not apply the 128-character key-length default unless `MaxLengthForKeys` is explicitly supplied.
+- The design-time model therefore left the four composite-key strings unbounded, and the SQL Server provider mapped them to `nvarchar(450)`.
 - This produced oversized clustered primary keys: UserLogins (1800 bytes) and UserTokens (1816 bytes), above SQL Server's 900-byte clustered-index key limit.
 
 ### Corrective change in progress
