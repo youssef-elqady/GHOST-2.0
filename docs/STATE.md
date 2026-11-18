@@ -1512,3 +1512,14 @@ Reported by user after fast-forward pull to commit `761f98ce4ead4dead43af76f262e
 - The SQL pasted by the user did not include `SET XACT_ABORT ON;`, despite that statement being present in the GitHub migration source. Treat the pasted SQL as not matching the current source/branch output; regenerate it from the latest branch commit before any further review.
 - Source-only GitHub change committed as `b0dbc4c1a4505b24da7332fd2cd0c2bf11f6fae0`. No database was connected to or modified; no migration was applied; PR #4 remains draft/open and unmerged.
 - **Next action:** user pulls this commit in the separate `E:\\GHOST\\GHOST-2.0-authfix` worktree, regenerates `FixIdentityCompositeKeyLengths.sql`, and shares the complete output. Verify the generated script contains `SET XACT_ABORT ON;` after `BEGIN TRANSACTION;`, each `IF EXISTS` wraps its THROW in BEGIN/END, and the remaining DDL/history/COMMIT sequence is unchanged. Then rerun the SQL Server integration test project after this source change. Do not execute the migration script.
+
+
+## AUTH-02 — Regenerated Identity migration SQL review (2026-11-18)
+
+- User supplied the regenerated `FixIdentityCompositeKeyLengths.sql` from the latest source correction.
+- Verified the script starts its migration transaction, enables `SET XACT_ABORT ON` before either preflight, and scopes both `THROW 51001` / `THROW 51002` inside explicit `IF EXISTS ... BEGIN ... END` blocks.
+- Both preflights retain `TABLOCKX, HOLDLOCK` and check `DATALENGTH(...) > 256` before any schema changes.
+- Verified the script drops only `PK_UserLogins` and `PK_UserTokens`, narrows exactly the four intended columns to `nvarchar(128) NOT NULL`, recreates the same composite primary keys, inserts the corrective migration history row, and commits.
+- No table drops, explicit row deletes, or unrelated schema changes appear in the supplied script. Expected composite key widths remain 512 bytes for UserLogins and 528 bytes for UserTokens, below SQL Server's 900-byte clustered-index key limit.
+- Backend CI run #17 for source-fix commit `b0dbc4c1a4505b24da7332fd2cd0c2bf11f6fae0` completed successfully.
+- Remaining verification: rerun the dedicated SQL Server test project against the exact pre-approved `GHOST_AUTH02_IT` target after this latest source change. These tests validate the existing SQL Server harness and do not apply the Identity migration. Do not execute the migration SQL. Any migration application still requires separate explicit approval.
