@@ -1476,3 +1476,15 @@ Synchronize the local AUTH-02 branch and verify migration files/snapshot are pre
 ### Immediate next action
 - Correct the migration's preflight failure handling without weakening the transaction/locking guarantee. Validate the generated script's success and failure paths before requesting any separate approval to apply it to `GHOST_AUTH02_IT`.
 - Keep PR #4 draft/open and unmerged. Preserve the local `artifacts/` directory and the separate authfix worktree.
+
+
+## AUTH-02 — Migration preflight rollback hardening (2026-11-18)
+
+- Updated `20261118190000_FixIdentityCompositeKeyLengths.Up` to execute `SET XACT_ABORT ON;` before either data preflight query, inside the migration's transaction.
+- Rationale: SQL Server defaults `XACT_ABORT` to OFF; `THROW` honors this setting. Enabling it ensures a runtime error from the preflight aborts and rolls back the active transaction rather than leaving the manual script session holding the table locks. Microsoft reference: https://learn.microsoft.com/sql/t-sql/statements/set-xact-abort-transact-sql
+- The existing `TABLOCKX, HOLDLOCK` protection remains in place, so the check-to-ALTER race is still guarded by transaction-held locks.
+- This is a source change only. It has not yet been built or tested locally, and the regenerated SQL has not yet been inspected.
+- No migration was applied; no database was accessed; `GHOST2` remains untouched.
+
+### Immediate next action
+- Pull the latest PR branch, rebuild/re-run tests, regenerate `FixIdentityCompositeKeyLengths.sql`, and send the regenerated SQL for review. Confirm it contains `SET XACT_ABORT ON;` after `BEGIN TRANSACTION` and before the preflight. Do not execute it yet.
