@@ -1,7 +1,9 @@
 # GHOST STATE
 
-Last updated: 2026-11-17
-Current phase: AUTH-02 — secure first Admin bootstrap (source audit in progress)
+Last updated: 2026-11-18
+Current phase: AUTH-02 — isolated SQL Server integration-test harness
+
+> Delivery plan and phase exit criteria: [DELIVERY-ROADMAP.md](./DELIVERY-ROADMAP.md). Keep this file as the live execution log; update it after every meaningful milestone.
 
 ## Product and architecture decisions
 - Primary UI: **Next.js** for both Staff and Admin.
@@ -1359,3 +1361,14 @@ Synchronize the local AUTH-02 branch and verify migration files/snapshot are pre
 - Then add the dedicated SQL Server integration-test project and strict connection-string guard for exactly `GHOST_AUTH02_IT`. Keep test fixtures non-destructive and never run against `GHOST2`.
 - Before any database operation, inspect the configured connection metadata and confirm the exact target. Only then apply existing migrations to the approved test database.
 
+
+
+## Project governance and roadmap checkpoint (2026-11-18)
+
+- Added `docs/DELIVERY-ROADMAP.md` as the phase-by-phase delivery map, including exit gates, security/financial quality requirements, and the commitment to make a runnable Next.js shell visible early after the AUTH-02 SQL gate.
+- `docs/STATE.md` remains the live source of truth for the current branch, verified work, blockers, and next action. Update it after each meaningful code/test milestone; do not rely on chat history as the only record.
+- Current verified local baseline reported by the user: Bootstrap Release build succeeded; existing unit suite 43 passed, 0 failed, 0 skipped. This does not verify SQL Server behavior.
+- Current immediate task: inspect repository test conventions and implement a safe, opt-in SQL Server test harness. The connection must come only from `GHOST_AUTH02_TEST_CONNECTION_STRING` and must reject any catalog except exactly `GHOST_AUTH02_IT`.
+- No SQL Server connection, migration, schema mutation, database creation/drop/reset, or destructive test cleanup is authorized by this roadmap. Any specific database operation requires its own preflight and explicit confirmation.
+- Preserve local untracked `artifacts/`; no destructive Git operations or unreviewed branch merges.
+- After the SQL gate, prioritize a runnable Next.js application shell (Staff/Admin navigation, RTL layout, API connection state) so the product becomes visible and testable early, then proceed through AUTH-03 and the documented vertical workflows.
