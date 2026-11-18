@@ -1412,3 +1412,8 @@ Synchronize the local AUTH-02 branch and verify migration files/snapshot are pre
 - SQL test project: 10 passed, 0 failed, 3 SQL integration tests skipped because no dedicated SQL connection was configured.
 - The first CI attempt exposed an incorrect test expectation: SqlClient normalizes trailing whitespace in the catalog value. The guard compares the parsed catalog actually used by SqlClient; the invalid expectation was removed, and the rerun passed.
 - This green CI proves compilation and the connection-guard unit tests. It does **not** prove live SQL Server trigger/constraint behavior because all 3 database integration tests were skipped.
+
+
+### Pull request review note
+- PR #3 is still draft/open and currently targets `feature/products-inventory-billing` as its base branch, not `main`.
+- No base-branch change, merge, or PR readiness change was made. Confirm the intended integration target and review the full diff before any merge; keep the PR draft until SQL Server integration tests and remaining AUTH-02 gates pass.
