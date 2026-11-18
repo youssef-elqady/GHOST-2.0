@@ -1590,3 +1590,14 @@ Reported by user after fast-forward pull to commit `761f98ce4ead4dead43af76f262e
 1. Resolve issue #7 in a focused branch/PR and pass Release build/tests/CI.
 2. Update issue #5's rollout procedure to use verified backup restore for rollback, then verify the exact `GHOST_AUTH02_IT` target, migration history, and data preflight.
 3. Only then consider a controlled migration window. Do not apply to production or `GHOST2`.
+
+
+## AUTH-02 — Forward-only migration rollback correction (2026-11-18)
+
+- Issue #7 identified that the merged migration's original `Down` attempted to restore `nvarchar(450)` Identity composite-key columns and recreate 1,800-byte / 1,816-byte primary keys, exceeding SQL Server's 900-byte limit.
+- On branch `fix/auth02-forward-only-identity-migration`, changed `20261118190000_FixIdentityCompositeKeyLengths.Down` to throw `NotSupportedException` immediately, before adding any migration operations. The exception explains that the correction is forward-only and rollback requires restoring a verified pre-migration backup.
+- Added `IdentityMigrationRollbackTests.DownOperations_WhenRequested_ThrowsBeforeCreatingSchemaOperations`, asserting the migration's Down operation generation fails closed and explains the backup-restore path and SQL Server key limit.
+- The migration `Up` method, data-length preflight checks, `SET XACT_ABORT ON`, `TABLOCKX, HOLDLOCK`, four column alterations, and primary-key recreation are unchanged.
+- Commits: `bb30e3405a462ccb0fbf1cbc1386e1319a25e867` (migration) and `177091ce869852a1e2fa89d4f92e9aebf3819a77` (test).
+- **Verification pending:** no local build/test was run in this environment. Backend CI must compile and execute the new test before this correction is considered verified. No database was connected to or modified; the migration was not applied; `GHOST2` remains untouched.
+- **Next action:** run Release solution build/tests and inspect the generated migration rollback script/operations. Then update Issue #5 to require verified backup restore as the only rollback path. Keep the rollout blocked until the correction is merged, target is verified, and restore rehearsal passes.
