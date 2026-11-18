@@ -1394,15 +1394,15 @@ Synchronize the local AUTH-02 branch and verify migration files/snapshot are pre
 
 ### Immediate next action
 1. Pull the latest active branch locally.
-2. Run `dotnet test backend/tests/GHOST.SqlServer.Tests/GHOST.SqlServer.Tests.csproj --configuration Release` with the AUTH-02 connection variable unset. Confirm the guard unit tests pass and SQL integration tests are skipped.
-3. Run the existing unit suite and Bootstrap Release build.
-4. Review any compile/test issue before setting a SQL connection string. Do not configure or run SQL integration tests until the parsed server/catalog preflight is reviewed.
+2. Remove any existing `GHOST_AUTH02_TEST_CONNECTION_STRING` from the current PowerShell session, then run `dotnet test backend/GHOST.slnx --configuration Release`.
+3. Confirm the local test/build output matches green CI and inspect `git status -sb`; preserve untracked `artifacts/`.
+4. Do not configure the SQL integration connection yet. First perform a separate read-only preflight of the proposed server/catalog and confirm the dedicated database is the intended test target.
 
 
 ### CI wiring (2026-11-18)
 - Added `.github/workflows/backend-ci.yml` to restore, Release-build, and test the full `.NET 10` solution on backend pull requests and the active AUTH-02 branch.
 - The workflow does not receive a SQL connection secret. Therefore the SQL Server integration tests remain skipped in CI by default while the connection-guard unit tests execute.
-- CI has been authored but its first GitHub Actions run has not yet been observed. Do not report it as green until the run completes successfully.
+- The first GitHub Actions run initially failed on an incorrect trailing-whitespace test expectation; that test was corrected and the successful rerun is recorded below.
 
 
 ### Backend CI verification (2026-11-18)
