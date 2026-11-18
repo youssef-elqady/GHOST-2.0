@@ -169,7 +169,7 @@ try
 }
 catch (Exception exception)
 {
-    Console.Error.WriteLine($"Bootstrap failed; the transaction was rolled back. Error type: {exception.GetType().Name}.");
+    Console.Error.WriteLine($"Bootstrap could not complete. No success was reported. Error type: {exception.GetType().Name}.");
     Console.Error.WriteLine("Review the server-side configuration and database state before retrying.");
     return 1;
 }
@@ -218,4 +218,8 @@ static string ReadSecret(int maxLength)
             buffer.Append(key.KeyChar);
         }
     }
+}
+
+sealed class SecretTooLongException : Exception
+{
 }
