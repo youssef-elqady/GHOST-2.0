@@ -1625,7 +1625,7 @@ Reported by user after fast-forward pull to commit `761f98ce4ead4dead43af76f262e
 
 ### Merge and verification
 - PR #12 was squash-merged into `feature/auth-02-auditlog-append-only` as `3f04105dea4e785abd034c02a878d959ee9bc53b`.
-- Backend CI runs #39 and #40 passed on the corrected PR head; both Release Build and Test steps succeeded.
+- Backend CI runs #39 and #40 passed on the corrected PR head; both Release Build and Test steps succeeded. Post-merge Backend CI run #43 (run ID `44378356448`) also passed Build and Test.
 - The earlier failed run #36 was fixed by removing the unnecessary `AddSignInManager()` registration. The shared Identity setup now registers IdentityCore, Roles, and EF stores only; SignInManager will be added with the actual login implementation if needed.
 - No migration was applied and no database was accessed or modified.
 
