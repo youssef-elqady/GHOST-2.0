@@ -1235,3 +1235,35 @@ GHOST.API
 
 ### Immediate next action
 Obtain explicit approval to provision/use a dedicated SQL Server test database (separate from `GHOST2`) before adding/running migration-backed integration tests. Keep PR #3 draft until those tests and runtime gates pass.
+
+
+## AUTH-02 — Reconciliation of external review (2026-11-18)
+
+### Branch and migration verification
+- Reviewed the current GitHub contents of `feature/auth-02-auditlog-append-only` and `feature/products-inventory-billing`, not the older review snapshot at commit `156c988`.
+- Both current branches contain `20261114053406_AddIdentityPersistence.cs` and its Designer file. The migration source blob is identical on both branches.
+- The current `GHOSTDbContextModelSnapshot.cs` on both branches includes `GHOST.Infrastructure.Identity.ApplicationUser`, `IdentityRole<Guid>`, and the Identity tables (`Users`, `Roles`, `UserRoles`, claims, logins, and tokens).
+- The AUTH-02 branch also contains `20261117213727_AddAuditLogs.cs`, its Designer, and a snapshot including AuditLogs. Therefore the review claim that AUTH-01 migration files are absent and the snapshot contains no Identity model is not true for the current branch tips inspected. Do not regenerate or duplicate AUTH-01 migration.
+- The AUTH-01 migration creates Identity tables and the `Shifts.StaffUserId -> Users.Id` FK. The current AUTH-02 migration creates AuditLogs and its append-only trigger.
+
+### External review items reconciled
+- C1 (missing AUTH-01 migration/snapshot): not reproducible on current branch tips; likely based on an earlier commit/tree. Confirm local checkout is synchronized before any EF tooling.
+- C2 (API endpoints are anonymous and trust request-supplied staff/shift IDs): valid scope/security gap. AUTH-02 bootstrap does not secure API endpoints; do not expose API beyond loopback/trusted local host until authentication/authorization work is completed in its planned slice.
+- H1 (no SQL Server integration-test project/fixture): valid. Add migration-backed SQL Server integration tests; never point them at GHOST2.
+- H4 (no audit table): not true on current AUTH-02 branch; AuditLogs entity/configuration/migration exist. The current bootstrap writes a sanitized `Admin.Bootstrapped` System event.
+- H2, H5/M5, M6 and M7 are valid follow-up concerns for account lifecycle, role protection, deployment hardening, and device seeding; they are not reasons to broaden AUTH-02 into API authentication or unrelated device workflows.
+- Current bootstrap source explicitly assigns a new Guid to IdentityRole, sets password policy (12 chars, four unique characters, upper/lower/digit/non-alphanumeric), and configures lockout (5 attempts / 15 minutes). These should still receive integration/unit coverage.
+- The current CLI does not verify pending migrations before proceeding, does not impose a maximum password length, and embeds orchestration in top-level Program.cs. These are concrete AUTH-02 improvements before SQL integration tests.
+- Current bootstrap uses a Serializable transaction plus transaction-owned SQL application lock (10-second timeout). Keep the application lock as the primary cross-process serialization mechanism; review whether Serializable is necessary after tests.
+
+### Design direction for next implementation slice
+- Keep the existing SRS-aligned append-only AuditLogs table for the bootstrap event; do not add a parallel SecurityAuditEvents table without a demonstrated requirement. Continue to store only allow-listed, non-secret metadata.
+- Extract bootstrap orchestration from the CLI into a testable Infrastructure service while leaving interactive confirmation and hidden password input in the CLI. Keep the service out of API DI registration in AUTH-02.
+- Add a migration preflight that refuses to run when pending migrations exist; never auto-apply migrations from the bootstrap command.
+- Add a filtered unique database index protecting the single successful `Admin.Bootstrapped` event, subject to checking current AuditLogs indexes/collation.
+- Build a dedicated SQL Server integration-test harness using only the explicitly designated `GHOST_AUTH02_IT` database. No GHOST2 connection, automatic database deletion, or cleanup of existing databases.
+- User explicitly approved creating `GHOST_AUTH02_IT` and applying migrations to it. This approval does not authorize dropping/recreating it or creating additional databases without asking first.
+- No database was connected to or modified during this review; no code was changed in this reconciliation.
+
+### Immediate next action
+Synchronize the local AUTH-02 branch and verify migration files/snapshot are present. Then implement the testable bootstrap service, migration preflight, and SQL Server integration-test harness before creating/applying migrations to the approved test database.
