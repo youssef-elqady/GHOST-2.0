@@ -1577,3 +1577,16 @@ Reported by user after fast-forward pull to commit `761f98ce4ead4dead43af76f262e
 - Branch comparison confirms `feature/frontend-v0-foundation` is an ancestor of the current AUTH branch (0 commits ahead, 118 behind); it is not a separate feature to merge forward. The inventory branch is divergent and remains unapproved.
 - **Next implementation action:** begin AUTH-03 on a new feature branch from the current AUTH-02 tip. First inspect Identity registrations, existing bootstrap/password policy, API request DTOs, and current-shift/session ownership contracts. Implement the runtime authentication foundation in small slices with unit and SQL Server integration tests. Protect existing device write endpoints before any frontend operation is considered safe. Keep AUTH-02 database rollout as a separate gated operation; do not block all code work on the unavailable backup/SQL execution environment.
 - No application code, migration, or database was changed in this checkpoint. No local worktree or untracked artifact was accessed or modified.
+
+
+## AUTH-02 — Migration rollback review finding (2026-11-18)
+
+- Reviewed the merged migration source, `20261118190000_FixIdentityCompositeKeyLengths`, including its `Down` method.
+- **New blocker:** `Down` widens the four Identity key columns back to `nvarchar(450)` and recreates the original composite primary keys. Those definitions total 1,800 bytes for `UserLogins` and 1,816 bytes for `UserTokens`. Microsoft documents a 900-byte maximum for SQL Server primary keys; the Down path therefore attempts to recreate an invalid schema and is not a viable rollback plan. [SQL Server primary/foreign key limits](https://learn.microsoft.com/en-us/sql/relational-databases/tables/primary-and-foreign-key-constraints?view=sql-server-ver17).
+- Created issue #7: [Make Identity key-length migration explicitly forward-only](https://github.com/youssef-elqady/GHOST-2.0/issues/7). Required: make Down fail explicitly before DDL, test the fail-closed behavior, and document backup restore as the only rollback mechanism. Keep Up/preflight/locking unchanged.
+- **Execution gate updated:** issue #5 must remain open until issue #7 is resolved, the exact target is verified, and a backup restore rehearsal succeeds. No migration has been run; no database was accessed or changed; `GHOST2` remains excluded.
+
+### Immediate next action
+1. Resolve issue #7 in a focused branch/PR and pass Release build/tests/CI.
+2. Update issue #5's rollout procedure to use verified backup restore for rollback, then verify the exact `GHOST_AUTH02_IT` target, migration history, and data preflight.
+3. Only then consider a controlled migration window. Do not apply to production or `GHOST2`.
