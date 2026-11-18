@@ -1534,3 +1534,14 @@ Reported by user after fast-forward pull to commit `761f98ce4ead4dead43af76f262e
 - This run verifies the SQL Server integration-test harness and existing AuditLog behavior after the latest migration source correction. It does **not** execute or apply `20261118190000_FixIdentityCompositeKeyLengths`.
 - No Identity migration was applied and no schema change was performed by this test run. `GHOST2` remains untouched. Preserve the separate authfix worktree and local artifacts.
 - **Next gate:** optionally rerun the full solution Release build/test after the latest source correction if not already done on this exact commit; then review PR #4 status and remaining AUTH-02 exit criteria. Keep PR #4 draft/open and unmerged pending explicit user approval. Applying the Identity migration still requires separate explicit approval.
+
+## AUTH-02 — Full-solution Release verification after SQL migration correction (2026-11-18)
+
+- User ran both commands from the separate `E:\\GHOST\\GHOST-2.0-authfix` worktree:
+  - `dotnet build backend/GHOST.slnx --configuration Release`: succeeded; all solution projects compiled.
+  - `dotnet test backend/GHOST.slnx --configuration Release`: **57 total, 54 passed, 0 failed, 3 skipped**; test duration 6.0 seconds.
+- The three skipped tests are the live SQL Server integration tests because `GHOST_AUTH02_TEST_CONNECTION_STRING` was not configured in this full-solution invocation.
+- This full-solution run complements, and does not replace, the separate dedicated SQL Server test run recorded above: **13 passed, 0 failed, 0 skipped** against the approved `GHOST_AUTH02_IT` target after the latest migration source correction.
+- Build and test outputs were user-reported from the correct AUTH-02 worktree. No migration was applied and no database schema was changed by these build/test commands.
+- `GHOST2` remains untouched. The separate authfix worktree and local artifacts remain preserved.
+- PR #4 remains draft/open/unmerged. Applying the Identity migration still requires separate explicit approval.
