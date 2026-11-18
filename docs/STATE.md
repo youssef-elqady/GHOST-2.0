@@ -1442,3 +1442,11 @@ Synchronize the local AUTH-02 branch and verify migration files/snapshot are pre
 ### Next gate
 - Review the PR diff and generated migration SQL; run the backend CI workflow and local Release tests.
 - Only after those gates pass, request separate explicit approval before applying the new migration to `GHOST_AUTH02_IT`.
+
+
+## Dependency security follow-up (2026-11-18)
+- User ran Release build and tests from the PR worktree: build succeeded; 54 tests passed, 0 failed, 3 SQL Server integration tests skipped because `GHOST_AUTH02_TEST_CONNECTION_STRING` was not configured.
+- Restore reported `System.Security.Cryptography.Pkcs 9.0.4` with GHSA-2fmv-rv2c-59x7 (Moderate) and GHSA-846f-f764-76mx (High).
+- The vulnerable transitive dependency comes from the SQL Server test project's `Microsoft.Data.SqlClient 6.1.3` dependency graph. Upgrade to SqlClient 6.1.8, whose .NET 9 dependency group requires Pkcs 9.0.21, the patched release for both advisories.
+- This dependency update is a targeted servicing update; restore/build/tests must be rerun to verify the resolved graph and compatibility.
+- The three SQL Server tests remain unverified until run against the dedicated test database.
