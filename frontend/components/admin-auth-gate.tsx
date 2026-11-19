@@ -1,6 +1,6 @@
 'use client'
 
-import { FormEvent, useEffect, useState } from 'react'
+import { useEffect, useState, type FormEvent } from 'react'
 import { ArrowLeft, Eye, EyeOff, Gamepad2, LockKeyhole, ShieldCheck, UserRound } from 'lucide-react'
 import { AdminDashboard } from '@/components/admin-dashboard'
 import {
@@ -10,7 +10,6 @@ import {
   readAdminSession,
   saveAdminSession,
   type AuthenticatedUser,
-  type PasswordChangeRequiredResponse,
 } from '@/lib/ghost-api'
 import './admin-auth.css'
 
@@ -54,7 +53,7 @@ export function AdminAuthGate() {
     try {
       const result = await login(username.trim(), password)
       if (result.status === 'password_change_required') {
-        setPasswordToken((result as PasswordChangeRequiredResponse).passwordChangeToken)
+        setPasswordToken(result.passwordChangeToken)
         setMode('change-password')
         setCurrentPassword(password)
         setPassword('')
