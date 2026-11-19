@@ -1,5 +1,6 @@
 using System.Text.Json.Serialization;
 using GHOST.API.Authentication;
+using GHOST.API.Configuration;
 using GHOST.Application.Abstractions.Persistence;
 using GHOST.Application.BusinessDays.CloseShift;
 using GHOST.Application.BusinessDays.OpenBusinessDay;
@@ -11,6 +12,7 @@ using GHOST.Infrastructure.Identity;
 using GHOST.Infrastructure.Persistence;
 using GHOST.Infrastructure.Persistence.Repositories;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Options;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -32,11 +34,19 @@ builder.Services.AddCors(options =>
             .AllowAnyMethod());
 });
 
-builder.Services.AddDbContext<GHOSTDbContext>(options =>
+builder.Services.AddGhostDatabaseConnection(builder.Configuration);
+
+builder.Services.AddDbContext<GHOSTDbContext>((serviceProvider, options) =>
+{
+    var databaseOptions = serviceProvider
+        .GetRequiredService<IOptions<DatabaseConnectionOptions>>()
+        .Value;
+
     options.UseSqlServer(
-        builder.Configuration.GetConnectionString("DefaultConnection"),
+        databaseOptions.DefaultConnection,
         sqlOptions => sqlOptions.MigrationsAssembly(
-            typeof(GHOSTDbContext).Assembly.FullName)));
+            typeof(GHOSTDbContext).Assembly.FullName));
+});
 
 builder.Services.AddGhostIdentity();
 builder.Services.AddGhostJwtAuthentication(builder.Configuration);
