@@ -63,6 +63,7 @@ public static class JwtAuthenticationServiceCollectionExtensions
             options.FallbackPolicy = new AuthorizationPolicyBuilder()
                 .RequireAuthenticatedUser()
                 .RequireClaim("token_use", JwtTokenService.AccessTokenPurpose)
+                .RequireRole("Admin")
                 .Build();
 
             // Bootstrap accounts can only use their restricted token to change a password.
