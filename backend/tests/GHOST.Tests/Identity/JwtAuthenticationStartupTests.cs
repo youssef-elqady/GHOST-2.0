@@ -53,7 +53,7 @@ public sealed class JwtAuthenticationStartupTests
             fallbackPolicy.Requirements,
             requirement => requirement is ClaimsAuthorizationRequirement claimRequirement &&
                 claimRequirement.ClaimType == "token_use" &&
-                claimRequirement.AllowedValues.Contains(JwtTokenService.AccessTokenPurpose));
+                claimRequirement.AllowedValues?.Contains(JwtTokenService.AccessTokenPurpose) == true);
     }
 
 
@@ -72,7 +72,7 @@ public sealed class JwtAuthenticationStartupTests
             policy.Requirements,
             requirement => requirement is ClaimsAuthorizationRequirement claimRequirement &&
                 claimRequirement.ClaimType == "token_use" &&
-                claimRequirement.AllowedValues.Contains(JwtTokenService.PasswordChangeTokenPurpose));
+                claimRequirement.AllowedValues?.Contains(JwtTokenService.PasswordChangeTokenPurpose) == true);
     }
 
     private static IConfiguration CreateValidConfiguration() =>
