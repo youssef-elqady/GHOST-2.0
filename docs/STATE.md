@@ -1900,3 +1900,13 @@ Reported by user after fast-forward pull to commit `761f98ce4ead4dead43af76f262e
 - `GHOST.SqlServer.Tests`: **10 passed, 4 skipped**. The dedicated SQL persistence test was skipped because `GHOST_AUTH02_TEST_CONNECTION_STRING` was not configured; no SQL Server connection was made.
 - The audit-writer and controller changes are **VERIFIED at build/unit-test level**. Actual SQL Server persistence remains unverified until the exact isolated test connection is configured.
 - PR #31 contains only the audit hardening layered on top of merged PR #29. It does not duplicate or replace the login/token flow.
+
+
+### Post-merge AUTH-03 audit hardening checkpoint (2026-11-19)
+
+- PR #31 merged into the delivery branch as `6ac5eba46e14dacb209e77a3e86047061c64ce50`.
+- Backend CI run #89 passed before merge: Release build 0 warnings/0 errors; `GHOST.Tests` 78 passed; `GHOST.SqlServer.Tests` 10 passed / 4 skipped.
+- Login/password-change audit events are now wired to the existing append-only AuditLogs table. Unit tests verify success/failure/lockout/password-change audit events and ensure unknown usernames/passwords are not persisted.
+- The SQL Server audit persistence test is present and guarded, but skipped without `GHOST_AUTH02_TEST_CONNECTION_STRING`; no database was connected or modified.
+- PR #26 was closed as superseded by PR #29 after detecting the concurrent, newer login/password-change implementation. No duplicate token/login code was merged.
+- Current next backend slice: A3 refresh-token/session lifecycle design, followed by implementation only after the storage, cookie, CSRF, concurrency and migration strategy are documented.
