@@ -1854,3 +1854,11 @@ Reported by user after fast-forward pull to commit `761f98ce4ead4dead43af76f262e
 - Corrected all remaining calls to use the injected audit writer. Fix commit: `70c22909a09eb3daff86eac64dd46c20149d6745`.
 - Added controller-level unit tests with fake Identity/audit dependencies for unknown, inactive, locked, invalid-password, valid Admin, MustChangePassword, and fifth-failure lockout scenarios.
 - The failed CI attempt is not verification. A new Backend CI run for the corrected head is pending; tests remain unverified until it passes.
+
+
+### AUTH-03 A2 second CI finding and correction (2026-11-19)
+
+- Corrected controller audit calls compiled in the API project during Backend CI run #72 (run ID `44465848986`), but the test project then failed to compile.
+- The test failures were missing `Microsoft.AspNetCore.Mvc` imports for MVC result assertions and an ambiguous `Options.Create` reference resolving to the inherited UserManager.Options property.
+- Added the MVC namespace and fully qualified `Microsoft.Extensions.Options.Options.Create`. Fix commit: `ee953dc3982f9b76b3c03cfde4f813289171dc0e`.
+- Run #72 is not verification; tests were skipped because test compilation failed. A new CI run for the corrected test head is pending.
