@@ -1877,3 +1877,16 @@ Reported by user after fast-forward pull to commit `761f98ce4ead4dead43af76f262e
 3. Frontend login and required password-change screen, then session integration. Do not store long-lived refresh secrets in localStorage.
 4. Visual QA for the Admin dashboard skeleton in Light/Dark and responsive breakpoints.
 5. Real dashboard analytics APIs only after financial/session/shift source-of-truth contracts are implemented and reconciled.
+
+
+## AUTH-03 authentication audit hardening — 2026-11-19
+
+- PR #29 is the authoritative merged AUTH-03 login/password-change implementation. The earlier audit-writer PR #26 was closed as superseded; none of its duplicate login/token code was merged.
+- New focused branch: `feature/auth03-login-audit-hardening`, based on the delivery branch after PR #29.
+- Added `IAuthenticationAuditWriter` and `AuthenticationAuditWriter` using the existing immutable `AuditLog` entity and `GHOSTDbContext`.
+- Wired audit events into the authoritative PR #29 login and password-change flows: successful login, unknown-user failure, inactive-account denial, locked-account denial, failed password, lockout, restricted password-change token issuance, password-change success/failure/denial.
+- Authentication audit entries never include usernames from failed attempts, passwords, raw JWTs, or temporary credentials. Unauthenticated attempts use a System actor; authenticated success/change events use the user GUID.
+- Extended EF Core InMemory controller tests to assert the audit events and verify that unknown usernames/passwords are not persisted.
+- Added a guarded SQL Server integration test for actual audit persistence, using only the exact `GHOST_AUTH02_IT` database via `GHOST_AUTH02_TEST_CONNECTION_STRING`, and rolling back its row.
+- No login/token implementation was duplicated or overwritten. No DB connection or migration was performed.
+- **Verification:** CI pending on this audit-only hardening branch. Keep PR separate from the already merged login/password-change flow until build/tests pass. SQL persistence remains unverified unless the isolated test connection is explicitly configured.
