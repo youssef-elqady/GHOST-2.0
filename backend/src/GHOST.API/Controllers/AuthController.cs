@@ -67,6 +67,14 @@ public sealed class AuthController : ControllerBase
         if (user is null || !user.IsActive)
             return Unauthorized(new { error = "invalid_credentials" });
 
+        if (!user.LockoutEnabled)
+        {
+            var lockoutEnabled = await _userManager.SetLockoutEnabledAsync(user, true);
+            if (!lockoutEnabled.Succeeded)
+                return StatusCode(StatusCodes.Status503ServiceUnavailable,
+                    new { error = "authentication_unavailable" });
+        }
+
         if (await _userManager.IsLockedOutAsync(user))
             return LockedOut();
 
