@@ -76,7 +76,10 @@ public sealed class AuthController : ControllerBase
 
         if (!await _userManager.CheckPasswordAsync(user, request.Password))
         {
-            await _userManager.AccessFailedAsync(user);
+            var failedAttempt = await _userManager.AccessFailedAsync(user);
+            if (!failedAttempt.Succeeded)
+                return Problem(statusCode: StatusCodes.Status500InternalServerError);
+
             var lockedOut = await _userManager.IsLockedOutAsync(user);
 
             await WriteSystemAuditAsync(
@@ -104,7 +107,7 @@ public sealed class AuthController : ControllerBase
             return Forbid();
         }
 
-        var issued = _tokenIssuer.Issue(user, roles);
+        var issued = _tokenIssuer.Issue(user, roles.ToArray());
         await WriteUserAuditAsync(user.Id, "Authentication.LoginSucceeded", cancellationToken);
 
         return Ok(new LoginResponse(
