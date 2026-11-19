@@ -64,6 +64,7 @@ public static class JwtAuthenticationServiceCollectionExtensions
                 .RequireAuthenticatedUser()
                 .RequireAssertion(context =>
                     !context.User.HasClaim(GhostClaimTypes.MustChangePassword, "true"))
+                .RequireClaim(GhostClaimTypes.BusinessAccess, "true")
                 .Build();
 
             options.DefaultPolicy = normalUserPolicy;
