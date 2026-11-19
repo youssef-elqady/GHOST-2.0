@@ -3,6 +3,8 @@
 import { useCallback, useEffect, useState } from 'react'
 import { Check, CircleAlert, Gamepad2, RefreshCw, Save, ShieldCheck } from 'lucide-react'
 import { getDevices, seedDefaultDevices, updateDeviceRates, type ApiDevice, type RateInput } from '@/lib/ghost-api'
+import { Button } from '@/components/ui/button'
+import { Badge } from '@/components/ui/badge'
 
 type RateDraft = { single: string; multi: string }
 
@@ -106,9 +108,9 @@ export function AdminDeviceManager() {
           <strong>إدارة الأجهزة والتسعير</strong>
           <p>الأجهزة تُحفظ في قاعدة البيانات بدون سعر افتراضي. الإدارة وحدها هي التي تضبط سعر الساعة للفردية والمتعددة؛ ولا يمكن بدء جلسة لنوع لعب بلا سعر محفوظ.</p>
         </div>
-        <button className="primary-button" onClick={addDefaults} disabled={busy}>
-          <Gamepad2 size={16} /> {busy ? 'جاري الإضافة...' : 'إضافة أجهزة GHOST الافتراضية'}
-        </button>
+        <Button onClick={addDefaults} disabled={busy} leadingIcon={<Gamepad2 size={16} />}>
+          {busy ? 'جاري الإضافة...' : 'إضافة أجهزة GHOST الافتراضية'}
+        </Button>
       </div>
 
       {notice && <div className="notice-bar"><div className="notice-icon"><Check size={17} /></div><div><strong>تمت العملية</strong><p>{notice}</p></div></div>}
@@ -116,7 +118,7 @@ export function AdminDeviceManager() {
 
       <div className="section-header">
         <div><h2>الأجهزة المسجلة</h2><p>{loading ? 'جاري تحميل البيانات من الـ API...' : `${devices.length} أجهزة محفوظة في النظام`}</p></div>
-        <button className="text-button" onClick={() => void reload()} disabled={loading}><RefreshCw size={15} /> تحديث القائمة</button>
+        <Button variant="ghost" size="sm" onClick={() => void reload()} disabled={loading} leadingIcon={<RefreshCw size={15} />}>تحديث القائمة</Button>
       </div>
 
       {loading && <div className="panel" style={{ padding: 24 }}>جاري قراءة الأجهزة من قاعدة البيانات...</div>}
@@ -138,7 +140,7 @@ export function AdminDeviceManager() {
                 <article key={device.id} style={{ display: 'grid', gridTemplateColumns: 'minmax(130px, 1fr) minmax(120px, 1fr) minmax(120px, 1fr) auto', gap: 12, alignItems: 'end', border: '1px solid var(--line)', borderRadius: 12, padding: 14 }}>
                   <div>
                     <strong>{device.name}</strong>
-                    <p style={{ margin: '5px 0 0', fontSize: 12, color: 'var(--muted)' }}>{device.category} · {configured ? 'السعر مضبوط' : 'لم يتم تحديد السعر'}</p>
+                    <p style={{ margin: '7px 0 0', fontSize: 12, color: 'var(--muted)' }}>{device.category} · <Badge tone={configured ? 'success' : 'warning'} dot>{configured ? 'السعر مضبوط' : 'لم يتم تحديد السعر'}</Badge></p>
                   </div>
                   <label style={{ display: 'grid', gap: 6, fontSize: 13 }}>
                     سعر الفردية / ساعة (ج.م)
@@ -148,9 +150,9 @@ export function AdminDeviceManager() {
                     سعر المتعددة / ساعة (ج.م)
                     <input type="number" min="0.01" step="0.5" value={draft.multi} onChange={(event) => setDrafts((current) => ({ ...current, [device.id]: { ...draft, multi: event.target.value } }))} placeholder="لم يحدد" style={{ width: '100%', minWidth: 0, padding: '10px 12px', borderRadius: 8, border: '1px solid var(--line)', background: 'var(--card)', color: 'var(--foreground)' }} />
                   </label>
-                  <button className="primary-button" onClick={() => void saveRates(device)} disabled={savingId === device.id || loading}>
-                    <Save size={15} /> {savingId === device.id ? 'حفظ...' : 'حفظ السعر'}
-                  </button>
+                  <Button size="sm" onClick={() => void saveRates(device)} disabled={savingId === device.id || loading} leadingIcon={<Save size={15} />}>
+                    {savingId === device.id ? 'حفظ...' : 'حفظ السعر'}
+                  </Button>
                 </article>
               )
             })}
