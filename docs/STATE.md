@@ -1,7 +1,7 @@
 # GHOST STATE
 
-Last updated: 2026-11-18
-Current phase: AUTH-02 — isolated SQL Server integration-test harness
+Last updated: 2026-11-19
+Current phase: AUTH-03 login + Frontend B1 Design System
 
 > Delivery plan and phase exit criteria: [DELIVERY-ROADMAP.md](./DELIVERY-ROADMAP.md). Keep this file as the live execution log; update it after every meaningful milestone.
 
@@ -1767,3 +1767,30 @@ Reported by user after fast-forward pull to commit `761f98ce4ead4dead43af76f262e
 1. Start Frontend B1 on a focused branch: shared Light/Dark theme provider, unify tokens and theme toggle, reusable Button/Card/Badge/PageHeader primitives; preserve existing Staff/Admin screens and behavior.
 2. Start AUTH-03 login/access-token issuance on a separate focused branch: Identity password verification, lockout, inactive-account denial, MustChangePassword, short-lived JWT issuance, and tests.
 3. Do not connect to any database or apply migrations without explicit target approval and verified backup/restore gates.
+
+
+## Frontend B1 — shared design system implementation started (2026-11-19)
+
+- Working branch: `feature/frontend-b1-design-system`, based on the current delivery line `feature/auth-02-auditlog-append-only`. No changes were made to `main`.
+- Scope: shared theme foundation for the existing Next.js Staff and Admin applications; no route redesign, dashboard analytics, mock financial values, or backend changes in this slice.
+- Added a single `ThemeProvider` and `useGhostTheme` context shared by Staff and Admin. Both dashboards now use the same `ThemeToggle`; removed duplicated localStorage/theme class state from each dashboard.
+- Added a pre-hydration theme bootstrap in the root layout to apply the saved `ghost-theme` preference before rendering and reduce theme flash. Default remains dark when no preference exists.
+- Added semantic design tokens for gaming revenue, product revenue, total revenue, duration, expenses, focus state, and common radii. Kept the existing GHOST warm-neutral/charcoal and restrained gold direction.
+- Added reusable UI primitives: Button variants, Card, semantic Badge, PageHeader, and EmptyState. Added consistent keyboard focus-visible styling, reduced-motion handling, and responsive page-header behavior.
+- Preserved existing Staff/Admin screen structure, API workflows, and explicit no-fake-data states. No chart dependency was introduced; chart selection remains deferred until real analytics contracts exist.
+- **Verification:** source changes committed on the feature branch. Build, browser behavior, theme persistence, hydration, responsive checks, and CI are NOT YET VERIFIED. Do not mark B1 complete until CI and a local visual smoke test pass.
+- **Safety:** no API runtime, database, migration, `GHOST2`, or production environment was accessed.
+
+### B1 review checklist
+- [ ] Confirm shared provider compiles and wraps both routes.
+- [ ] Confirm theme toggle updates both Staff and Admin consistently.
+- [ ] Confirm saved theme survives refresh without a visible flash.
+- [ ] Confirm Light/Dark token contrast and component states.
+- [ ] Confirm responsive behavior and keyboard focus.
+- [ ] Run frontend production build and PR CI.
+- [ ] Update evidence and merge only into `feature/auth-02-auditlog-append-only` after review.
+
+### Next action
+1. Complete B1 source review and run frontend CI/build; fix any errors.
+2. In parallel, start AUTH-03 A2 login/access-token issuance on a separate branch with focused Identity and API tests.
+3. Do not connect to a database or apply the pending Identity migration.
