@@ -33,7 +33,7 @@ Normal access tokens contain:
 
 Password-change tokens contain the user identity and `token_use=password_change`, have a five-minute lifetime, and contain no role claims.
 
-The API fallback authorization policy requires both an authenticated principal and `token_use=access`. The `PasswordChangeOnly` policy requires `token_use=password_change`. Public access is explicitly limited to the login action.
+The API fallback authorization policy currently requires an authenticated principal, `token_use=access`, and the `Admin` role. This is an intentionally restrictive temporary gate until Manager/Cashier/Staff role and resource-ownership policies are implemented and tested. A non-Admin access token is not sufficient to call normal API endpoints yet. The `PasswordChangeOnly` policy requires `token_use=password_change`. Public access is explicitly limited to the login action.
 
 ## Current limitations
 
