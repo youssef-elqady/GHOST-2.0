@@ -37,6 +37,13 @@ public sealed class AuthControllerTests
         Assert.Contains(jwt.Claims, claim => claim.Type == "token_use" && claim.Value == "access");
         Assert.Contains(jwt.Claims, claim => claim.Type == "role" && claim.Value == "Admin");
         Assert.True(payload.ExpiresAtUtc > DateTimeOffset.UtcNow);
+
+        var audit = await fixture.DbContext.AuditLogs.SingleAsync(
+            item => item.Action == "Authentication.LoginSucceeded");
+        Assert.Equal("User", audit.ActorType);
+        Assert.Equal(user.Id, audit.UserId);
+        Assert.Null(audit.OldValues);
+        Assert.Null(audit.NewValues);
     }
 
     [Fact]
@@ -46,7 +53,7 @@ public sealed class AuthControllerTests
         var user = await fixture.CreateUserAsync(mustChangePassword: true);
 
         var result = await fixture.Controller.Login(
-            new AuthController.LoginRequest(user.UserName, InitialPassword));
+            new AuthController.LoginRequest(user.UserName, InitialPassword), CancellationToken.None);
 
         var response = Assert.IsType<OkObjectResult>(result);
         var payload = Assert.IsType<AuthController.PasswordChangeRequiredResponse>(response.Value);
@@ -60,6 +67,8 @@ public sealed class AuthControllerTests
             payload.ExpiresAtUtc - DateTimeOffset.UtcNow,
             TimeSpan.Zero,
             TimeSpan.FromMinutes(5));
+        Assert.Contains(await fixture.DbContext.AuditLogs.ToListAsync(), item =>
+            item.Action == "Authentication.PasswordChangeTokenIssued" && item.UserId == user.Id);
     }
 
     [Fact]
@@ -82,6 +91,8 @@ public sealed class AuthControllerTests
         Assert.False(refreshedUser!.MustChangePassword);
         Assert.True(await fixture.UserManager.CheckPasswordAsync(refreshedUser, NewPassword));
         Assert.False(await fixture.UserManager.CheckPasswordAsync(refreshedUser, InitialPassword));
+        Assert.Contains(await fixture.DbContext.AuditLogs.ToListAsync(), item =>
+            item.Action == "Authentication.PasswordChanged" && item.UserId == user.Id);
     }
 
     [Fact]
@@ -91,9 +102,31 @@ public sealed class AuthControllerTests
         var user = await fixture.CreateUserAsync(isActive: false);
 
         var result = await fixture.Controller.Login(
-            new AuthController.LoginRequest(user.UserName, InitialPassword));
+            new AuthController.LoginRequest(user.UserName, InitialPassword), CancellationToken.None);
 
         Assert.IsType<UnauthorizedObjectResult>(result);
+        Assert.Contains(await fixture.DbContext.AuditLogs.ToListAsync(), item =>
+            item.Action == "Authentication.LoginDenied.InactiveAccount" &&
+            item.ActorType == "System" && item.UserId is null && item.EntityId == user.Id.ToString());
+    }
+
+    [Fact]
+    public async Task Login_UnknownUser_IsAuditedWithoutPersistingUsernameOrCredentials()
+    {
+        await using var fixture = await IdentityFixture.CreateAsync();
+
+        var result = await fixture.Controller.Login(
+            new AuthController.LoginRequest("missing-user", "Sensitive!Password123"),
+            CancellationToken.None);
+
+        Assert.IsType<UnauthorizedObjectResult>(result);
+        var audit = await fixture.DbContext.AuditLogs.SingleAsync(
+            item => item.Action == "Authentication.LoginFailed");
+        Assert.Equal("System", audit.ActorType);
+        Assert.Null(audit.UserId);
+        Assert.Null(audit.EntityId);
+        Assert.Null(audit.OldValues);
+        Assert.Null(audit.NewValues);
     }
 
     [Fact]
@@ -112,6 +145,10 @@ public sealed class AuthControllerTests
         var locked = Assert.IsType<ObjectResult>(result);
         Assert.Equal(StatusCodes.Status423Locked, locked.StatusCode);
         Assert.True(await fixture.UserManager.IsLockedOutAsync(user));
+        Assert.Equal(4, await fixture.DbContext.AuditLogs.CountAsync(
+            item => item.Action == "Authentication.LoginFailed"));
+        Assert.Single(await fixture.DbContext.AuditLogs.Where(
+            item => item.Action == "Authentication.AccountLocked").ToListAsync());
     }
 
     private sealed class IdentityFixture : IAsyncDisposable
