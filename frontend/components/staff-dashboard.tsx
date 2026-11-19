@@ -22,17 +22,16 @@ import {
   LogOut,
   Menu,
   MessageSquareText,
-  Moon,
   MoreHorizontal,
   Search,
   Send,
   ShieldCheck,
-  Sun,
   Users,
   WalletCards,
   X,
   Zap,
 } from 'lucide-react'
+import { ThemeToggle } from '@/components/theme-toggle'
 
 type Device = { id: string; name: string; type: string; room: string; status: 'available' | 'playing' | 'maintenance'; rates?: ApiDevice['rates']; duration?: string; game?: string; price?: string }
 
@@ -53,7 +52,6 @@ function mapApiDevice(device: ApiDevice): Device {
 }
 
 export function StaffDashboard() {
-  const [dark, setDark] = useState(true)
   const [devices, setDevices] = useState<Device[]>([])
   const [devicesLoading, setDevicesLoading] = useState(true)
   const [devicesError, setDevicesError] = useState<string | null>(null)
@@ -61,16 +59,6 @@ export function StaffDashboard() {
   const [selectedDevice, setSelectedDevice] = useState<Device | null>(null)
   const [mode, setMode] = useState<'single' | 'multi'>('single')
   const [mobileNav, setMobileNav] = useState(false)
-
-  useEffect(() => {
-    const saved = window.localStorage.getItem('ghost-theme')
-    if (saved) setDark(saved === 'dark')
-  }, [])
-
-  useEffect(() => {
-    document.documentElement.classList.toggle('dark', dark)
-    window.localStorage.setItem('ghost-theme', dark ? 'dark' : 'light')
-  }, [dark])
 
   useEffect(() => {
     let cancelled = false
@@ -133,7 +121,7 @@ export function StaffDashboard() {
       </aside>
 
       <section className="content-area">
-        <header className="topbar"><button className="icon-button menu-button" onClick={() => setMobileNav(true)} aria-label="فتح القائمة"><Menu size={21} /></button><div className="breadcrumbs"><span>مساحة الموظفين</span><ChevronLeft size={14} /><strong>{navItems.find(n => n.id === activeNav)?.label}</strong></div><div className="top-actions"><div className="sync-state"><span /> {devicesLoading ? 'جاري الاتصال' : devicesError ? 'تعذر الاتصال' : 'متصل بالـ API'}</div><button className="icon-button notification" aria-label="التنبيهات"><Bell size={19} /></button><button className="theme-toggle" onClick={() => setDark(!dark)} aria-label="تبديل المظهر">{dark ? <Sun size={18} /> : <Moon size={18} />}<span>{dark ? 'فاتح' : 'داكن'}</span></button></div></header>
+        <header className="topbar"><button className="icon-button menu-button" onClick={() => setMobileNav(true)} aria-label="فتح القائمة"><Menu size={21} /></button><div className="breadcrumbs"><span>مساحة الموظفين</span><ChevronLeft size={14} /><strong>{navItems.find(n => n.id === activeNav)?.label}</strong></div><div className="top-actions"><div className="sync-state"><span /> {devicesLoading ? 'جاري الاتصال' : devicesError ? 'تعذر الاتصال' : 'متصل بالـ API'}</div><button className="icon-button notification" aria-label="التنبيهات"><Bell size={19} /></button><ThemeToggle /></div></header>
 
         {activeNav === 'overview' && <>
           <div className="page-heading"><div><p className="eyebrow">لوحة التشغيل اليومية</p><h1>أهلاً بك في GHOST <span>—</span></h1><p className="subheading">هذه نظرة سريعة على ما يحتاج انتباهك خلال ورديتك.</p></div><div className="shift-pill"><span className="live-pulse" /><div><b>شيفتك الحالية</b><strong>بيانات الشيفت بعد الربط</strong></div><ArrowLeftRight size={17} /></div></div>
