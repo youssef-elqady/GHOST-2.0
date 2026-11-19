@@ -1,4 +1,5 @@
 using GHOST.API.Authentication;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Authorization.Infrastructure;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
@@ -35,14 +36,14 @@ public sealed class JwtAuthenticationStartupTests
     }
 
     [Fact]
-    public async Task AddGhostJwtAuthentication_RequiresAuthenticationByDefault()
+    public void AddGhostJwtAuthentication_RequiresAuthenticationByDefault()
     {
         var builder = Host.CreateApplicationBuilder();
         builder.Services.AddGhostJwtAuthentication(CreateValidConfiguration());
 
         using var provider = builder.Services.BuildServiceProvider();
-        var policyProvider = provider.GetRequiredService<IAuthorizationPolicyProvider>();
-        var fallbackPolicy = await policyProvider.GetFallbackPolicyAsync();
+        var authorizationOptions = provider.GetRequiredService<IOptions<AuthorizationOptions>>().Value;
+        var fallbackPolicy = authorizationOptions.FallbackPolicy;
 
         Assert.NotNull(fallbackPolicy);
         Assert.Contains(
