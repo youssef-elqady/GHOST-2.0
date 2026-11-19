@@ -1,4 +1,6 @@
 using System.Text.Json.Serialization;
+using GHOST.API.Authentication;
+using GHOST.API.Configuration;
 using GHOST.Application.Abstractions.Persistence;
 using GHOST.Application.BusinessDays.CloseShift;
 using GHOST.Application.BusinessDays.OpenBusinessDay;
@@ -6,9 +8,11 @@ using GHOST.Application.BusinessDays.OpenShift;
 using GHOST.Application.Devices.CreateDevice;
 using GHOST.Application.Sessions;
 using GHOST.Application.Sessions.StartSession;
+using GHOST.Infrastructure.Identity;
 using GHOST.Infrastructure.Persistence;
 using GHOST.Infrastructure.Persistence.Repositories;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Options;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -30,11 +34,24 @@ builder.Services.AddCors(options =>
             .AllowAnyMethod());
 });
 
-builder.Services.AddDbContext<GHOSTDbContext>(options =>
+builder.Services.AddGhostDatabaseConnection(builder.Configuration);
+
+builder.Services.AddDbContext<GHOSTDbContext>((serviceProvider, options) =>
+{
+    var databaseOptions = serviceProvider
+        .GetRequiredService<IOptions<DatabaseConnectionOptions>>()
+        .Value;
+
     options.UseSqlServer(
-        builder.Configuration.GetConnectionString("DefaultConnection"),
+        databaseOptions.DefaultConnection,
         sqlOptions => sqlOptions.MigrationsAssembly(
-            typeof(GHOSTDbContext).Assembly.FullName)));
+            typeof(GHOSTDbContext).Assembly.FullName));
+});
+
+builder.Services.AddGhostIdentity();
+builder.Services.AddGhostJwtAuthentication(builder.Configuration);
+builder.Services.AddSingleton<JwtTokenService>();
+builder.Services.AddScoped<IAuthenticationAuditWriter, AuthenticationAuditWriter>();
 
 builder.Services.AddScoped<IBusinessDayRepository, BusinessDayRepository>();
 builder.Services.AddScoped<IDeviceRepository, DeviceRepository>();
@@ -51,6 +68,8 @@ builder.Services.AddScoped<CloseShiftHandler>();
 var app = builder.Build();
 
 app.UseCors("GhostFrontend");
+app.UseAuthentication();
+app.UseAuthorization();
 
 if (app.Environment.IsDevelopment())
 {

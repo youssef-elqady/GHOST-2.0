@@ -1,0 +1,83 @@
+using System;
+using Microsoft.EntityFrameworkCore.Migrations;
+
+#nullable disable
+
+namespace GHOST.Infrastructure.Persistence.Migrations
+{
+    /// <inheritdoc />
+    public partial class FixIdentityCompositeKeyLengths : Migration
+    {
+        /// <inheritdoc />
+        protected override void Up(MigrationBuilder migrationBuilder)
+        {
+            // Refuse to narrow any existing value. DATALENGTH is measured in bytes;
+            // nvarchar(128) supports at most 256 bytes.
+            migrationBuilder.Sql("""
+                SET XACT_ABORT ON;
+
+                IF EXISTS
+                (
+                    SELECT 1
+                    FROM [dbo].[UserLogins] WITH (TABLOCKX, HOLDLOCK)
+                    WHERE DATALENGTH([LoginProvider]) > 256
+                       OR DATALENGTH([ProviderKey]) > 256
+                )
+                BEGIN
+                    THROW 51001, 'Identity UserLogins contains a key value longer than 128 characters; no schema changes were applied.', 1;
+                END;
+
+                IF EXISTS
+                (
+                    SELECT 1
+                    FROM [dbo].[UserTokens] WITH (TABLOCKX, HOLDLOCK)
+                    WHERE DATALENGTH([LoginProvider]) > 256
+                       OR DATALENGTH([Name]) > 256
+                )
+                BEGIN
+                    THROW 51002, 'Identity UserTokens contains a key value longer than 128 characters; no schema changes were applied.', 1;
+                END;
+                """);
+
+            migrationBuilder.DropPrimaryKey(name: "PK_UserLogins", table: "UserLogins");
+            migrationBuilder.DropPrimaryKey(name: "PK_UserTokens", table: "UserTokens");
+
+            migrationBuilder.AlterColumn<string>(
+                name: "LoginProvider", table: "UserLogins",
+                type: "nvarchar(128)", maxLength: 128, nullable: false,
+                oldClrType: typeof(string), oldType: "nvarchar(450)");
+
+            migrationBuilder.AlterColumn<string>(
+                name: "ProviderKey", table: "UserLogins",
+                type: "nvarchar(128)", maxLength: 128, nullable: false,
+                oldClrType: typeof(string), oldType: "nvarchar(450)");
+
+            migrationBuilder.AlterColumn<string>(
+                name: "LoginProvider", table: "UserTokens",
+                type: "nvarchar(128)", maxLength: 128, nullable: false,
+                oldClrType: typeof(string), oldType: "nvarchar(450)");
+
+            migrationBuilder.AlterColumn<string>(
+                name: "Name", table: "UserTokens",
+                type: "nvarchar(128)", maxLength: 128, nullable: false,
+                oldClrType: typeof(string), oldType: "nvarchar(450)");
+
+            migrationBuilder.AddPrimaryKey(
+                name: "PK_UserLogins", table: "UserLogins",
+                columns: new[] { "LoginProvider", "ProviderKey" });
+
+            migrationBuilder.AddPrimaryKey(
+                name: "PK_UserTokens", table: "UserTokens",
+                columns: new[] { "UserId", "LoginProvider", "Name" });
+        }
+
+        /// <inheritdoc />
+        protected override void Down(MigrationBuilder migrationBuilder)
+        {
+            throw new InvalidOperationException(
+                "Migration 20261118190000_FixIdentityCompositeKeyLengths is forward-only. " +
+                "The previous Identity composite keys exceed SQL Server's 900-byte primary-key limit. " +
+                "To roll back, restore the verified pre-migration database backup; do not execute EF Down.");
+        }
+    }
+}

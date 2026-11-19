@@ -1,7 +1,9 @@
 # GHOST STATE
 
-Last updated: 2026-11-17
-Current phase: AUTH-02 — secure first Admin bootstrap (source audit in progress)
+Last updated: 2026-11-18
+Current phase: AUTH-02 — isolated SQL Server integration-test harness
+
+> Delivery plan and phase exit criteria: [DELIVERY-ROADMAP.md](./DELIVERY-ROADMAP.md). Keep this file as the live execution log; update it after every meaningful milestone.
 
 ## Product and architecture decisions
 - Primary UI: **Next.js** for both Staff and Admin.
@@ -1091,3 +1093,820 @@ Implement the AuditLog entity and EF configuration, generate and inspect the add
 
 ### Immediate next action
 Synchronize the local branch to `eca7be9423372d659ab338251a55db283877b5df`, generate the AuditLogs migration using the installed EF Core 10.0.12 tooling, and share the generated migration output/files for review. Do not apply it to GHOST2. After reviewing generated Up/Down operations, add the append-only trigger and proceed to the CLI bootstrap and disposable SQL Server tests.
+
+
+## AUTH-02 AuditLogs migration generated and reviewed (2026-11-17)
+
+### Generated migration
+- Local EF Core CLI 10.0.12 generated `20261117213727_AddAuditLogs.cs`, its Designer, and updated `GHOSTDbContextModelSnapshot.cs`.
+- User committed and pushed the three generated files in commit `d57c349` on `feature/products-inventory-billing`.
+- Source review confirmed the migration is additive: it creates only `dbo.AuditLogs`, its primary key, actor/JSON check constraints, restricted FK to `Users`, and the two intended indexes. The generated `Down()` drops only `AuditLogs`.
+- Snapshot and Designer describe the same AuditLog model and FK. No existing business or Identity table changes appeared in the reviewed migration diff.
+- `git diff --check` returned no output on the user's local checkout.
+
+### Append-only enforcement added in review branch
+- Add SQL Server trigger `dbo.TR_AuditLogs_AppendOnly` after the AuditLogs indexes. It rejects UPDATE and DELETE with SQL error 51000; INSERT remains permitted.
+- Drop the trigger before dropping AuditLogs in `Down()`.
+- Trigger protection is defense in depth, not a substitute for a least-privilege runtime SQL principal. A principal with schema/DDL or db_owner rights can alter or remove the trigger; runtime grants still need a separately reviewed deployment plan.
+
+### Current verification and safety status
+- Migration source and snapshot were reviewed; trigger source is added in a separate review branch/PR.
+- No local build or SQL Server integration test was run by the assistant. User's earlier EF migration generation reported a successful build, but that does not test trigger execution.
+- No database was queried or modified by this review. Do not apply this migration to live `GHOST2`; separate explicit approval and backup/restore plan remain required.
+- The CLI bootstrap, transaction-owned `sp_getapplock`, atomic role/user/audit flow, and disposable SQL Server integration tests remain outstanding.
+- Existing NU1902/NU1903 advisories for `System.Security.Cryptography.Pkcs 9.0.11` remain a separate dependency-remediation task.
+
+### Immediate next action
+Review the append-only trigger PR, then implement the dedicated bootstrap CLI and isolated SQL Server integration tests. Keep the live `GHOST2` database untouched until a separate migration-application approval.
+
+
+## AUTH-02 — Bootstrap CLI implementation started (2026-11-17)
+
+- Added dedicated `backend/src/GHOST.Bootstrap` .NET 10 console project and registered it in `backend/GHOST.slnx`.
+- The CLI requires an explicit `GHOST_CONNECTION_STRING`; it does not inherit the API's development `GHOST2` connection string and does not run migrations.
+- Requires an interactive terminal, explicit `BOOTSTRAP` confirmation, username/full name, and hidden password entry twice. Password is not accepted through command-line arguments, environment variables, or configuration.
+- Uses existing ASP.NET Core Identity stores and the same scoped `GHOSTDbContext`; password policy is length 12, four unique characters, uppercase/lowercase/digit/non-alphanumeric; new account is active and marked `MustChangePassword`.
+- Uses a transaction-owned exclusive `sp_getapplock` before checking Admin membership. Only nonnegative lock return codes are accepted.
+- Creates only `Admin` and `Staff` roles, one Admin, and a sanitized `Admin.Bootstrapped` AuditLog row in one EF transaction. No Staff account is created.
+- Added CLI README with invocation, safety constraints, and exit codes.
+- Not yet built or executed. No database was connected to, queried, migrated, or modified. Do not run against live `GHOST2`; disposable SQL Server integration tests and local build review remain required.
+- Review notes before build: verify the console host's Identity DI registrations, SQL Server app-lock command behavior, and the EF transaction-sharing behavior on the local SQL Server test instance. The current code does not attempt migrations.
+
+- Hardening refinement: CLI now parses and displays the SQL Server/data source and requires the exact database-specific confirmation `BOOTSTRAP <database-name>`; it rejects connection strings without an explicit Initial Catalog. This reduces accidental execution against the wrong database.
+- The CLI has not been compiled or run in this environment. Immutable .NET password strings cannot be reliably zeroed; the tool avoids writing them to logs, arguments, environment variables, configuration, and audit payloads.
+
+
+## AUTH-02 — Local solution build verified (2026-11-17)
+
+- User ran `dotnet build .\\backend\\GHOST.slnx --configuration Release` from the repository root.
+- Result: **Build succeeded**, all five projects compiled (Domain, Application, Infrastructure, Tests, API) with **0 errors**.
+- Restore/build reported **8 warnings**: NU1902 (moderate) and NU1903 (high) for transitive package `System.Security.Cryptography.Pkcs 9.0.11` in Infrastructure and API. These advisories remain unresolved and must be traced to the dependency chain and remediated with a compatible patched version; do not suppress the warnings.
+- This build confirms the solution as currently configured compiles, but it does not verify runtime bootstrap behavior, SQL Server app-lock semantics, transaction rollback, or the AuditLogs trigger.
+- No database connection, migration application, or bootstrap execution was performed as part of this build.
+- Next: add isolated SQL Server integration coverage for AuditLogs constraints/trigger and bootstrap atomicity/concurrency. Before that, inspect and remediate the vulnerable transitive package version, then rebuild and run the existing test suite.
+
+
+## AUTH-02 — Vulnerability advisory triage (2026-11-17)
+
+- User ran `dotnet list .\\backend\\GHOST.slnx package --vulnerable --include-transitive`. It confirms `System.Security.Cryptography.Pkcs 9.0.11` is transitive in `GHOST.API` and `GHOST.Infrastructure`; Application, Domain, and Tests report no vulnerable packages.
+- The report does not identify the parent dependency. Do not add a direct package override until the dependency path is known.
+- Reviewed GitHub-reviewed advisories GHSA-846f-f764-76mx (High, CVE-2026-84008) and GHSA-2fmv-rv2c-59x7 (Moderate, CVE-2026-70162). Both list `System.Security.Cryptography.Pkcs 9.0.21` as patched for the 9.x line; 10.x is patched at 10.0.13. Preserve the dependency's intended major line; do not upgrade major versions without evidence.
+- API directly references Microsoft.AspNetCore.OpenApi 10.0.12 and EF Design 10.0.12. Infrastructure directly references EF Core/SqlServer/Identity.EntityFrameworkCore 10.0.12. Neither project directly references Pkcs.
+- Verified branch: `feature/auth-02-auditlog-append-only`; HEAD at review time: `20b34c3acd052c6f62a863e73bfb423bbe07c361` (`Record successful Release solution build and dependency advisories`).
+- Next action: run `dotnet nuget why` for `System.Security.Cryptography.Pkcs` against both API and Infrastructure project files to identify the exact parent chain. Then choose the smallest compatible patched update, rebuild, rerun vulnerability scan and full tests. No dependency changes have been made.
+- Advisories: https://github.com/advisories/GHSA-846f-f764-76mx and https://github.com/advisories/GHSA-2fmv-rv2c-59x7.
+
+
+## AUTH-02 — Transitive SQL client vulnerability traced and dependency update prepared (2026-11-17)
+
+### Dependency path confirmed by user
+```text
+GHOST.API
+└── GHOST.Infrastructure
+    └── Microsoft.EntityFrameworkCore.SqlServer 10.0.12
+        └── Microsoft.Data.SqlClient 6.1.6
+            └── System.Security.Cryptography.Pkcs 9.0.11
+```
+
+### Package metadata review
+- NuGet metadata for `Microsoft.EntityFrameworkCore.SqlServer 10.0.15` (net10.0) confirms dependencies on `Microsoft.Data.SqlClient >= 6.1.7` and `System.Security.Cryptography.Pkcs >= 10.0.13`. Pkcs 10.0.13 is the patched .NET 10 line for both reported advisories.
+- `Microsoft.EntityFrameworkCore 10.0.15`, `Microsoft.EntityFrameworkCore.Design 10.0.15`, `Microsoft.AspNetCore.Identity.EntityFrameworkCore 10.0.15`, and `Microsoft.AspNetCore.OpenApi 10.0.15` are available stable .NET 10 packages. Keep the EF package family aligned rather than mixing patch versions.
+- No direct `Microsoft.Data.SqlClient` or `System.Security.Cryptography.Pkcs` PackageReference override is added. The SQL Server EF provider now supplies the patched Pkcs dependency through its own declared dependency graph.
+- Advisory evidence: GHSA-846f-f764-76mx and GHSA-2fmv-rv2c-59x7; package metadata: NuGet Microsoft.EntityFrameworkCore.SqlServer 10.0.15.
+
+### Source changes committed to this branch (not locally validated yet)
+- `backend/src/GHOST.Infrastructure/GHOST.Infrastructure.csproj`: all four EF/Identity package references updated from 10.0.12 to 10.0.15.
+- `backend/src/GHOST.API/GHOST.API.csproj`: Microsoft.AspNetCore.OpenApi and EF Design updated from 10.0.12 to 10.0.15.
+- Commits: Infrastructure `08b909df3e60c011b7f6bc79ff81ac48b2298eb2`; API `affd7cd6bd67fd83ba1c6d76f87dee98fda3276a`.
+- No source API, domain model, migration, database, or bootstrap behavior was changed. No database was accessed.
+
+### Important verification correction
+- The current `backend/GHOST.slnx` source includes six projects, including `GHOST.Bootstrap`. The earlier build summary recorded five compiled projects and did not list Bootstrap; the full local build must explicitly confirm all six projects compile. Do not count Bootstrap as verified until the new build output shows it.
+
+### Immediate next action
+- Synchronize local branch to latest remote commit, then run: `dotnet restore .\\backend\\GHOST.slnx`; `dotnet list .\\backend\\GHOST.slnx package --vulnerable --include-transitive`; `dotnet build .\\backend\\GHOST.slnx --configuration Release`; `dotnet test .\\backend\\GHOST.slnx --configuration Release`.
+- Confirm the resolved SQL Server dependency graph contains a patched `System.Security.Cryptography.Pkcs 10.0.13` or later and that vulnerability scan has no remaining findings. Capture all warnings and test results. No Bootstrap execution, migration application, or live GHOST2 database access.
+
+
+## AUTH-02 — Local dependency remediation verification and branch recovery (2026-11-17)
+
+### Local verification reported by user
+- After syncing the AUTH-02 commits, the user ran `dotnet restore .\\backend\\GHOST.slnx`: succeeded.
+- User ran `dotnet list .\\backend\\GHOST.slnx package --vulnerable --include-transitive`: all six projects (API, Application, Bootstrap, Domain, Infrastructure, Tests) reported no vulnerable packages from the configured NuGet sources.
+- User ran `dotnet build .\\backend\\GHOST.slnx --configuration Release`: succeeded; all six projects compiled, including the previously unverified GHOST.Bootstrap project.
+- User ran `dotnet test .\\backend\\GHOST.slnx --configuration Release`: 43 passed, 0 failed, 0 skipped.
+- This verifies restore, vulnerability scan, Release compilation, and the existing unit-test suite on the user's local environment. The output did not print the exact resolved System.Security.Cryptography.Pkcs version; record the clean vulnerability scan, but do not infer a specific resolved version from it.
+- No Bootstrap execution, SQL Server integration test, migration application, or database connection/change was performed. These remain separate verification gates.
+
+### Local branch recovery confirmed
+- A mistaken pull had fast-forwarded the local `feature/products-inventory-billing` branch to the AUTH-02 tip. The user safely created local `feature/auth-02-auditlog-append-only` tracking `origin/feature/auth-02-auditlog-append-only`, then restored the local products branch pointer to `origin/feature/products-inventory-billing`.
+- User's latest `git status -sb`: `feature/products-inventory-billing...origin/feature/products-inventory-billing`, clean tracked working tree, with only untracked `artifacts/`.
+- Local branch tips reported:
+  - `feature/products-inventory-billing` = `d57c349`, tracking `origin/feature/products-inventory-billing`.
+  - `feature/auth-02-auditlog-append-only` = `b785823`, tracking `origin/feature/auth-02-auditlog-append-only`.
+- The untracked `artifacts/` directory was not deleted, staged, or committed. Keep it untouched unless the user explicitly asks to manage it.
+
+### PR status at review time
+- PR #3, `AUTH-02: AuditLog append-only enforcement and first Admin bootstrap`, was still open and draft when checked. GitHub reported `mergeable=true` at that moment; this is not approval to merge and does not establish that required checks or runtime gates passed.
+- Do not mark the PR ready or merge it yet. Bootstrap runtime behavior, disposable SQL Server integration coverage, and migration/trigger execution remain unverified.
+
+### Next action
+- Continue on the AUTH-02 branch for any AUTH-02 source/STATE changes. Before local AUTH-02 work, switch to `feature/auth-02-auditlog-append-only` and confirm `git status -sb`; preserve the untracked `artifacts/` directory. Next engineering gate is isolated SQL Server integration testing for AuditLogs constraints/append-only trigger and bootstrap transaction/app-lock atomicity. Do not run against live `GHOST2` or apply the migration without separate explicit approval.
+
+
+## AUTH-02 — Static source review before SQL Server integration tests (2026-11-17)
+
+### Files reviewed at current AUTH-02 branch tip
+- `backend/src/GHOST.Bootstrap/Program.cs` and its README/project file.
+- `GHOSTDbContext`, Identity `ApplicationUser`, AuditLog entity/configuration, and `20261117213727_AddAuditLogs` migration.
+- API `Program.cs` and the current `GHOST.Tests.csproj`.
+
+### Source-level observations (not runtime verification)
+- Bootstrap registers `AddIdentityCore<ApplicationUser>().AddRoles<IdentityRole<Guid>>().AddEntityFrameworkStores<GHOSTDbContext>()`, resolves `ILookupNormalizer`, and uses one scoped `GHOSTDbContext` for Identity stores and AuditLogs.
+- Bootstrap begins a Serializable EF transaction, acquires `sp_getapplock` with `LockOwner = Transaction` using that transaction, then performs user creation, role membership, audit insert, and commit through the same scoped context. Negative app-lock return codes fail closed.
+- CLI requires an explicit SQL Server Initial Catalog and exact database-specific confirmation; it does not run migrations. It refuses redirected input/output and reads the password without echoing it.
+- AuditLog has application-level factory validation plus SQL check constraints for actor consistency, actor type, JSON validity, and 16 KiB payload limits. The migration adds an AFTER UPDATE, DELETE trigger that throws SQL error 51000.
+- No obvious transaction/context mismatch was identified by static inspection. This is not proof of SQL Server runtime behavior, lock serialization, rollback atomicity, or trigger enforcement.
+
+### Required integration-test work
+- Current `GHOST.Tests.csproj` references only `GHOST.Application`; it has no Infrastructure project reference or SQL Server integration-test fixture.
+- Bootstrap orchestration is currently embedded in top-level `Program.cs`, so it is not directly callable from tests. Extract the provisioning operation into a testable service while keeping the CLI as a thin interactive input/confirmation shell.
+- Add SQL Server integration coverage for: migration creates AuditLogs and trigger; INSERT succeeds; UPDATE and DELETE fail with SQL error 51000; actor/JSON/size constraints reject invalid rows; first-admin creation persists user + roles + audit atomically; duplicate/concurrent bootstrap cannot create a second Admin; failures roll back all related rows.
+- Integration tests must require an explicitly configured, dedicated disposable test database and fail closed if the catalog is not the designated test database. Never point tests at `GHOST2`. Applying migrations to the dedicated test database requires separate explicit operator approval.
+- No source code or database was changed as part of this static review; no SQL Server integration tests were run.
+
+### Immediate next action
+Obtain explicit approval to provision/use a dedicated SQL Server test database (separate from `GHOST2`) before adding/running migration-backed integration tests. Keep PR #3 draft until those tests and runtime gates pass.
+
+
+## AUTH-02 — Reconciliation of external review (2026-11-18)
+
+### Branch and migration verification
+- Reviewed the current GitHub contents of `feature/auth-02-auditlog-append-only` and `feature/products-inventory-billing`, not the older review snapshot at commit `156c988`.
+- Both current branches contain `20261114053406_AddIdentityPersistence.cs` and its Designer file. The migration source blob is identical on both branches.
+- The current `GHOSTDbContextModelSnapshot.cs` on both branches includes `GHOST.Infrastructure.Identity.ApplicationUser`, `IdentityRole<Guid>`, and the Identity tables (`Users`, `Roles`, `UserRoles`, claims, logins, and tokens).
+- The AUTH-02 branch also contains `20261117213727_AddAuditLogs.cs`, its Designer, and a snapshot including AuditLogs. Therefore the review claim that AUTH-01 migration files are absent and the snapshot contains no Identity model is not true for the current branch tips inspected. Do not regenerate or duplicate AUTH-01 migration.
+- The AUTH-01 migration creates Identity tables and the `Shifts.StaffUserId -> Users.Id` FK. The current AUTH-02 migration creates AuditLogs and its append-only trigger.
+
+### External review items reconciled
+- C1 (missing AUTH-01 migration/snapshot): not reproducible on current branch tips; likely based on an earlier commit/tree. Confirm local checkout is synchronized before any EF tooling.
+- C2 (API endpoints are anonymous and trust request-supplied staff/shift IDs): valid scope/security gap. AUTH-02 bootstrap does not secure API endpoints; do not expose API beyond loopback/trusted local host until authentication/authorization work is completed in its planned slice.
+- H1 (no SQL Server integration-test project/fixture): valid. Add migration-backed SQL Server integration tests; never point them at GHOST2.
+- H4 (no audit table): not true on current AUTH-02 branch; AuditLogs entity/configuration/migration exist. The current bootstrap writes a sanitized `Admin.Bootstrapped` System event.
+- H2, H5/M5, M6 and M7 are valid follow-up concerns for account lifecycle, role protection, deployment hardening, and device seeding; they are not reasons to broaden AUTH-02 into API authentication or unrelated device workflows.
+- Current bootstrap source explicitly assigns a new Guid to IdentityRole, sets password policy (12 chars, four unique characters, upper/lower/digit/non-alphanumeric), and configures lockout (5 attempts / 15 minutes). These should still receive integration/unit coverage.
+- The current CLI does not verify pending migrations before proceeding, does not impose a maximum password length, and embeds orchestration in top-level Program.cs. These are concrete AUTH-02 improvements before SQL integration tests.
+- Current bootstrap uses a Serializable transaction plus transaction-owned SQL application lock (10-second timeout). Keep the application lock as the primary cross-process serialization mechanism; review whether Serializable is necessary after tests.
+
+### Design direction for next implementation slice
+- Keep the existing SRS-aligned append-only AuditLogs table for the bootstrap event; do not add a parallel SecurityAuditEvents table without a demonstrated requirement. Continue to store only allow-listed, non-secret metadata.
+- Extract bootstrap orchestration from the CLI into a testable Infrastructure service while leaving interactive confirmation and hidden password input in the CLI. Keep the service out of API DI registration in AUTH-02.
+- Add a migration preflight that refuses to run when pending migrations exist; never auto-apply migrations from the bootstrap command.
+- Add a filtered unique database index protecting the single successful `Admin.Bootstrapped` event, subject to checking current AuditLogs indexes/collation.
+- Build a dedicated SQL Server integration-test harness using only the explicitly designated `GHOST_AUTH02_IT` database. No GHOST2 connection, automatic database deletion, or cleanup of existing databases.
+- User explicitly approved creating `GHOST_AUTH02_IT` and applying migrations to it. This approval does not authorize dropping/recreating it or creating additional databases without asking first.
+- No database was connected to or modified during this review; no code was changed in this reconciliation.
+
+### Immediate next action
+Synchronize the local AUTH-02 branch and verify migration files/snapshot are present. Then implement the testable bootstrap service, migration preflight, and SQL Server integration-test harness before creating/applying migrations to the approved test database.
+
+
+## AUTH-02 — Bootstrap implementation deep review and execution plan (2026-11-18)
+
+### Current source baseline
+- Reviewed current branch HEAD `3119778d211ec1186ba265717ab8bff6b023d637` (confirmed from GitHub branch metadata).
+- User's local checkout is synchronized to the same commit; tracked worktree is clean and untracked `artifacts/` is intentionally preserved.
+- Re-read the current Bootstrap CLI, project references, `GHOSTDbContext`, `AuditLogConfiguration`, `AuditLog`, `ApplicationUser`, and test project.
+
+### Concrete source findings
+- Bootstrap orchestration is entirely in top-level `GHOST.Bootstrap/Program.cs`; the Infrastructure project is already referenced by the CLI, but the test project currently references Application only.
+- The CLI currently has no `Database.GetPendingMigrationsAsync` preflight. It prints that migrations are not run, but does not verify schema readiness before attempting Identity operations.
+- `ReadSecret()` accumulates an unbounded `StringBuilder`; there is no 128-character maximum. Enforce a bounded read while continuing to avoid echo, args, environment variables, and logs.
+- Identity failure paths currently include `IdentityError.Description` in exception messages. Replace this with stable error codes only; do not emit descriptions or raw exception messages to console.
+- The service must preserve one scoped `GHOSTDbContext` for UserManager, RoleManager, and AuditLogs so the EF transaction covers all writes.
+- The existing transaction-owned `sp_getapplock` is retained as the cross-process serialization mechanism. Its negative return codes are treated as failure. Integration tests must prove lock behavior on SQL Server.
+- Existing `AuditLogs` index names and SQL collation must be inspected before adding a filtered unique index for the one successful `Admin.Bootstrapped` action. The filtered predicate must match the actual Action column semantics and SQL Server provider.
+- `AuditLog.Create` generates UTC timestamps directly; `ApplicationUser.CreatedAt` also uses `DateTimeOffset.UtcNow`. Introducing a clock abstraction is a broader model/API decision; do not add it opportunistically unless needed for deterministic AUTH-02 tests and migration impact is understood.
+- The current Admin-existence check uses `GetUsersInRoleAsync("Admin")`, which includes disabled users; preserve the rule that a disabled Admin still blocks first-admin bootstrap. Test it explicitly.
+- Existing Identity options are currently configured in the CLI host only. Keep this slice's service independent of API authentication registration; AUTH-03 will centralize runtime Identity setup when sign-in is implemented.
+
+### Implementation decisions for this slice
+1. Extract an `IAdminBootstrapService` contract and result/failure codes into Application; implement it in Infrastructure.
+2. Keep terminal input, exact database confirmation, hidden password collection, and process exit-code mapping in the CLI.
+3. Add an explicit migration preflight before any bootstrap writes. Pending migrations or inability to read migration state must fail closed; the CLI must never invoke `Migrate()`.
+4. Bound secret input to 128 characters and reject excess input without echoing it. Return only stable Identity error codes to the operator.
+5. Retain the current `AuditLogs` table and sanitized `Admin.Bootstrapped` event. Do not add `SecurityAuditEvents`.
+6. Inspect collation/index behavior, then add a filtered unique index for exactly one successful bootstrap event in an additive migration if the predicate is robust. No hand-edited model snapshot.
+7. Add a dedicated SQL Server integration-test project. Its connection string must come only from `GHOST_AUTH02_TEST_CONNECTION_STRING`; validate server/database metadata and require Initial Catalog exactly `GHOST_AUTH02_IT`. No fallback to application configuration, no GHOST2, no automatic DROP/CREATE database, and no destructive fixture cleanup.
+8. Apply migrations only after an explicit safety preflight confirms the exact approved catalog. Preserve all existing data in the test database; tests must use unique usernames and non-destructive assertions. Repeated concurrency stress requiring database reset is deferred until an isolated reset strategy is separately approved.
+
+### Verification boundary
+- This was a GitHub source review only. No local build, tests, SQL Server connection, migration application, or database operation was performed in this step.
+- PR #3 remains open and draft. Do not mark ready or merge until SQL Server integration tests and runtime gates pass.
+- `GHOST2`, existing databases, backups, and the local untracked `artifacts/` directory remain untouched.
+
+### Immediate next action
+- Implement the Application bootstrap contract/result codes and Infrastructure service extraction, then reduce the CLI to a thin host. Add tests for pure validation/result mapping first. After local build and unit tests pass, implement migration preflight and the dedicated SQL Server integration harness guarded to `GHOST_AUTH02_IT`. Only then apply migrations to that approved database.
+
+
+## AUTH-02 — Bootstrap service extraction milestone (2026-11-18)
+
+### Implemented on the branch
+- Added Application contracts under `GHOST.Application.Identity.Bootstrap`: `AdminBootstrapRequest`, `AdminBootstrapResult`, `AdminBootstrapStatus`, and `IAdminBootstrapService`.
+- Added `GHOST.Infrastructure.Identity.AdminBootstrapService`. It now owns the Serializable transaction, transaction-owned `sp_getapplock`, existing-Admin check, Admin/Staff role creation, Identity user creation, role assignment, and sanitized `Admin.Bootstrapped` audit insert.
+- The service returns explicit outcomes for success, existing Admin, Identity rejection, and role conflict. Identity error descriptions are no longer returned; only stable error codes are surfaced.
+- Reduced `GHOST.Bootstrap/Program.cs` to interactive input/confirmation, DI composition, service invocation, and process exit-code mapping. The CLI still does not run migrations.
+- The CLI and service use the same scoped DI graph; `GHOSTDbContext` is registered once and the Identity stores and bootstrap service resolve from that scope.
+
+### Review notes / verification boundary
+- Static source review confirms the transaction and lock logic moved into Infrastructure and the CLI calls the Application contract.
+- The existing disabled-Admin blocking behavior is preserved because the service still checks role membership without filtering `IsActive`.
+- Early non-success results leave the transaction uncommitted; disposal rolls it back. Identity and audit writes remain in the same scoped context/transaction.
+- No local .NET build or tests have been run after these changes. Do not treat this milestone as compile-verified.
+- No SQL connection, migration, or database operation was performed. The approved `GHOST_AUTH02_IT` database remains untouched.
+- The local `artifacts/` directory remains untracked and must be preserved.
+
+### Next implementation steps
+1. User pulls the latest branch and runs a Release build of `GHOST.Bootstrap` plus the existing test suite. Fix compile/test failures before adding more behavior.
+2. Add bounded 128-character hidden-secret input and reject overlength input without echoing it.
+3. Add fail-closed pending-migration preflight (read-only; never call `Migrate()`) before service invocation.
+4. Add the isolated SQL Server integration-test project guarded exclusively to `GHOST_AUTH02_IT`; then inspect AuditLogs indexes/collation before deciding on the filtered unique bootstrap-event index.
+5. Only after build, tests, and safety checks pass, apply the existing migrations to the explicitly approved test database. Never target `GHOST2`, drop/recreate a database, or clean existing data.
+
+
+
+## AUTH-02 — Local build/test confirmation and safety gates (2026-11-18)
+
+### Verified by the user on the local checkout
+- Pulled the bootstrap-service extraction commit successfully.
+- `dotnet build backend/src/GHOST.Bootstrap/GHOST.Bootstrap.csproj --configuration Release`: succeeded.
+- `dotnet test backend/tests/GHOST.Tests/GHOST.Tests.csproj --configuration Release`: 43 passed, 0 failed, 0 skipped.
+- Tracked worktree clean; untracked `artifacts/` preserved.
+
+### Follow-up hardening added after that verification
+- Added `InvalidRequest` result status and defensive service validation: username required/max 256, full name required/max 150, password required/max 128.
+- Added hidden console password input bound of 128 characters. A 129th character aborts input without echoing the secret.
+- Added a read-only EF pending-migrations preflight before resolving/invoking the bootstrap service. If migrations are pending, CLI exits with code 4 and does not call `Migrate()`.
+- Changed the generic CLI exception message so it does not incorrectly claim a transaction was rolled back for failures that occur during the preflight.
+- These latest hardening edits have not yet been compiled or tested locally. The previously reported 43 passing tests and build apply to the prior extraction commit only.
+
+### Safety / execution status
+- The migration preflight will open a connection to the database named by `GHOST_CONNECTION_STRING` when the CLI is run. Do not run the CLI until the connection string is independently verified to target exactly `GHOST_AUTH02_IT`.
+- No CLI execution, SQL connection, migration application, or database mutation has occurred in this milestone.
+- `GHOST2` remains explicitly out of scope. No database drop/recreate or cleanup is authorized.
+- The untracked local `artifacts/` directory remains untouched.
+
+### Next action
+- Pull the latest branch, rerun the Bootstrap Release build and existing test suite. Inspect any compile/test failure before continuing.
+- Then add the dedicated SQL Server integration-test project and strict connection-string guard for exactly `GHOST_AUTH02_IT`. Keep test fixtures non-destructive and never run against `GHOST2`.
+- Before any database operation, inspect the configured connection metadata and confirm the exact target. Only then apply existing migrations to the approved test database.
+
+
+
+## Project governance and roadmap checkpoint (2026-11-18)
+
+- Added `docs/DELIVERY-ROADMAP.md` as the phase-by-phase delivery map, including exit gates, security/financial quality requirements, and the commitment to make a runnable Next.js shell visible early after the AUTH-02 SQL gate.
+- `docs/STATE.md` remains the live source of truth for the current branch, verified work, blockers, and next action. Update it after each meaningful code/test milestone; do not rely on chat history as the only record.
+- Current verified local baseline reported by the user: Bootstrap Release build succeeded; existing unit suite 43 passed, 0 failed, 0 skipped. This does not verify SQL Server behavior.
+- Current immediate task: inspect repository test conventions and implement a safe, opt-in SQL Server test harness. The connection must come only from `GHOST_AUTH02_TEST_CONNECTION_STRING` and must reject any catalog except exactly `GHOST_AUTH02_IT`.
+- No SQL Server connection, migration, schema mutation, database creation/drop/reset, or destructive test cleanup is authorized by this roadmap. Any specific database operation requires its own preflight and explicit confirmation.
+- Preserve local untracked `artifacts/`; no destructive Git operations or unreviewed branch merges.
+- After the SQL gate, prioritize a runnable Next.js application shell (Staff/Admin navigation, RTL layout, API connection state) so the product becomes visible and testable early, then proceed through AUTH-03 and the documented vertical workflows.
+
+
+## AUTH-02 — isolated SQL Server test harness foundation (2026-11-18)
+
+### Added to the branch
+- Added `backend/tests/GHOST.SqlServer.Tests` as a separate .NET 10 xUnit project and registered it in `backend/GHOST.slnx`.
+- Added a connection-string safety boundary that reads only `GHOST_AUTH02_TEST_CONNECTION_STRING`; it requires a non-empty server and exact ordinal catalog `GHOST_AUTH02_IT`, and rejects attached database files and failover partners.
+- Added always-runnable unit tests for the guard, including explicit rejection of `GHOST2`, `master`, wrong casing, whitespace differences, missing server/catalog, and unsafe connection modes.
+- Added an opt-in SQL Server Fact attribute: integration tests are skipped only when the dedicated environment variable is absent. If a value is present but unsafe, validation fails closed.
+- Added initial integration checks for the dedicated catalog, AuditLogs table, append-only trigger, and trigger rejection of UPDATE/DELETE. Mutation tests insert a uniquely identified row inside a transaction and roll back; they do not run cleanup DELETE statements.
+- Added project README with safe invocation guidance and the no-create/no-drop/no-migrate/no-reset boundary.
+
+### Verification status
+- Source files and solution registration have been committed to the active branch.
+- **Not yet compiled or executed locally.** Package restore, build, and test results remain pending user-side/local verification.
+- No SQL Server connection was opened. No database, schema, or migration was created/applied/changed.
+- SQL integration tests require the already-provisioned dedicated `GHOST_AUTH02_IT` database and its migrations; the harness does not provision or migrate it.
+- No test or source reads application configuration or `GHOST_CONNECTION_STRING`; the dedicated variable is the sole configured source.
+- Local untracked `artifacts/` remains outside GitHub edits and must be preserved.
+
+### Immediate next action
+1. Pull the latest active branch locally.
+2. Remove any existing `GHOST_AUTH02_TEST_CONNECTION_STRING` from the current PowerShell session, then run `dotnet test backend/GHOST.slnx --configuration Release`.
+3. Confirm the local test/build output matches green CI and inspect `git status -sb`; preserve untracked `artifacts/`.
+4. Do not configure the SQL integration connection yet. First perform a separate read-only preflight of the proposed server/catalog and confirm the dedicated database is the intended test target.
+
+
+### CI wiring (2026-11-18)
+- Added `.github/workflows/backend-ci.yml` to restore, Release-build, and test the full `.NET 10` solution on backend pull requests and the active AUTH-02 branch.
+- The workflow does not receive a SQL connection secret. Therefore the SQL Server integration tests remain skipped in CI by default while the connection-guard unit tests execute.
+- The first GitHub Actions run initially failed on an incorrect trailing-whitespace test expectation; that test was corrected and the successful rerun is recorded below.
+
+
+### Backend CI verification (2026-11-18)
+- GitHub Actions run [#44324909301](https://github.com/youssef-elqady/GHOST-2.0/actions/runs/44324909301) completed successfully on commit `473d61b003867bc72771bd87503fb423389d3f18`.
+- Full `.NET 10` solution restore and Release build succeeded.
+- Existing unit suite: 43 passed, 0 failed.
+- SQL test project: 10 passed, 0 failed, 3 SQL integration tests skipped because no dedicated SQL connection was configured.
+- The first CI attempt exposed an incorrect test expectation: SqlClient normalizes trailing whitespace in the catalog value. The guard compares the parsed catalog actually used by SqlClient; the invalid expectation was removed, and the rerun passed.
+- This green CI proves compilation and the connection-guard unit tests. It does **not** prove live SQL Server trigger/constraint behavior because all 3 database integration tests were skipped.
+
+
+### Pull request review note
+- PR #3 is still draft/open and currently targets `feature/products-inventory-billing` as its base branch, not `main`.
+- No base-branch change, merge, or PR readiness change was made. Confirm the intended integration target and review the full diff before any merge; keep the PR draft until SQL Server integration tests and remaining AUTH-02 gates pass.
+
+
+## AUTH-02 — Identity composite-key index correction (2026-11-18)
+
+### Root cause confirmed
+- EF Identity's design-time context reads `IdentityOptions` from the EF options service provider. When that provider is absent, it falls back to Identity schema version 1; that path does not apply the 128-character key-length default unless `MaxLengthForKeys` is explicitly supplied.
+- The design-time model therefore left the four composite-key strings unbounded, and the SQL Server provider mapped them to `nvarchar(450)`.
+- This produced oversized clustered primary keys: UserLogins (1800 bytes) and UserTokens (1816 bytes), above SQL Server's 900-byte clustered-index key limit.
+
+### Corrective change in progress
+- Explicitly cap `IdentityUserLogin<Guid>.LoginProvider`, `ProviderKey`, and `IdentityUserToken<Guid>.LoginProvider`, `Name` at 128 characters in `GHOSTDbContext.OnModelCreating`; this is the schema-level source of truth and does not depend on the host's DI configuration.
+- Set `IdentityOptions.Stores.MaxLengthForKeys = 128` in the Bootstrap host so runtime Identity options agree with the EF model.
+- Add a corrective migration that checks existing values before narrowing columns, drops/recreates the two composite primary keys around the ALTER COLUMN operations, and restores the previous schema on Down.
+- Add a no-database model test asserting all four max lengths and composite-key byte sizes remain below SQL Server's 900-byte limit.
+
+### Verification and safety boundary
+- Source-level root cause confirmed against the ASP.NET Core Identity EF implementation and the current migration/snapshot.
+- The existing `GHOST_AUTH02_IT` database already has the previous schema. This code change does not connect to or modify any database.
+- Migration is for review only; it must not be applied until its generated SQL and data preflight are reviewed and the user separately approves execution.
+- No build or tests have been run by this GitHub-only edit. CI and user-side Release tests remain required.
+- No changes to `GHOST2`, no branch merge, and no destructive database operation.
+
+### Next gate
+- Review the PR diff and generated migration SQL; run the backend CI workflow and local Release tests.
+- Only after those gates pass, request separate explicit approval before applying the new migration to `GHOST_AUTH02_IT`.
+
+
+## Dependency security follow-up (2026-11-18)
+- User ran Release build and tests from the PR worktree: build succeeded; 54 tests passed, 0 failed, 3 SQL Server integration tests skipped because `GHOST_AUTH02_TEST_CONNECTION_STRING` was not configured.
+- Restore reported `System.Security.Cryptography.Pkcs 9.0.4` with GHSA-2fmv-rv2c-59x7 (Moderate) and GHSA-846f-f764-76mx (High).
+- The vulnerable transitive dependency comes from the SQL Server test project's `Microsoft.Data.SqlClient 6.1.3` dependency graph. Upgrade to SqlClient 6.1.8, whose .NET 9 dependency group requires Pkcs 9.0.21, the patched release for both advisories.
+- This dependency update is a targeted servicing update; restore/build/tests must be rerun to verify the resolved graph and compatibility.
+- The three SQL Server tests remain unverified until run against the dedicated test database.
+
+
+## AUTH-02 — Identity key-length migration SQL review (2026-11-18)
+
+### User-side verification reported after the dependency update
+- `dotnet ef --version` reports EF Core Tools 10.0.15, aligned with EF Core runtime 10.0.15.
+- Release build succeeded and the complete solution test run reported 54 passed, 0 failed, 3 skipped (the SQL Server integration tests were skipped because the dedicated connection variable was absent).
+- With `GHOST_AUTH02_TEST_CONNECTION_STRING` configured for the dedicated `GHOST_AUTH02_IT` catalog, `GHOST.SqlServer.Tests` reported 13 passed, 0 failed, 0 skipped. This includes live verification of the AuditLogs table and append-only trigger rejecting UPDATE and DELETE, plus connection-target safety checks.
+- NuGet's vulnerable-package check for `GHOST.SqlServer.Tests` reported no vulnerable packages.
+- GitHub Actions Backend CI run [#44369739626](https://github.com/youssef-elqady/GHOST-2.0/actions/runs/44369739626) completed successfully for the reviewed branch head `5dd7a691ddf6883d12b621c789abd402f01002c9`.
+
+### Generated SQL review
+- User generated `FixIdentityCompositeKeyLengths.sql` with EF Tools 10.0.15 (3,057 bytes) in the separate local worktree `E:\\GHOST\\GHOST-2.0-authfix`; this path is outside the primary `E:\\GHOST\\GHOST-2.0` checkout and is intentionally preserved as a separate worktree artifact.
+- Reviewed the supplied script: it starts a transaction; checks `UserLogins` and `UserTokens` for values over 256 bytes using `DATALENGTH`; takes `TABLOCKX, HOLDLOCK` locks; drops the two primary keys; narrows the four Identity key columns to `nvarchar(128)`; recreates both primary keys; inserts only the corrective migration ID into `__EFMigrationsHistory`; and commits.
+- Calculated target composite-key widths are 512 bytes for `UserLogins` and 528 bytes for `UserTokens`, below SQL Server's 900-byte clustered-key limit.
+- No row-copy, table-drop, or explicit data-delete operation appears in the supplied SQL.
+
+### Blocking hardening item — preflight error transaction behavior
+- The generated script's transaction begins before the preflight, but the preflight raises `THROW` without an explicit `SET XACT_ABORT ON` or `TRY/CATCH` rollback path.
+- SQL Server documents `XACT_ABORT OFF` as the default and states that with it, some run-time errors roll back only the failing statement while the transaction remains active. Since `THROW` honors `XACT_ABORT`, a failed preflight may leave the script session's transaction and table locks open until explicitly rolled back or the connection closes. See Microsoft Learn: https://learn.microsoft.com/sql/t-sql/statements/set-xact-abort-transact-sql
+- This is a script-execution safety issue, not evidence that the successful migration path is incorrect. Do not execute the script yet. Harden and verify the failure path, then regenerate and review the SQL output.
+- No migration has been applied to `GHOST_AUTH02_IT`. No connection or operation against `GHOST2` was authorized or performed.
+
+### Immediate next action
+- Correct the migration's preflight failure handling without weakening the transaction/locking guarantee. Validate the generated script's success and failure paths before requesting any separate approval to apply it to `GHOST_AUTH02_IT`.
+- Keep PR #4 draft/open and unmerged. Preserve the local `artifacts/` directory and the separate authfix worktree.
+
+
+## AUTH-02 — Migration preflight rollback hardening (2026-11-18)
+
+- Updated `20261118190000_FixIdentityCompositeKeyLengths.Up` to execute `SET XACT_ABORT ON;` before either data preflight query, inside the migration's transaction.
+- Rationale: SQL Server defaults `XACT_ABORT` to OFF; `THROW` honors this setting. Enabling it ensures a runtime error from the preflight aborts and rolls back the active transaction rather than leaving the manual script session holding the table locks. Microsoft reference: https://learn.microsoft.com/sql/t-sql/statements/set-xact-abort-transact-sql
+- The existing `TABLOCKX, HOLDLOCK` protection remains in place, so the check-to-ALTER race is still guarded by transaction-held locks.
+- This is a source change only. It has not yet been built or tested locally, and the regenerated SQL has not yet been inspected.
+- No migration was applied; no database was accessed; `GHOST2` remains untouched.
+
+### Immediate next action
+- Pull the latest PR branch, rebuild/re-run tests, regenerate `FixIdentityCompositeKeyLengths.sql`, and send the regenerated SQL for review. Confirm it contains `SET XACT_ABORT ON;` after `BEGIN TRANSACTION` and before the preflight. Do not execute it yet.
+
+
+## AUTH-02 — Post-hardening local verification (2026-11-18)
+
+Reported by user after fast-forward pull to commit `761f98ce4ead4dead43af76f262e1ebda7b60a0d`:
+- `git pull --ff-only origin fix/auth-identity-composite-key-lengths`: succeeded; fast-forward from `5dd7a69` to `761f98c`.
+- `dotnet build backend/GHOST.slnx --configuration Release`: succeeded.
+- `dotnet test backend/GHOST.slnx --configuration Release`: 57 total, 54 passed, 0 failed, 3 skipped. The 3 skipped are the SQL Server integration tests because `GHOST_AUTH02_TEST_CONNECTION_STRING` was not set in this invocation.
+- Regenerated `FixIdentityCompositeKeyLengths.sql` after the `SET XACT_ABORT ON` source change; EF build succeeded. The regenerated SQL content has not yet been reviewed.
+- The dedicated SQL Server test project has not yet been rerun after this migration source change.
+- No migration was applied and no database was modified.
+
+### Immediate next action
+- Review the regenerated SQL output and confirm `SET XACT_ABORT ON;` appears after `BEGIN TRANSACTION;` and before both preflight checks. Then validate the SQL Server failure path safely without leaving an open transaction. Keep PR #4 draft and unmerged.
+
+
+## AUTH-02 — Identity migration preflight syntax correction (2026-11-18)
+
+- Reviewed the user's regenerated SQL output and found that both preflight checks used `;THROW` as the statement immediately following a single-line `IF`. This syntax is unsafe because the leading semicolon terminates an empty statement; the THROW is not reliably scoped as the IF body and can execute unconditionally.
+- Corrected the migration source `20261118190000_FixIdentityCompositeKeyLengths.cs`: both preflight checks now use explicit `BEGIN ... END` blocks around their respective `THROW 51001` / `THROW 51002` statements.
+- The migration source still includes `SET XACT_ABORT ON;` before both preflight checks, and retains `TABLOCKX, HOLDLOCK` on both tables.
+- The SQL pasted by the user did not include `SET XACT_ABORT ON;`, despite that statement being present in the GitHub migration source. Treat the pasted SQL as not matching the current source/branch output; regenerate it from the latest branch commit before any further review.
+- Source-only GitHub change committed as `b0dbc4c1a4505b24da7332fd2cd0c2bf11f6fae0`. No database was connected to or modified; no migration was applied; PR #4 remains draft/open and unmerged.
+- **Next action:** user pulls this commit in the separate `E:\\GHOST\\GHOST-2.0-authfix` worktree, regenerates `FixIdentityCompositeKeyLengths.sql`, and shares the complete output. Verify the generated script contains `SET XACT_ABORT ON;` after `BEGIN TRANSACTION;`, each `IF EXISTS` wraps its THROW in BEGIN/END, and the remaining DDL/history/COMMIT sequence is unchanged. Then rerun the SQL Server integration test project after this source change. Do not execute the migration script.
+
+
+## AUTH-02 — Regenerated Identity migration SQL review (2026-11-18)
+
+- User supplied the regenerated `FixIdentityCompositeKeyLengths.sql` from the latest source correction.
+- Verified the script starts its migration transaction, enables `SET XACT_ABORT ON` before either preflight, and scopes both `THROW 51001` / `THROW 51002` inside explicit `IF EXISTS ... BEGIN ... END` blocks.
+- Both preflights retain `TABLOCKX, HOLDLOCK` and check `DATALENGTH(...) > 256` before any schema changes.
+- Verified the script drops only `PK_UserLogins` and `PK_UserTokens`, narrows exactly the four intended columns to `nvarchar(128) NOT NULL`, recreates the same composite primary keys, inserts the corrective migration history row, and commits.
+- No table drops, explicit row deletes, or unrelated schema changes appear in the supplied script. Expected composite key widths remain 512 bytes for UserLogins and 528 bytes for UserTokens, below SQL Server's 900-byte clustered-index key limit.
+- Backend CI run #17 for source-fix commit `b0dbc4c1a4505b24da7332fd2cd0c2bf11f6fae0` completed successfully.
+- Remaining verification: rerun the dedicated SQL Server test project against the exact pre-approved `GHOST_AUTH02_IT` target after this latest source change. These tests validate the existing SQL Server harness and do not apply the Identity migration. Do not execute the migration SQL. Any migration application still requires separate explicit approval.
+
+
+## AUTH-02 — Dedicated SQL Server tests after migration source correction (2026-11-18)
+
+- User reran `backend/tests/GHOST.SqlServer.Tests/GHOST.SqlServer.Tests.csproj` in Release configuration from the separate `E:\\GHOST\\GHOST-2.0-authfix` worktree, with `GHOST_AUTH02_TEST_CONNECTION_STRING` configured for the approved dedicated `GHOST_AUTH02_IT` catalog.
+- Result: **13 passed, 0 failed, 0 skipped**; test duration 2.9 seconds; project build succeeded.
+- Live SQL Server checks passed for the AuditLog table and append-only trigger rejecting UPDATE and DELETE.
+- Connection-safety checks passed, including rejection of `master`, `GHOST2`, wrong catalog casing, missing/unsafe connection values, attach-file mode, and failover partner; exact dedicated catalog validation passed.
+- This run verifies the SQL Server integration-test harness and existing AuditLog behavior after the latest migration source correction. It does **not** execute or apply `20261118190000_FixIdentityCompositeKeyLengths`.
+- No Identity migration was applied and no schema change was performed by this test run. `GHOST2` remains untouched. Preserve the separate authfix worktree and local artifacts.
+- **Next gate:** optionally rerun the full solution Release build/test after the latest source correction if not already done on this exact commit; then review PR #4 status and remaining AUTH-02 exit criteria. Keep PR #4 draft/open and unmerged pending explicit user approval. Applying the Identity migration still requires separate explicit approval.
+
+## AUTH-02 — Full-solution Release verification after SQL migration correction (2026-11-18)
+
+- User ran both commands from the separate `E:\\GHOST\\GHOST-2.0-authfix` worktree:
+  - `dotnet build backend/GHOST.slnx --configuration Release`: succeeded; all solution projects compiled.
+  - `dotnet test backend/GHOST.slnx --configuration Release`: **57 total, 54 passed, 0 failed, 3 skipped**; test duration 6.0 seconds.
+- The three skipped tests are the live SQL Server integration tests because `GHOST_AUTH02_TEST_CONNECTION_STRING` was not configured in this full-solution invocation.
+- This full-solution run complements, and does not replace, the separate dedicated SQL Server test run recorded above: **13 passed, 0 failed, 0 skipped** against the approved `GHOST_AUTH02_IT` target after the latest migration source correction.
+- Build and test outputs were user-reported from the correct AUTH-02 worktree. No migration was applied and no database schema was changed by these build/test commands.
+- `GHOST2` remains untouched. The separate authfix worktree and local artifacts remain preserved.
+- PR #4 remains draft/open/unmerged. Applying the Identity migration still requires separate explicit approval.
+
+## AUTH-02 — PR #4 merged (2026-11-18)
+
+- PR #4 was marked ready for review and squash-merged successfully into `feature/auth-02-auditlog-append-only`.
+- Merge commit: `171fbd216cfaf6221b1bf18bb89665e282d54e3c`; GitHub reports the PR closed and merged.
+- The merged commit includes the Identity composite-key length correction, runtime Identity option alignment, guarded corrective migration, model snapshot/test updates, SQL Client servicing update, and AUTH-02 verification documentation.
+- Latest PR-head Backend CI run #21 (run ID `44375104887`) completed successfully.
+- User-reported local verification from `E:\\GHOST\\GHOST-2.0-authfix`: Release solution build succeeded; 57 tests total, 54 passed, 0 failed, 3 skipped (the 3 live SQL Server tests were skipped in that full-suite invocation because the connection variable was absent).
+- Separate live SQL Server test run after the migration source correction: 13 passed, 0 failed, 0 skipped against the dedicated `GHOST_AUTH02_IT` target. This validated the SQL Server test harness and existing AuditLog behavior; it did not apply the Identity migration.
+- **Migration status: not applied.** No database schema was modified by the merge or test runs. Before applying, confirm the exact target database, take/verify a restorable backup, check preflight values, and schedule a controlled migration window. Do not target `GHOST2`.
+- The separate local authfix worktree and its artifacts remain preserved. No local worktree was altered by this GitHub merge.
+
+## AUTH-02 — Database rollout gate (2026-11-18)
+
+- Created tracking issue #5: [Controlled rollout of Identity composite-key migration](https://github.com/youssef-elqady/GHOST-2.0/issues/5).
+- The migration source was reviewed after merge. Its preflight checks reject values whose `DATALENGTH` exceeds 256 bytes before the schema changes; it then narrows the four Identity key columns to `nvarchar(128)` and recreates the two composite primary keys.
+- No SQL Server database connection, backup inventory, or restore-verification capability is available in this execution environment. Therefore the exact target instance, backup existence/restorability, current migration history, and preflight data values could not be independently verified.
+- **Decision: do not apply the migration yet.** This is a deliberate safety hold, not a code defect or a claim that rollout is complete.
+- Issue #5 records the required preflight, backup/restore rehearsal, reviewed script, controlled execution, and post-migration verification steps. Target scope is only the dedicated `GHOST_AUTH02_IT`; `GHOST2` and production are explicitly excluded.
+
+
+## AUTH-03 — Runtime authentication planning checkpoint (2026-11-18)
+
+- Re-read `docs/STATE.md`, `docs/GHOST — SRS + ERD v0.2.md`, `ai/GHOST-master-prompt.md`, `docs/DELIVERY-ROADMAP.md`, and `docs/AUTHENTICATION-DECISIONS.md` on `feature/auth-02-auditlog-append-only` after AUTH-02 PR #4 was merged.
+- Verified current branch tip from the branch comparison metadata: `3392c23e697ddf18cc17973ed207b665d22fa0e4` (`docs: record AUTH-02 database rollout safety gate`). Backend CI run #25 (run ID `44375664551`) completed successfully.
+- Verified the existing Next.js Staff/Admin frontend is already present in this branch; `frontend/package.json`, `frontend/app/*`, `frontend/components/*`, and `frontend/lib/ghost-api.ts` are part of the current foundation. Device listing and Admin rate setup are connected, while authentication, shift/session operations, sales, inventory, and persistent messages remain incomplete.
+- Security review reconfirmed that `GHOST.API/Program.cs` currently has no runtime JWT authentication/authorization middleware or policies, and `DevicesController` exposes device seeding and rate updates without server-side authorization. CORS and hidden UI controls are not security boundaries. Keep the API local/trusted-only until these endpoints are protected.
+- Created Issue #6: [AUTH-03 — Runtime authentication, authorization, and actor scoping](https://github.com/youssef-elqady/GHOST-2.0/issues/6), defining login/JWT/refresh rotation, lockout, disabled-account revocation, MustChangePassword, claims-backed `ICurrentUser`, role/resource ownership policies, audit events, frontend integration, and required tests.
+- Issue #5 remains open for the Identity composite-key migration rollout. The migration is **not applied**; exact SQL target, backup/restore capability, migration history, and data preflight remain unverified in this environment. Do not apply it or target `GHOST2` without the documented operational gates.
+- Branch comparison confirms `feature/frontend-v0-foundation` is an ancestor of the current AUTH branch (0 commits ahead, 118 behind); it is not a separate feature to merge forward. The inventory branch is divergent and remains unapproved.
+- **Next implementation action:** begin AUTH-03 on a new feature branch from the current AUTH-02 tip. First inspect Identity registrations, existing bootstrap/password policy, API request DTOs, and current-shift/session ownership contracts. Implement the runtime authentication foundation in small slices with unit and SQL Server integration tests. Protect existing device write endpoints before any frontend operation is considered safe. Keep AUTH-02 database rollout as a separate gated operation; do not block all code work on the unavailable backup/SQL execution environment.
+- No application code, migration, or database was changed in this checkpoint. No local worktree or untracked artifact was accessed or modified.
+
+
+## AUTH-02 — Migration rollback review finding (2026-11-18)
+
+- Reviewed the merged migration source, `20261118190000_FixIdentityCompositeKeyLengths`, including its `Down` method.
+- **New blocker:** `Down` widens the four Identity key columns back to `nvarchar(450)` and recreates the original composite primary keys. Those definitions total 1,800 bytes for `UserLogins` and 1,816 bytes for `UserTokens`. Microsoft documents a 900-byte maximum for SQL Server primary keys; the Down path therefore attempts to recreate an invalid schema and is not a viable rollback plan. [SQL Server primary/foreign key limits](https://learn.microsoft.com/en-us/sql/relational-databases/tables/primary-and-foreign-key-constraints?view=sql-server-ver17).
+- Created issue #7: [Make Identity key-length migration explicitly forward-only](https://github.com/youssef-elqady/GHOST-2.0/issues/7). Required: make Down fail explicitly before DDL, test the fail-closed behavior, and document backup restore as the only rollback mechanism. Keep Up/preflight/locking unchanged.
+- **Execution gate updated:** issue #5 must remain open until issue #7 is resolved, the exact target is verified, and a backup restore rehearsal succeeds. No migration has been run; no database was accessed or changed; `GHOST2` remains excluded.
+
+### Immediate next action
+1. Resolve issue #7 in a focused branch/PR and pass Release build/tests/CI.
+2. Update issue #5's rollout procedure to use verified backup restore for rollback, then verify the exact `GHOST_AUTH02_IT` target, migration history, and data preflight.
+3. Only then consider a controlled migration window. Do not apply to production or `GHOST2`.
+
+
+## AUTH-02 — Identity migration made explicitly forward-only (2026-11-18)
+
+### Implemented on a focused fix branch
+- Branch: `fix/auth02-identity-migration-forward-only`, based on the latest AUTH-02 tip `e8cfdd3a75ecdb0d858280cfb051257e4997e27e`.
+- Updated only the `Down` method of `20261118190000_FixIdentityCompositeKeyLengths`: it now throws an explicit `InvalidOperationException` before adding any migration operations.
+- The exception explains that the old composite keys exceed SQL Server's 900-byte primary-key limit and that rollback requires restoring a verified pre-migration backup.
+- The `Up` path, its `SET XACT_ABORT ON`, both `TABLOCKX, HOLDLOCK` preflights, all four `nvarchar(128)` alterations, and primary-key recreation were left unchanged.
+- Added `IdentityMigrationRollbackTests`, which invokes the protected Down method through a test adapter and asserts that it throws and leaves `MigrationBuilder.Operations` empty.
+
+### Verification status / safety
+- Source diff is limited to the migration Down implementation, its focused unit test, and this state update.
+- Backend CI run #32 (run ID `44377059343`) completed successfully; both Release Build and Test steps passed. The exact test count was not available from the workflow summary. No local test run was performed in this environment.
+- No migration script was executed, no database was connected to or modified, and no data was changed.
+- Issue #5 remains blocked until this fix is reviewed and green, then the exact `GHOST_AUTH02_IT` target and verified backup/restore rehearsal are independently confirmed. `GHOST2` and production remain excluded.
+
+### Immediate next action
+1. PR #11 was squash-merged into `feature/auth-02-auditlog-append-only` as commit `d5fdf30ed1a5b6380feb372b3e8a599fbe58081d` after the Up/Down diff review and successful Backend CI.
+2. Issue #7 is resolved. Issue #5 remains open for the exact `GHOST_AUTH02_IT` target verification, verified backup/restore rehearsal, schema/history/data preflight, and controlled execution.
+3. Do not apply the migration until every Issue #5 operational gate passes; do not use EF Down as rollback.
+
+
+## AUTH-03 — shared Identity registration slice rebased after AUTH-02 fix (2026-11-18)
+
+- Recreated the AUTH-03 working branch as `feature/auth-03-runtime-authentication-v2` from the updated AUTH-02 tip `bc042285179add3c0ca5217106251a6add409d92`, which includes the forward-only migration correction and its CI verification.
+- Reapplied the shared Identity registration slice: `AddGhostIdentity` centralizes the 128-character key setting, approved password complexity, 5-attempt/15-minute lockout, Roles and EF stores.
+- API and Bootstrap now use the same registration; a focused options unit test is included.
+- This branch is a clean descendant of the updated AUTH-02 tip. The earlier PR #10 branch is retained but paused as stale; it is not to be merged.
+- Initial Backend CI run #36 exposed a compile error: `AddSignInManager()` is not available from the current Infrastructure package graph. Removed that unnecessary registration because this slice does not yet use SignInManager; login implementation will add only the required dependency. Corrected head passed Backend CI runs #39 and #40 (run IDs `44377914844` and `44377955129`): Release Build and Test steps succeeded in both.
+- No JWT, login, refresh tokens, claims-backed actor identity, or endpoint authorization has been implemented yet. Keep API local/trusted-only.
+- No database connection or migration was performed; Issue #5 remains operationally blocked. `GHOST2` and production remain excluded.
+
+### Merge and verification
+- PR #12 was squash-merged into `feature/auth-02-auditlog-append-only` as `3f04105dea4e785abd034c02a878d959ee9bc53b`.
+- Backend CI runs #39 and #40 passed on the corrected PR head; both Release Build and Test steps succeeded. Post-merge Backend CI run #43 (run ID `44378356448`) also passed Build and Test.
+- The earlier failed run #36 was fixed by removing the unnecessary `AddSignInManager()` registration. The shared Identity setup now registers IdentityCore, Roles, and EF stores only; SignInManager will be added with the actual login implementation if needed.
+- No migration was applied and no database was accessed or modified.
+
+### Immediate next action
+1. Continue AUTH-03 with fail-closed JWT configuration: validate required issuer, audience, signing key, and lifetime settings at startup; never commit secrets or use a development fallback in production.
+2. Add login and short-lived access-token issuance using Identity password verification and lockout, rejecting disabled accounts and enforcing `MustChangePassword`.
+3. Then implement hashed refresh-token persistence/rotation/replay detection, claims-backed `ICurrentUser`, and endpoint/resource authorization with integration tests.
+4. Keep the API restricted to trusted local development until every mutating endpoint is protected and anonymous/role/ownership tests pass.
+
+
+## AUTH-03 — fail-closed JWT configuration slice (2026-11-19)
+
+- Tracking issue: [#14 — GHOST execution plan](https://github.com/youssef-elqady/GHOST-2.0/issues/14).
+- Working branch: `feature/auth03-jwt-configuration`, based on `feature/auth-02-auditlog-append-only`.
+- Added explicit `Authentication:Jwt` options for issuer, audience, signing key, and access-token lifetime. No secret or weak development fallback is committed.
+- Added startup validation: issuer/audience required; signing key must contain at least 32 UTF-8 bytes; access-token lifetime must be 1–30 minutes. `ValidateOnStart` makes invalid/missing settings fail startup.
+- Registered JWT bearer validation for issuer, audience, signature, expiration, and HMAC-SHA256 only; expiration is required, clock skew is 30 seconds, inbound claim remapping/token saving/detailed bearer errors are disabled. Added authentication/authorization middleware to API pipeline.
+- Added validator tests and host-startup tests for missing versus valid explicit settings. Added environment-variable configuration instructions in `docs/AUTH-03-JWT-CONFIGURATION.md`.
+- **Scope limitation:** this slice validates incoming JWTs only. It does not issue tokens, implement login/refresh, or add `[Authorize]` to endpoints. The API is not yet secured for operational use; keep it trusted-local-only until AUTH-03 endpoint protection and tests are complete.
+- **Verification status:** source changes committed to the feature branch; automated CI and Release test results are pending PR checks. No local build/test was run by this environment. Do not mark VERIFIED until CI and review pass.
+- **Database safety:** no database was connected to or modified. Existing `appsettings.json` contains a default connection string naming `GHOST2`; do not start API health/database operations or use that connection. A separate configuration-hardening action must remove accidental default targeting before any DB-connected runtime test.
+
+### Next actions
+1. Review PR checks and fix any compile/test issues before considering merge.
+2. Inspect Staff/Admin reference repositories and current Next.js components (B0 discovery) without rewriting UI.
+3. Implement login/access-token issuance only after this configuration slice passes.
+
+
+### AUTH-03 JWT CI correction — 2026-11-19
+
+- First CI attempt on PR #16 (run #47, run ID `44462682911`) restored dependencies and built the API successfully, then failed compiling the test project because the test referenced `DenyAnonymousAuthorizationRequirement` from the wrong namespace. It also reported an xUnit analyzer warning for a synchronous wait in an async-policy test.
+- Corrected the test to import `Microsoft.AspNetCore.Authorization.Infrastructure` and await `GetFallbackPolicyAsync()`. This is committed on `feature/auth03-jwt-configuration` as `f0a54daec91cbea9b5490f1ebfa915cb94c67c91`.
+- **Status remains IN REVIEW / CI PENDING** until a workflow run for the corrected head passes Build and Test. The failed attempt is not counted as verification.
+
+
+### AUTH-03 JWT CI follow-up — 2026-11-19
+
+- Replacement PR #17 CI run #49 (run ID `44462949680`) confirmed the prior namespace fix, then exposed that `IAuthorizationPolicyProvider` was not available to the test project's compile-time references. API project itself built successfully; tests did not compile.
+- Simplified the test to inspect the registered `IOptions<AuthorizationOptions>.Value.FallbackPolicy` directly, retaining the assertion that anonymous users are denied by default. The test now imports the public authorization namespaces only.
+- This correction is committed on `feature/auth03-jwt-configuration-reviewed`; CI must be rerun on the corrected head. No successful test claim is made yet.
+
+
+### AUTH-03 JWT configuration — CI verified (2026-11-19)
+
+- Corrected-head Backend CI run #51 (run ID `44463074527`) passed.
+- Release solution build: **succeeded, 0 warnings, 0 errors**.
+- `GHOST.Tests`: **58 passed, 0 failed**.
+- `GHOST.SqlServer.Tests`: **10 passed, 3 skipped**. The skipped cases require the separately approved SQL Server integration environment; no SQL Server database was connected by this CI run.
+- The two earlier failed CI attempts were test-source compile issues; both were corrected before run #51. Do not count those earlier attempts as successful verification.
+- Issue #19 created to remove the committed `GHOST2` default connection string and require explicit environment configuration before any API DB operation. No database was accessed or changed.
+- AUTH-03 JWT configuration slice is **VERIFIED at build/unit-test level**; JWT login/token issuance/refresh, endpoint authorization integration and full security matrix remain NOT STARTED. The fallback policy already requires authentication by default, so existing API routes are denied anonymously; no login endpoint exists yet.
+
+
+## Execution plan and frontend discovery — 2026-11-19
+
+- User-approved working agreement: execute GHOST in explicit phases, track each status and evidence, and keep this file current. Engineering lead owns technical sequencing, review, risk reporting, and honest completion criteria.
+- Tracking issue: [#14 — GHOST execution plan](https://github.com/youssef-elqady/GHOST-2.0/issues/14).
+- Detailed plan: [docs/EXECUTION-PLAN-2026-11-19.md](./EXECUTION-PLAN-2026-11-19.md).
+- Frontend discovery and KEEP/MODIFY/ADD/DEFER: [docs/FRONTEND-DISCOVERY-2026-11-19.md](./FRONTEND-DISCOVERY-2026-11-19.md).
+
+### Status after AUTH-03 JWT configuration merge
+
+| Workstream | Status | Evidence / next action |
+|---|---|---|
+| AUTH-02 shared Identity registration | VERIFIED | PR #12 merged earlier; pending database migration remains unapplied. |
+| AUTH-03 JWT configuration | VERIFIED — configuration slice only | PR #18 merged as `48b0d564b1db125aed6d1cdfc7c2031ee23b9f01`. Backend CI run #51 passed: Release build 0 warnings/0 errors; GHOST.Tests 58/58; GHOST.SqlServer.Tests 10 passed/3 skipped (SQL integration cases skipped without approved SQL connection). |
+| AUTH-03 login/access-token issuance | NOT STARTED | Implement password verification, lockout, disabled-account checks, MustChangePassword and short-lived token creation. |
+| AUTH-03 refresh-token lifecycle and claims-backed actor | NOT STARTED | Hashed persistence, rotation, replay detection, revocation, ICurrentUser. |
+| AUTH-03 endpoint/resource authorization | IN PROGRESS — foundation in place | Fallback policy requires authentication by default. Protect/verify each workflow and test 401/403/ownership; no login endpoint exists yet. |
+| Frontend B0 discovery | VERIFIED | Existing Next.js app and Staff/Admin reference repos reviewed; decisions recorded in discovery document. No UI code changed in discovery. |
+| Frontend B1 Design System | NOT STARTED | Next frontend implementation: shared theme provider, semantic tokens, Light/Dark, RTL and reusable primitives. |
+| AUTH-02 migration rollout | BLOCKED | Exact target and backup/restore/data preflight remain unverified; no migration applied. |
+| API database configuration safety | BLOCKED / HIGH PRIORITY | Issue #19: committed API appsettings currently names `GHOST2`. Do not run DB health checks or database operations until the default is removed and explicit configuration is required. No DB was accessed. |
+
+### Immediate next actions
+
+1. Resolve Issue #19 before any API runtime operation that can touch the database: remove hard-coded `GHOST2` and require explicit environment-specific connection strings.
+2. AUTH-03 login/access-token slice with Identity verification, lockout, account state, MustChangePassword and tests.
+3. Frontend B1 shared theme provider/design tokens and reusable components on a focused branch.
+4. Continue refresh tokens, claims-backed actor identity, resource/shift ownership and endpoint security tests.
+5. Only after authentication and authorization are complete, connect the Admin and Staff shells to protected operational workflows.
+
+### Safety and verification notes
+
+- PR #18 CI run #51 was green before merge. It did not connect to SQL Server: 10 SQL guard/unit tests passed and 3 SQL integration tests were skipped due to no approved connection string.
+- JWT configuration validates required issuer, audience, signing key (minimum 32 UTF-8 bytes), and access-token lifetime (1–30 minutes) at startup; only HMAC-SHA256 is accepted; expiration is required; fallback authorization requires authenticated users by default.
+- This does **not** mean login or full API authorization is complete. No token issuance, refresh flow, claims-backed user context, role/ownership policies, or login UI exists yet.
+- No database was connected to or modified. Do not use `GHOST2`, production, or apply the pending AUTH-02 migration.
+
+
+## API database connection hardening — Issue #19 (2026-11-19)
+
+- Tracking issue: [#19 — remove hard-coded GHOST2 database target](https://github.com/youssef-elqady/GHOST-2.0/issues/19).
+- Working branch: `fix/api-database-connection-fail-closed`, based on the latest delivery branch after PR #18.
+- Removed the committed `ConnectionStrings:DefaultConnection` value that named `GHOST2` from API `appsettings.json`.
+- Added explicit `DatabaseConnectionOptions` with startup validation. API requires `ConnectionStrings__DefaultConnection`; there is no committed fallback.
+- Validation parses the SQL Server connection string without opening a connection; requires explicit data source and catalog; rejects `GHOST2`, `GHOST_AUTH02_IT`, SQL system catalogs, and attached database files.
+- API DbContext now consumes the validated options. No database connection was made by these changes or tests.
+- Added validator tests for missing/malformed values, reserved catalogs, missing server/catalog, attached files, and valid safe config; added startup validation tests.
+- **Verification status:** PR CI pending. No local build/test was run in this environment. Do not mark verified until CI passes.
+
+### Next action
+1. Review CI and fix any build/test issues.
+2. Merge only to `feature/auth-02-auditlog-append-only` after green checks.
+3. Then continue AUTH-03 login/access-token issuance; keep all database operations blocked until a user-approved exact target and backup/restore gates are met.
+
+
+### API database configuration safety — CI verified (2026-11-19)
+
+- PR #21 Backend CI run #57 (run ID `44463594101`) passed.
+- Release solution build: **succeeded, 0 warnings, 0 errors**.
+- `GHOST.Tests`: **71 passed, 0 failed**.
+- `GHOST.SqlServer.Tests`: **10 passed, 3 skipped** because the isolated SQL integration connection was not configured. No database connection was made by CI.
+- The API no longer has a committed `GHOST2` connection string. Startup requires explicit `ConnectionStrings__DefaultConnection` and validates server/catalog without connecting. `GHOST2`, `GHOST_AUTH02_IT`, system catalogs and attached database files are rejected.
+- This code/configuration slice is **VERIFIED at build/unit-test level**; merge remains pending review. No DB was accessed or changed.
+
+
+## Post-merge checkpoint — 2026-11-19
+
+- PR #18 merged JWT configuration as `48b0d564b1db125aed6d1cdfc7c2031ee23b9f01`. Backend CI run #51 passed: Release build 0 warnings/0 errors; `GHOST.Tests` 58 passed; `GHOST.SqlServer.Tests` 10 passed / 3 skipped. The SQL integration environment was not connected.
+- PR #20 merged the execution plan and frontend discovery docs as `07a83f1a985719ada47238ac383453c7b61f0c00`.
+- PR #21 merged API database configuration hardening as `bfd2f4f7a67238d1c27a155ae84c89bcefb4fbac`. Backend CI run #57 passed: Release build 0 warnings/0 errors; `GHOST.Tests` 71 passed; `GHOST.SqlServer.Tests` 10 passed / 3 skipped. No database connection was made.
+- Issue #19 is closed. The API no longer has a committed `GHOST2` target; it requires explicit `ConnectionStrings__DefaultConnection` and rejects `GHOST2`, `GHOST_AUTH02_IT`, system catalogs and attached database files at startup.
+- **No database was accessed or modified; no migration was applied.** `GHOST2` and production remain excluded.
+
+### Current delivery statuses
+
+| Area | Status | Next action |
+|---|---|---|
+| AUTH-02 Identity registration + migration rollback safety | VERIFIED in code/CI | Database migration remains unapplied pending separate operational gates. |
+| AUTH-03 JWT validation/configuration | VERIFIED in code/CI | Login and access-token issuance. |
+| AUTH-03 login/refresh/actor/endpoint authorization | NOT STARTED beyond JWT validation/fallback policy | Implement in focused slices; test account states, refresh replay, 401/403 and ownership. |
+| API DB configuration safety | VERIFIED in code/CI | Provide a specifically approved environment connection string only when DB work is authorized. |
+| Frontend B0 discovery | VERIFIED | Completed and documented. |
+| Frontend B1 Design System | NEXT | Shared theme provider, semantic tokens, reusable primitives, Light/Dark, RTL/responsive. |
+| AUTH-02 database rollout | BLOCKED | Exact target, verified backup/restore, schema/history/data preflight. |
+
+### Immediate next actions
+1. Start Frontend B1 on a focused branch: shared Light/Dark theme provider, unify tokens and theme toggle, reusable Button/Card/Badge/PageHeader primitives; preserve existing Staff/Admin screens and behavior.
+2. Start AUTH-03 login/access-token issuance on a separate focused branch: Identity password verification, lockout, inactive-account denial, MustChangePassword, short-lived JWT issuance, and tests.
+3. Do not connect to any database or apply migrations without explicit target approval and verified backup/restore gates.
+
+
+## Frontend B1 — shared Design System foundation (2026-11-19)
+
+- Working branch: `feature/frontend-design-system`, based on the current delivery branch after PR #22.
+- Added a shared `ThemeProvider` and `ThemeToggle`; the root layout bootstraps the saved/system theme before hydration. Staff and Admin now use the same theme state rather than maintaining duplicate localStorage effects.
+- Added reusable Button, Card, Badge and PageHeader primitives. Admin device management now uses shared Button and Badge components for add/refresh/save actions and rate-configuration status.
+- Extended semantic CSS tokens for raised surfaces, focus ring, violet, and chart series. Added keyboard focus styling, selection styling, and reduced-motion support.
+- Design contract: [docs/FRONTEND-DESIGN-SYSTEM-B1.md](./FRONTEND-DESIGN-SYSTEM-B1.md).
+- **Scope:** this is a foundation only. No financial charts, dashboard metrics, login flow, or fake data were added. Existing Staff/Admin layout and API workflows are preserved.
+- **Verification:** Frontend CI is pending; no local pnpm build was run in this environment. Do not mark B1 VERIFIED until the Next.js production build passes and the theme is visually checked in both modes.
+
+### Next actions
+1. Review Frontend CI and fix TypeScript/Next.js issues.
+2. If CI passes, visually inspect Staff and Admin in Light/Dark and verify persistence across routes.
+3. Continue with Admin shell and dashboard skeleton without adding fake figures; keep AUTH-03 login/access-token work on a separate branch.
+
+
+### Frontend B1 build verification — 2026-11-19
+
+- Frontend CI run #27 (run ID `44464329267`) passed both jobs:
+  - Next.js production build: **compiled successfully**; routes emitted.
+  - Backend API Release build: **passed**.
+- No local browser/visual QA was performed in this environment. The B1 code is **build-verified**, while visual inspection of Light/Dark, route-to-route preference persistence, and responsive breakpoints remains pending before marking the whole design-system phase VERIFIED.
+- Node/pnpm ecosystem deprecation notices appeared in CI logs; they did not fail the build and are not application compile errors.
+
+## Admin dashboard skeleton — B2/B3 (2026-11-19)
+
+- Working branch: `feature/admin-dashboard-skeleton`, based on the delivery branch after PR #23.
+- Added an Admin Overview skeleton with KPI cards, financial revenue panel, separate time/usage panel, financial source summary, shift/cash summary, product table, device/room table, insights placeholder and data-integrity notice.
+- Color contract is visible in the UI: gaming blue, products green, total collected gold, expenses/refunds red, gaming duration violet in a separate time panel. EGP and time are not mixed.
+- Every metric remains — and every table/chart shows a truthful empty state. No sample revenue, session counts, percentages, cash balances, or fabricated chart bars.
+- Existing Admin Device Management behavior is preserved.
+- Design and backend data requirements: [docs/ADMIN-DASHBOARD-SKELETON.md](./ADMIN-DASHBOARD-SKELETON.md).
+- Verification: Frontend CI pending. No local browser QA was performed. Do not mark this phase VERIFIED until production build and visual checks pass.
+
+### Admin dashboard skeleton — build verification (2026-11-19)
+
+- Frontend CI run #30 (run ID `44464844197`) passed both jobs: Next.js production build and API Release build.
+- The dashboard skeleton is **build-verified**. Visual inspection in browser at desktop/tablet/mobile and both themes remains pending because no local browser session was available.
+- The dashboard is intentionally a layout skeleton: metrics show `—`, charts/tables show empty states, and no demo financial values are present.
+- B1 shared Design System PR #23 was merged as `9eba817074b6205fb5e0c2d1ec477f1f1bed8ca0`; its Frontend CI run #27 passed Next.js production build and API Release build. Visual QA remains a separate acceptance item.
+
+
+## Post-merge Admin dashboard checkpoint — 2026-11-19
+
+- PR #23 merged shared frontend Design System as `9eba817074b6205fb5e0c2d1ec477f1f1bed8ca0`. Frontend CI #27 passed Next.js production build and API Release build.
+- PR #24 merged Admin dashboard skeleton as `18f00db404b2e6da83ebcbde2f352e72546f2a8c`. Frontend CI #30 passed Next.js production build and API Release build.
+- Dashboard skeleton includes distinct gaming/product/total/expenses colors and a separate violet time-usage panel. All metrics remain unknown (`—`) until real API contracts are available; no demo values are shown.
+- **Visual QA remains pending:** inspect Light/Dark and responsive layouts in an actual browser before calling the UI phase fully VERIFIED. Build success is not visual acceptance.
+- No database was connected or modified.
+
+### Next work
+1. AUTH-03 login and short-lived access-token issuance using the existing Identity setup, with lockout, inactive-account and MustChangePassword handling.
+2. AUTH-03 refresh-token lifecycle and claims-backed actor context.
+3. Frontend login/session integration and protected Staff/Admin route experience.
+4. Build real analytics APIs only after business-day, shift, invoice/payment and session source-of-truth contracts are defined and tested.
+
+## AUTH-03 — login and access-token issuance (2026-11-19)
+
+- Working branch: `feature/auth03-login-access-token`, based on the active delivery line after the Admin dashboard skeleton.
+- Added POST /api/auth/login with generic invalid-credential handling, inactive-account denial, Identity lockout (5 attempts / 15 minutes), and short-lived access-token issuance.
+- Existing accounts are explicitly lockout-enabled during login if they predate the lockout setting. New ApplicationUser instances and first Admin bootstrap enable lockout.
+- Accounts flagged MustChangePassword receive a five-minute restricted token only; POST /api/auth/change-password requires that token, validates current/new password, clears the flag with the Identity password update, and returns a normal access token.
+- Authorization now distinguishes token purpose: fallback API policy requires token_use=access; PasswordChangeOnly requires token_use=password_change. Restricted tokens cannot access normal API endpoints.
+- Access tokens include sub, unique_name, role, full_name, jti, issuer, audience and expiry. Refresh tokens, revocation, claims-backed actor abstraction and resource/shift policies remain later work.
+- Added EF Core InMemory controller tests for successful login/role claims, MustChangePassword flow, password change, inactive account and five-attempt lockout; policy tests verify the two token-purpose policies.
+- Detailed flow and limitations: [docs/AUTH-03-LOGIN.md](./AUTH-03-LOGIN.md).
+- **Verification:** CI pending. No database connection was made; tests use EF Core InMemory. Do not mark verified until Build and Test pass.
+
+### AUTH-03 login CI review — 2026-11-19
+
+- Initial PR #27 CI run #73 passed compilation and tests: `GHOST.Tests` 77/77; `GHOST.SqlServer.Tests` 10 passed / 3 skipped; 0 build errors.
+- The build emitted two nullable-analysis warnings in the authorization-policy tests because `AllowedValues` is nullable. The tests were corrected to use a null-safe check. This is a quality correction; a clean rerun is required before merge.
+- No database was connected. The 3 SQL integration tests remained skipped.
+
+
+### AUTH-03 authorization safety refinement — 2026-11-19
+
+- During final review of the login flow, identified that an authenticated non-Admin token would otherwise satisfy the fallback policy before Manager/Cashier/Staff endpoint policies exist.
+- Tightened the fallback policy to require all three: authenticated principal, `token_use=access`, and `Admin` role. The restricted password-change policy remains separate and accepts only `token_use=password_change`.
+- Added a policy test asserting the temporary Admin-only fallback. This deliberately blocks non-Admin API access until explicit role/resource/shift policies and ownership tests are implemented.
+- Updated `docs/AUTH-03-LOGIN.md`. CI must rerun on this refinement before merge.
+
+
+### AUTH-03 login/access-token CI verified — 2026-11-19
+
+- Corrected-head CI run #83 (run ID `44466252139`) passed.
+- Release solution build: **succeeded, 0 warnings, 0 errors**.
+- `GHOST.Tests`: **77 passed, 0 failed**.
+- `GHOST.SqlServer.Tests`: **10 passed, 3 skipped** because no isolated SQL integration connection was configured. No database connection was made.
+- The fallback policy is intentionally Admin-only until explicit Manager/Cashier/Staff role and resource ownership policies are implemented. Restricted password-change tokens cannot access normal endpoints.
+- Login and required password-change flow are **VERIFIED at build/unit-test level**. Refresh tokens, replay detection/revocation, current-user abstraction, fine-grained policies, and frontend login remain NOT STARTED.
+
+
+## Post-merge AUTH-03 login checkpoint — 2026-11-19
+
+- PR #29 merged login and restricted password-change flow as `d7f9ec576a41f4b8621928b6d45d611f34962f91`.
+- Corrected-head Backend CI run #83 passed: Release build 0 warnings/0 errors; `GHOST.Tests` 77 passed; `GHOST.SqlServer.Tests` 10 passed / 3 skipped (no SQL integration connection configured).
+- Login supports Identity password verification, disabled-account denial, 5-attempt/15-minute lockout, short-lived access tokens, and a five-minute password-change-only token for bootstrap accounts. Password change returns a normal access token.
+- Fallback API access is intentionally Admin-only until explicit Manager/Cashier/Staff role and resource/shift ownership policies are implemented. The password-change token is purpose-restricted and cannot access operational endpoints.
+- Refresh tokens, rotation, replay detection, revocation, ICurrentUser, fine-grained endpoint policies and frontend login remain outstanding.
+- No database was connected or modified. No migration was applied.
+
+### Current priority order
+1. AUTH-03 refresh-token persistence, hashing, rotation, replay detection and revocation.
+2. Claims-backed current-user context and explicit role/resource/shift policies; expand beyond Admin only after endpoint-by-endpoint tests pass.
+3. Frontend login and required password-change screen, then session integration. Do not store long-lived refresh secrets in localStorage.
+4. Visual QA for the Admin dashboard skeleton in Light/Dark and responsive breakpoints.
+5. Real dashboard analytics APIs only after financial/session/shift source-of-truth contracts are implemented and reconciled.
+
+
+## AUTH-03 authentication audit hardening — 2026-11-19
+
+- PR #29 is the authoritative merged AUTH-03 login/password-change implementation. The earlier audit-writer PR #26 was closed as superseded; none of its duplicate login/token code was merged.
+- New focused branch: `feature/auth03-login-audit-hardening`, based on the delivery branch after PR #29.
+- Added `IAuthenticationAuditWriter` and `AuthenticationAuditWriter` using the existing immutable `AuditLog` entity and `GHOSTDbContext`.
+- Wired audit events into the authoritative PR #29 login and password-change flows: successful login, unknown-user failure, inactive-account denial, locked-account denial, failed password, lockout, restricted password-change token issuance, password-change success/failure/denial.
+- Authentication audit entries never include usernames from failed attempts, passwords, raw JWTs, or temporary credentials. Unauthenticated attempts use a System actor; authenticated success/change events use the user GUID.
+- Extended EF Core InMemory controller tests to assert the audit events and verify that unknown usernames/passwords are not persisted.
+- Added a guarded SQL Server integration test for actual audit persistence, using only the exact `GHOST_AUTH02_IT` database via `GHOST_AUTH02_TEST_CONNECTION_STRING`, and rolling back its row.
+- No login/token implementation was duplicated or overwritten. No DB connection or migration was performed.
+- **Verification:** CI pending on this audit-only hardening branch. Keep PR separate from the already merged login/password-change flow until build/tests pass. SQL persistence remains unverified unless the isolated test connection is explicitly configured.
+
+
+### AUTH-03 authentication audit hardening — CI verified (2026-11-19)
+
+- Backend CI run #89 (run ID `44466867203`) passed.
+- Release solution build: **0 warnings, 0 errors**.
+- `GHOST.Tests`: **78 passed, 0 failed**. The EF Core InMemory tests exercise login/password-change audit events and verify unknown-user credentials are not persisted.
+- `GHOST.SqlServer.Tests`: **10 passed, 4 skipped**. The dedicated SQL persistence test was skipped because `GHOST_AUTH02_TEST_CONNECTION_STRING` was not configured; no SQL Server connection was made.
+- The audit-writer and controller changes are **VERIFIED at build/unit-test level**. Actual SQL Server persistence remains unverified until the exact isolated test connection is configured.
+- PR #31 contains only the audit hardening layered on top of merged PR #29. It does not duplicate or replace the login/token flow.
+
+
+### Post-merge AUTH-03 audit hardening checkpoint (2026-11-19)
+
+- PR #31 merged into the delivery branch as `6ac5eba46e14dacb209e77a3e86047061c64ce50`.
+- Backend CI run #89 passed before merge: Release build 0 warnings/0 errors; `GHOST.Tests` 78 passed; `GHOST.SqlServer.Tests` 10 passed / 4 skipped.
+- Login/password-change audit events are now wired to the existing append-only AuditLogs table. Unit tests verify success/failure/lockout/password-change audit events and ensure unknown usernames/passwords are not persisted.
+- The SQL Server audit persistence test is present and guarded, but skipped without `GHOST_AUTH02_TEST_CONNECTION_STRING`; no database was connected or modified.
+- PR #26 was closed as superseded by PR #29 after detecting the concurrent, newer login/password-change implementation. No duplicate token/login code was merged.
+- Current next backend slice: A3 refresh-token/session lifecycle design, followed by implementation only after the storage, cookie, CSRF, concurrency and migration strategy are documented.

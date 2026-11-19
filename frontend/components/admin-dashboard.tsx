@@ -1,7 +1,9 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useState } from 'react'
 import { AdminDeviceManager } from '@/components/admin-device-manager'
+import { AdminOverview } from '@/components/admin-overview'
+import { ThemeToggle } from '@/components/theme-toggle'
 import {
   Activity,
   Bell,
@@ -12,11 +14,9 @@ import {
   LayoutDashboard,
   LogOut,
   Menu,
-  Moon,
   Package,
   Settings,
   ShieldCheck,
-  Sun,
   Users,
   Wallet,
   X,
@@ -87,21 +87,10 @@ const sectionDetails: Record<AdminSection, { eyebrow: string; title: string; des
 }
 
 export function AdminDashboard() {
-  const [dark, setDark] = useState(true)
   const [activeNav, setActiveNav] = useState<AdminSection>('overview')
   const [mobileNav, setMobileNav] = useState(false)
   const current = sectionDetails[activeNav]
   const CurrentIcon = current.icon
-
-  useEffect(() => {
-    const saved = window.localStorage.getItem('ghost-theme')
-    if (saved) setDark(saved === 'dark')
-  }, [])
-
-  useEffect(() => {
-    document.documentElement.classList.toggle('dark', dark)
-    window.localStorage.setItem('ghost-theme', dark ? 'dark' : 'light')
-  }, [dark])
 
   return (
     <main className="app-shell" dir="rtl">
@@ -132,21 +121,27 @@ export function AdminDashboard() {
           <div className="top-actions">
             <div className="sync-state"><span /> واجهة تطوير</div>
             <button className="icon-button notification" aria-label="التنبيهات"><Bell size={19} /></button>
-            <button className="theme-toggle" onClick={() => setDark(!dark)} aria-label="تبديل المظهر">{dark ? <Sun size={18} /> : <Moon size={18} />}<span>{dark ? 'فاتح' : 'داكن'}</span></button>
+            <ThemeToggle />
           </div>
         </header>
 
-        <div className="page-heading">
-          <div><p className="eyebrow">{current.eyebrow}</p><h1>{current.title} <span>—</span></h1><p className="subheading">{current.description}</p></div>
-          <div className="shift-pill"><ShieldCheck size={18} /><div><b>حالة الربط</b><strong>قيد التطوير</strong></div></div>
-        </div>
+        {activeNav !== 'overview' && (
+          <div className="page-heading">
+            <div><p className="eyebrow">{current.eyebrow}</p><h1>{current.title} <span>—</span></h1><p className="subheading">{current.description}</p></div>
+            <div className="shift-pill"><ShieldCheck size={18} /><div><b>حالة الربط</b><strong>قيد التطوير</strong></div></div>
+          </div>
+        )}
 
-        <div className="notice-bar">
-          <div className="notice-icon"><CurrentIcon size={17} /></div>
-          <div><strong>هذه مساحة الإدارة بنفس هوية GHOST</strong><p>{current.message}</p></div>
-        </div>
+        {activeNav !== 'overview' && (
+          <div className="notice-bar">
+            <div className="notice-icon"><CurrentIcon size={17} /></div>
+            <div><strong>هذه مساحة الإدارة بنفس هوية GHOST</strong><p>{current.message}</p></div>
+          </div>
+        )}
 
-        {activeNav === 'devices' ? (
+        {activeNav === 'overview' ? (
+          <AdminOverview />
+        ) : activeNav === 'devices' ? (
           <AdminDeviceManager />
         ) : (
           <>

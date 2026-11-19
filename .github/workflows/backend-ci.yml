@@ -1,0 +1,38 @@
+name: Backend CI
+
+on:
+  pull_request:
+    paths:
+      - "backend/**"
+      - ".github/workflows/backend-ci.yml"
+  push:
+    branches:
+      - main
+      - feature/auth-02-auditlog-append-only
+    paths:
+      - "backend/**"
+      - ".github/workflows/backend-ci.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  build-and-test:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 10.0.x
+
+      - name: Restore
+        run: dotnet restore backend/GHOST.slnx
+
+      - name: Build
+        run: dotnet build backend/GHOST.slnx --configuration Release --no-restore
+
+      - name: Test
+        run: dotnet test backend/GHOST.slnx --configuration Release --no-build --logger "console;verbosity=normal"
