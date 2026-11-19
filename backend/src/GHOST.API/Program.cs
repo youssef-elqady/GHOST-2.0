@@ -1,4 +1,5 @@
 using System.Text.Json.Serialization;
+using GHOST.API.Authentication;
 using GHOST.Application.Abstractions.Persistence;
 using GHOST.Application.BusinessDays.CloseShift;
 using GHOST.Application.BusinessDays.OpenBusinessDay;
@@ -38,6 +39,7 @@ builder.Services.AddDbContext<GHOSTDbContext>(options =>
             typeof(GHOSTDbContext).Assembly.FullName)));
 
 builder.Services.AddGhostIdentity();
+builder.Services.AddGhostJwtAuthentication(builder.Configuration);
 
 builder.Services.AddScoped<IBusinessDayRepository, BusinessDayRepository>();
 builder.Services.AddScoped<IDeviceRepository, DeviceRepository>();
@@ -54,6 +56,8 @@ builder.Services.AddScoped<CloseShiftHandler>();
 var app = builder.Build();
 
 app.UseCors("GhostFrontend");
+app.UseAuthentication();
+app.UseAuthorization();
 
 if (app.Environment.IsDevelopment())
 {
