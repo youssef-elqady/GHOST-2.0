@@ -1842,3 +1842,11 @@ Reported by user after fast-forward pull to commit `761f98ce4ead4dead43af76f262e
 - Initial PR #27 CI run #73 passed compilation and tests: `GHOST.Tests` 77/77; `GHOST.SqlServer.Tests` 10 passed / 3 skipped; 0 build errors.
 - The build emitted two nullable-analysis warnings in the authorization-policy tests because `AllowedValues` is nullable. The tests were corrected to use a null-safe check. This is a quality correction; a clean rerun is required before merge.
 - No database was connected. The 3 SQL integration tests remained skipped.
+
+
+### AUTH-03 authorization safety refinement — 2026-11-19
+
+- During final review of the login flow, identified that an authenticated non-Admin token would otherwise satisfy the fallback policy before Manager/Cashier/Staff endpoint policies exist.
+- Tightened the fallback policy to require all three: authenticated principal, `token_use=access`, and `Admin` role. The restricted password-change policy remains separate and accepts only `token_use=password_change`.
+- Added a policy test asserting the temporary Admin-only fallback. This deliberately blocks non-Admin API access until explicit role/resource/shift policies and ownership tests are implemented.
+- Updated `docs/AUTH-03-LOGIN.md`. CI must rerun on this refinement before merge.
