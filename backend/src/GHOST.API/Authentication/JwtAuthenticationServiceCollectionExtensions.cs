@@ -1,3 +1,4 @@
+using System.Security.Claims;
 using System.Text;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Authorization;
@@ -50,6 +51,8 @@ public static class JwtAuthenticationServiceCollectionExtensions
                     IssuerSigningKey = new SymmetricSecurityKey(
                         Encoding.UTF8.GetBytes(jwtOptions.SigningKey!)),
                     ValidAlgorithms = [SecurityAlgorithms.HmacSha256],
+                    NameClaimType = ClaimTypes.Name,
+                    RoleClaimType = ClaimTypes.Role,
                     ClockSkew = TimeSpan.FromSeconds(30)
                 };
             });
@@ -60,6 +63,11 @@ public static class JwtAuthenticationServiceCollectionExtensions
             options.FallbackPolicy = new AuthorizationPolicyBuilder()
                 .RequireAuthenticatedUser()
                 .Build();
+
+            // Bootstrap accounts can only use their restricted token to change a password.
+            options.AddPolicy("PasswordChangeOnly", policy =>
+                policy.RequireAuthenticatedUser()
+                    .RequireClaim("token_use", "password_change"));
         });
 
         return services;
