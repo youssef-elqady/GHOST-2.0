@@ -1910,3 +1910,15 @@ Reported by user after fast-forward pull to commit `761f98ce4ead4dead43af76f262e
 - The SQL Server audit persistence test is present and guarded, but skipped without `GHOST_AUTH02_TEST_CONNECTION_STRING`; no database was connected or modified.
 - PR #26 was closed as superseded by PR #29 after detecting the concurrent, newer login/password-change implementation. No duplicate token/login code was merged.
 - Current next backend slice: A3 refresh-token/session lifecycle design, followed by implementation only after the storage, cookie, CSRF, concurrency and migration strategy are documented.
+
+
+## AUTH-03 A3 — refresh-token/session design drafted (2026-11-19)
+
+- Design document: [docs/AUTH-03-REFRESH-TOKEN-DESIGN.md](./AUTH-03-REFRESH-TOKEN-DESIGN.md).
+- Proposed storage: dedicated RefreshTokens table, 256-bit random opaque token, SHA-256 hash only, unique hash index, family ID, replacement link, consumed/revoked timestamps, absolute expiry, and SQL rowversion.
+- Proposed lifetime: 7-day sliding refresh token, 30-day absolute family lifetime.
+- Rotation/replay: Serializable transaction plus rowversion; any consumed-token reuse revokes the entire family and is audited.
+- Browser security: HttpOnly SameSite=Strict cookie, Secure outside Development, exact CORS allowlist with credentials, trusted Origin and custom X-GHOST-Request header. Access JWT stays in memory; no browser storage of tokens.
+- Access-token revocation: normal JWT carries `sid`; validation checks active family and active user so logout/replay/disable are effective promptly.
+- Endpoints: login sets cookie for normal accounts, refresh rotates, logout revokes current family, password change creates a new family after successful update.
+- **Status:** design drafted; no A3 code, schema migration, or DB access yet. Next step is source-level review of current JWT validation/CORS and then implementation on a focused branch. Any generated migration must be reviewed and must not be applied without explicit target/backup approval.
