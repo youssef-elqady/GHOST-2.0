@@ -1634,3 +1634,42 @@ Reported by user after fast-forward pull to commit `761f98ce4ead4dead43af76f262e
 2. Add login and short-lived access-token issuance using Identity password verification and lockout, rejecting disabled accounts and enforcing `MustChangePassword`.
 3. Then implement hashed refresh-token persistence/rotation/replay detection, claims-backed `ICurrentUser`, and endpoint/resource authorization with integration tests.
 4. Keep the API restricted to trusted local development until every mutating endpoint is protected and anonymous/role/ownership tests pass.
+
+
+## Project execution agreement and plan — 2026-11-19
+
+- Owner/engineering lead agreement confirmed with the user: execute in explicit phases, track status and evidence, and update this file after every meaningful milestone. Be accountable for technical sequencing and review; never hide blockers or claim unverified success.
+- Tracking issue: [#14 — AUTH-03 security and premium Staff/Admin frontend](https://github.com/youssef-elqady/GHOST-2.0/issues/14).
+- Detailed plan: [docs/EXECUTION-PLAN-2026-11-19.md](./EXECUTION-PLAN-2026-11-19.md).
+- Delivery line remains `feature/auth-02-auditlog-append-only`; this documentation is prepared on `docs/ghost-execution-plan-2026-11-19` for review. Do not target `main`.
+
+### Current status at plan creation
+
+| Workstream | Status | Evidence / next action |
+|---|---|---|
+| AUTH-02 shared Identity foundation | VERIFIED | PR #11 forward-only migration rollback correction and PR #12 shared Identity registration were merged to the delivery branch; CI evidence is recorded above. The database migration remains unapplied. |
+| AUTH-03 JWT configuration | IN PROGRESS — next implementation slice | Validate issuer, audience, signing key, and token lifetime at startup; fail closed. |
+| AUTH-03 login, refresh lifecycle, actor context, endpoint authorization | NOT STARTED | Implement in focused slices with security and ownership tests. API remains trusted-local-only until all mutating endpoints are protected. |
+| Frontend discovery | IN PROGRESS — discovery only | Existing Next.js frontend is present. Inspect current app and both visual reference repositories; publish KEEP/MODIFY/ADD/DEFER before UI rewrites. |
+| Premium Design System (Light/Dark) | NOT STARTED | Build on existing frontend; Arabic RTL, responsive behavior, semantic color tokens, accessible reusable components. |
+| Admin/Staff shells and dashboard | NOT STARTED | Separate Admin analytics/management from Staff shift/session operations; connect real API data only after contracts are verified. |
+| AUTH-02 database rollout | BLOCKED | Exact target, backup/restore rehearsal, schema/history/data preflight remain unverified. Do not apply migration. |
+
+### Immediate execution sequence
+
+1. AUTH-03 A1: fail-closed JWT configuration with startup validation and tests.
+2. Frontend B0: inspect current Next.js files and reference repos; no blind rewrite.
+3. AUTH-03 A2: login and access-token issuance with lockout, disabled-account, and MustChangePassword handling.
+4. Frontend B1: Design System and Light/Dark themes on a separate focused branch.
+5. AUTH-03 A3/A4: hashed rotating refresh tokens, replay detection, claims-backed current user and ownership policies.
+6. Frontend B2/B3: Admin and Staff shells; integrate auth.
+7. AUTH-03 A5: protect every endpoint and pass anonymous/role/ownership tests before enabling operational writes.
+
+### Non-negotiable presentation and financial rules
+
+- Premium charcoal/warm-neutral + restrained gold GHOST identity; Light and Dark are first-class themes.
+- Arabic RTL is the default. Preserve responsive behavior and accessible contrast.
+- Admin financial analytics must distinguish gaming revenue, product revenue, total revenue, expenses/profit and time/usage. Currency and duration must never share one chart axis.
+- Missing data and API failures must not be shown as zero revenue. Demo data must be explicitly labelled.
+- Backend remains authoritative for money, billing, stock, session state and permissions.
+- No production/`GHOST2` access, no migration application, no destructive Git actions, and no merge to `main` without explicit authorization.
