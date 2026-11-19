@@ -12,7 +12,7 @@ export function Button({
   return <button className={`ui-button ui-button--${variant} ${className}`.trim()} {...props} />
 }
 
-export function Card({ className = '', ...props }: HTMLAttributes<HTMLDivElement>) {
+export function Card({ className = '', ...props }: HTMLAttributes<HTMLElement>) {
   return <section className={`ui-card ${className}`.trim()} {...props} />
 }
 
