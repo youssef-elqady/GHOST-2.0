@@ -146,7 +146,9 @@ export function readAdminSession(): { user: AuthenticatedUser } | null {
   const expiry = window.sessionStorage.getItem(ACCESS_EXPIRY_KEY)
   const rawUser = window.sessionStorage.getItem(USER_KEY)
 
-  if (!token || !expiry || !rawUser || new Date(expiry).getTime() <= Date.now()) {
+  const expiresAt = expiry ? new Date(expiry).getTime() : Number.NaN
+
+  if (!token || !expiry || !rawUser || !Number.isFinite(expiresAt) || expiresAt <= Date.now()) {
     clearAdminSession()
     return null
   }
