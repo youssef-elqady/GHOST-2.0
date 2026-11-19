@@ -1824,3 +1824,25 @@ Reported by user after fast-forward pull to commit `761f98ce4ead4dead43af76f262e
 2. AUTH-03 refresh-token lifecycle and claims-backed actor context.
 3. Frontend login/session integration and protected Staff/Admin route experience.
 4. Build real analytics APIs only after business-day, shift, invoice/payment and session source-of-truth contracts are defined and tested.
+
+
+## AUTH-03 A2 — login and access-token issuance started (2026-11-19)
+
+- Working branch: `feature/auth03-login-access-tokens-v2`, based on the latest delivery branch after Frontend B1.
+- Added `POST /api/auth/login` using ASP.NET Core Identity password verification, failed-access counting, lockout checks, disabled-account denial, and failed-count reset after success.
+- Added short-lived JWT issuance using the already validated issuer/audience/signing-key/lifetime options. Token claims explicitly include subject, name, role, token ID, issue time, and `ghost:must_change_password`.
+- Login success, failed login, inactive-account denial, lockout, and invalid role assignment are written to the append-only AuditLog. Passwords and raw tokens are not written to audit data.
+- Only exactly one approved role (`Admin` or `Staff`) is accepted for normal accounts.
+- Added a restricted temporary-password token: no business role is issued. Added `PasswordChangeOnly` authorization policy for the future password-change endpoint.
+- **Critical safety gate:** normal default/fallback API policies require `ghost:business_access=true` in addition to authentication and no pending password change. A2 deliberately does NOT issue that claim. Therefore, even a successful login cannot access operational endpoints until A5 authorization is complete and explicitly grants business access. This preserves the trusted-local-only restriction.
+- Explicit JWT role/name claim mapping is configured because inbound claim remapping is disabled.
+- Added focused token-issuer tests for signature/claims/expiry and restricted temporary-password tokens. Startup-policy tests assert the business-access and password-change policy requirements.
+- Contract and scope: [docs/AUTH-03-LOGIN-ACCESS-TOKENS.md](./AUTH-03-LOGIN-ACCESS-TOKENS.md).
+- **Verification:** source implementation and unit tests committed to the feature branch; CI/build results pending. No local build/test or API runtime test was performed in this environment. Do not mark A2 VERIFIED until CI passes and endpoint-level tests cover valid/invalid credentials, lockout, disabled accounts, audit behavior, and policy denial.
+- **Database safety:** no database was connected to or modified; no migration was applied. `GHOST2`, production, and the pending AUTH-02 migration remain excluded.
+
+### Next actions
+1. Review the A2 diff for Identity lockout semantics, token claims, audit persistence, and fail-closed authorization.
+2. Run Backend CI and fix all build/test failures.
+3. Add endpoint-level tests for invalid credentials, inactive/locked users, valid login, and audit records before merging.
+4. Keep refresh-token lifecycle as A3 and password-change completion as A4.
