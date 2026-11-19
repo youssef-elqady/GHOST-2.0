@@ -92,8 +92,6 @@ public sealed class AuthController : ControllerBase
             return Unauthorized(new { error = "invalid_credentials" });
         }
 
-        await _userManager.ResetAccessFailedCountAsync(user);
-
         if (user.MustChangePassword)
         {
             var passwordChangeToken = _tokenService.CreatePasswordChangeToken(user);
@@ -104,8 +102,6 @@ public sealed class AuthController : ControllerBase
                 passwordChangeToken.Value,
                 passwordChangeToken.ExpiresAtUtc));
         }
-
-        await _userManager.ResetAccessFailedCountAsync(user);
 
         var roles = await _userManager.GetRolesAsync(user);
         var accessToken = _tokenService.CreateAccessToken(user, roles);
@@ -173,6 +169,8 @@ public sealed class AuthController : ControllerBase
                 codes = changeResult.Errors.Select(error => error.Code).ToArray()
             });
         }
+
+        await _userManager.ResetAccessFailedCountAsync(user);
 
         var roles = await _userManager.GetRolesAsync(user);
         var accessToken = _tokenService.CreateAccessToken(user, roles);
