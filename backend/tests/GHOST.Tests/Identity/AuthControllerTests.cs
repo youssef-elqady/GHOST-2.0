@@ -25,7 +25,7 @@ public sealed class AuthControllerTests
         var user = await fixture.CreateUserAsync();
 
         var result = await fixture.Controller.Login(
-            new AuthController.LoginRequest(user.UserName, InitialPassword));
+            new AuthController.LoginRequest(user.UserName, InitialPassword), CancellationToken.None);
 
         var response = Assert.IsType<OkObjectResult>(result);
         var payload = Assert.IsType<AuthController.AuthenticatedResponse>(response.Value);
@@ -37,6 +37,13 @@ public sealed class AuthControllerTests
         Assert.Contains(jwt.Claims, claim => claim.Type == "token_use" && claim.Value == "access");
         Assert.Contains(jwt.Claims, claim => claim.Type == "role" && claim.Value == "Admin");
         Assert.True(payload.ExpiresAtUtc > DateTimeOffset.UtcNow);
+
+        var audit = await fixture.DbContext.AuditLogs.SingleAsync(
+            item => item.Action == "Authentication.LoginSucceeded");
+        Assert.Equal("User", audit.ActorType);
+        Assert.Equal(user.Id, audit.UserId);
+        Assert.Null(audit.OldValues);
+        Assert.Null(audit.NewValues);
     }
 
     [Fact]
@@ -46,7 +53,7 @@ public sealed class AuthControllerTests
         var user = await fixture.CreateUserAsync(mustChangePassword: true);
 
         var result = await fixture.Controller.Login(
-            new AuthController.LoginRequest(user.UserName, InitialPassword));
+            new AuthController.LoginRequest(user.UserName, InitialPassword), CancellationToken.None);
 
         var response = Assert.IsType<OkObjectResult>(result);
         var payload = Assert.IsType<AuthController.PasswordChangeRequiredResponse>(response.Value);
@@ -60,6 +67,8 @@ public sealed class AuthControllerTests
             payload.ExpiresAtUtc - DateTimeOffset.UtcNow,
             TimeSpan.Zero,
             TimeSpan.FromMinutes(5));
+        Assert.Contains(await fixture.DbContext.AuditLogs.ToListAsync(), item =>
+            item.Action == "Authentication.PasswordChangeTokenIssued" && item.UserId == user.Id);
     }
 
     [Fact]
@@ -70,7 +79,7 @@ public sealed class AuthControllerTests
         var controller = fixture.CreatePasswordChangeController(user.Id);
 
         var result = await controller.ChangePassword(
-            new AuthController.ChangePasswordRequest(InitialPassword, NewPassword));
+            new AuthController.ChangePasswordRequest(InitialPassword, NewPassword), CancellationToken.None);
 
         var response = Assert.IsType<OkObjectResult>(result);
         var payload = Assert.IsType<AuthController.AuthenticatedResponse>(response.Value);
@@ -82,6 +91,8 @@ public sealed class AuthControllerTests
         Assert.False(refreshedUser!.MustChangePassword);
         Assert.True(await fixture.UserManager.CheckPasswordAsync(refreshedUser, NewPassword));
         Assert.False(await fixture.UserManager.CheckPasswordAsync(refreshedUser, InitialPassword));
+        Assert.Contains(await fixture.DbContext.AuditLogs.ToListAsync(), item =>
+            item.Action == "Authentication.PasswordChanged" && item.UserId == user.Id);
     }
 
     [Fact]
@@ -91,9 +102,31 @@ public sealed class AuthControllerTests
         var user = await fixture.CreateUserAsync(isActive: false);
 
         var result = await fixture.Controller.Login(
-            new AuthController.LoginRequest(user.UserName, InitialPassword));
+            new AuthController.LoginRequest(user.UserName, InitialPassword), CancellationToken.None);
 
         Assert.IsType<UnauthorizedObjectResult>(result);
+        Assert.Contains(await fixture.DbContext.AuditLogs.ToListAsync(), item =>
+            item.Action == "Authentication.LoginDenied.InactiveAccount" &&
+            item.ActorType == "System" && item.UserId is null && item.EntityId == user.Id.ToString());
+    }
+
+    [Fact]
+    public async Task Login_UnknownUser_IsAuditedWithoutPersistingUsernameOrCredentials()
+    {
+        await using var fixture = await IdentityFixture.CreateAsync();
+
+        var result = await fixture.Controller.Login(
+            new AuthController.LoginRequest("missing-user", "Sensitive!Password123"),
+            CancellationToken.None);
+
+        Assert.IsType<UnauthorizedObjectResult>(result);
+        var audit = await fixture.DbContext.AuditLogs.SingleAsync(
+            item => item.Action == "Authentication.LoginFailed");
+        Assert.Equal("System", audit.ActorType);
+        Assert.Null(audit.UserId);
+        Assert.Null(audit.EntityId);
+        Assert.Null(audit.OldValues);
+        Assert.Null(audit.NewValues);
     }
 
     [Fact]
@@ -106,12 +139,16 @@ public sealed class AuthControllerTests
         for (var attempt = 0; attempt < 5; attempt++)
         {
             result = await fixture.Controller.Login(
-                new AuthController.LoginRequest(user.UserName, "Wrong!Password123"));
+                new AuthController.LoginRequest(user.UserName, "Wrong!Password123"), CancellationToken.None);
         }
 
         var locked = Assert.IsType<ObjectResult>(result);
         Assert.Equal(StatusCodes.Status423Locked, locked.StatusCode);
         Assert.True(await fixture.UserManager.IsLockedOutAsync(user));
+        Assert.Equal(4, await fixture.DbContext.AuditLogs.CountAsync(
+            item => item.Action == "Authentication.LoginFailed"));
+        Assert.Single(await fixture.DbContext.AuditLogs.Where(
+            item => item.Action == "Authentication.AccountLocked").ToListAsync());
     }
 
     private sealed class IdentityFixture : IAsyncDisposable
@@ -120,16 +157,21 @@ public sealed class AuthControllerTests
         private readonly AsyncServiceScope _scope;
 
         public UserManager<ApplicationUser> UserManager { get; }
+        public GHOSTDbContext DbContext { get; }
+        public AuthenticationAuditWriter AuditWriter { get; }
         public AuthController Controller { get; }
 
         private IdentityFixture(
             ServiceProvider provider,
             AsyncServiceScope scope,
-            UserManager<ApplicationUser> userManager)
+            UserManager<ApplicationUser> userManager,
+            GHOSTDbContext dbContext)
         {
             _provider = provider;
             _scope = scope;
             UserManager = userManager;
+            DbContext = dbContext;
+            AuditWriter = new AuthenticationAuditWriter(dbContext);
 
             var tokenService = new JwtTokenService(Options.Create(new JwtOptions
             {
@@ -139,7 +181,7 @@ public sealed class AuthControllerTests
                 AccessTokenLifetimeMinutes = 10
             }));
 
-            Controller = new AuthController(UserManager, tokenService);
+            Controller = new AuthController(UserManager, tokenService, AuditWriter);
         }
 
         public static async Task<IdentityFixture> CreateAsync()
@@ -154,11 +196,12 @@ public sealed class AuthControllerTests
             var scope = provider.CreateAsyncScope();
             var userManager = scope.ServiceProvider.GetRequiredService<UserManager<ApplicationUser>>();
             var roleManager = scope.ServiceProvider.GetRequiredService<RoleManager<IdentityRole<Guid>>>();
+            var dbContext = scope.ServiceProvider.GetRequiredService<GHOSTDbContext>();
 
             var roleResult = await roleManager.CreateAsync(new IdentityRole<Guid>("Admin"));
             Assert.True(roleResult.Succeeded);
 
-            return new IdentityFixture(provider, scope, userManager);
+            return new IdentityFixture(provider, scope, userManager, dbContext);
         }
 
         public async Task<ApplicationUser> CreateUserAsync(
@@ -198,7 +241,8 @@ public sealed class AuthControllerTests
                     Audience = "GHOST.Tests.Client",
                     SigningKey = Convert.ToBase64String(new byte[32]),
                     AccessTokenLifetimeMinutes = 10
-                })))
+                })),
+                AuditWriter)
             {
                 ControllerContext = new ControllerContext
                 {

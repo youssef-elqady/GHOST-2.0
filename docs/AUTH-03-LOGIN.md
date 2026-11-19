@@ -53,3 +53,21 @@ The API fallback authorization policy currently requires an authenticated princi
 - Startup policy tests assert normal endpoints require access-purpose tokens and password-change policy accepts only its dedicated token purpose.
 
 All tests use EF Core InMemory and do not connect to SQL Server.
+
+## Authentication audit coverage (hardening follow-up)
+
+Authentication lifecycle events are written through the append-only `AuditLogs` table:
+- `Authentication.LoginSucceeded`
+- `Authentication.LoginFailed`
+- `Authentication.LoginDenied.InactiveAccount`
+- `Authentication.LoginDenied.LockedOut`
+- `Authentication.AccountLocked`
+- `Authentication.PasswordChangeTokenIssued`
+- `Authentication.PasswordChanged`
+- `Authentication.PasswordChangeFailed`
+- `Authentication.PasswordChangeDenied`
+- `Authentication.PasswordChangeDenied.LockedOut`
+
+Failed/denied unauthenticated attempts use a System actor and do not persist the submitted username, password, or raw token. Successful and authenticated password-change events use the user actor and the user's GUID. Old/new values are left empty for authentication events to avoid capturing secrets.
+
+The API's EF Core audit writer is covered by InMemory controller tests and a SQL Server integration test. The SQL test only runs when `GHOST_AUTH02_TEST_CONNECTION_STRING` is explicitly configured and validated against the exact `GHOST_AUTH02_IT` catalog; it rolls back its inserted test row. CI skips it when the dedicated connection is absent.

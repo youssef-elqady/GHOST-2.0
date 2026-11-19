@@ -1877,3 +1877,26 @@ Reported by user after fast-forward pull to commit `761f98ce4ead4dead43af76f262e
 3. Frontend login and required password-change screen, then session integration. Do not store long-lived refresh secrets in localStorage.
 4. Visual QA for the Admin dashboard skeleton in Light/Dark and responsive breakpoints.
 5. Real dashboard analytics APIs only after financial/session/shift source-of-truth contracts are implemented and reconciled.
+
+
+## AUTH-03 authentication audit hardening — 2026-11-19
+
+- PR #29 is the authoritative merged AUTH-03 login/password-change implementation. The earlier audit-writer PR #26 was closed as superseded; none of its duplicate login/token code was merged.
+- New focused branch: `feature/auth03-login-audit-hardening`, based on the delivery branch after PR #29.
+- Added `IAuthenticationAuditWriter` and `AuthenticationAuditWriter` using the existing immutable `AuditLog` entity and `GHOSTDbContext`.
+- Wired audit events into the authoritative PR #29 login and password-change flows: successful login, unknown-user failure, inactive-account denial, locked-account denial, failed password, lockout, restricted password-change token issuance, password-change success/failure/denial.
+- Authentication audit entries never include usernames from failed attempts, passwords, raw JWTs, or temporary credentials. Unauthenticated attempts use a System actor; authenticated success/change events use the user GUID.
+- Extended EF Core InMemory controller tests to assert the audit events and verify that unknown usernames/passwords are not persisted.
+- Added a guarded SQL Server integration test for actual audit persistence, using only the exact `GHOST_AUTH02_IT` database via `GHOST_AUTH02_TEST_CONNECTION_STRING`, and rolling back its row.
+- No login/token implementation was duplicated or overwritten. No DB connection or migration was performed.
+- **Verification:** CI pending on this audit-only hardening branch. Keep PR separate from the already merged login/password-change flow until build/tests pass. SQL persistence remains unverified unless the isolated test connection is explicitly configured.
+
+
+### AUTH-03 authentication audit hardening — CI verified (2026-11-19)
+
+- Backend CI run #89 (run ID `44466867203`) passed.
+- Release solution build: **0 warnings, 0 errors**.
+- `GHOST.Tests`: **78 passed, 0 failed**. The EF Core InMemory tests exercise login/password-change audit events and verify unknown-user credentials are not persisted.
+- `GHOST.SqlServer.Tests`: **10 passed, 4 skipped**. The dedicated SQL persistence test was skipped because `GHOST_AUTH02_TEST_CONNECTION_STRING` was not configured; no SQL Server connection was made.
+- The audit-writer and controller changes are **VERIFIED at build/unit-test level**. Actual SQL Server persistence remains unverified until the exact isolated test connection is configured.
+- PR #31 contains only the audit hardening layered on top of merged PR #29. It does not duplicate or replace the login/token flow.

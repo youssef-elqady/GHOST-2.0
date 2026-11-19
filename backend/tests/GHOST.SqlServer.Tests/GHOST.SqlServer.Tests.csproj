@@ -19,4 +19,8 @@
     <Using Include="Xunit" />
   </ItemGroup>
 
+  <ItemGroup>
+    <ProjectReference Include="../../src/GHOST.API/GHOST.API.csproj" />
+  </ItemGroup>
+
 </Project>

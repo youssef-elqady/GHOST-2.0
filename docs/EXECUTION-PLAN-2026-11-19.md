@@ -29,8 +29,8 @@ Deliver GHOST as a reliable commercial PlayStation venue operations system with 
 
 | Step | Scope | Exit evidence | Initial status |
 |---|---|---|---|
-| A1 | Fail-closed JWT configuration and startup validation | Missing/weak issuer, audience, key and lifetime rejected; valid config builds | IN PROGRESS — next action |
-| A2 | Login, password verification, lockout, disabled-account checks, MustChangePassword, short-lived access tokens | Unit/API tests for valid and invalid credentials and account states | NOT STARTED |
+| A1 | Fail-closed JWT configuration and startup validation | Missing/weak issuer, audience, key and lifetime rejected; valid config builds | VERIFIED — PR #18 merged; CI #51 passed |
+| A2 | Login, password verification, lockout, disabled-account checks, MustChangePassword, short-lived access tokens and audit events | Unit/API tests for valid and invalid credentials and account states | VERIFIED — PR #29 and audit hardening PR #31; CI #89 passed. SQL audit persistence test added but skipped without approved DB. |
 | A3 | Hashed refresh-token persistence, rotation, replay detection and revocation | Persistence tests and replay/revocation scenarios | NOT STARTED |
 | A4 | Claims-backed current-user context and role/resource/shift ownership policies | Actor identity comes only from claims; ownership tests | NOT STARTED |
 | A5 | Protect every endpoint, including existing device mutations | Endpoint inventory + anonymous 401, role 403, ownership and integration tests | NOT STARTED |
@@ -41,11 +41,11 @@ Deliver GHOST as a reliable commercial PlayStation venue operations system with 
 
 | Step | Scope | Exit evidence | Initial status |
 |---|---|---|---|
-| B0 | Inspect existing Next.js app and Staff/Admin reference repositories; document KEEP/MODIFY/ADD/DEFER | File inventory, architecture map, visual reference review, no blind rewrite | IN PROGRESS — discovery |
-| B1 | Design System: light/dark tokens, Arabic RTL, responsive behavior, typography, buttons, cards, tables, forms, badges, charts and UI states | Both themes verified on core components and common screen sizes | NOT STARTED |
+| B0 | Inspect existing Next.js app and Staff/Admin reference repositories; document KEEP/MODIFY/ADD/DEFER | File inventory, architecture map, visual reference review, no blind rewrite | VERIFIED — discovery document published |
+| B1 | Design System: light/dark tokens, Arabic RTL, responsive behavior, typography, buttons, cards, tables, forms, badges, charts and UI states | Both themes verified on core components and common screen sizes | BUILD VERIFIED — PR #23 merged; visual QA in both themes and breakpoints pending |
 | B2 | Admin shell: sidebar, topbar, navigation, profile, theme switch | Navigation and theme persist; keyboard/mobile behavior checked | NOT STARTED |
 | B3 | Separate Staff shell optimized for shift/session workflows | Staff tasks are distinct and efficient; permission-aware navigation | NOT STARTED |
-| B4 | Admin dashboard skeleton | KPI layout, revenue panels, venue status, insights, alerts, recent activity; no fake live values | NOT STARTED |
+| B4 | Admin dashboard skeleton | KPI layout, revenue panels, venue status, insights, alerts, recent activity; no fake live values | BUILD VERIFIED — PR #24 merged; visual QA pending |
 | B5 | Real dashboard API integration | Figures reconcile with source endpoints/ledgers; loading/empty/error/permission states | NOT STARTED |
 | B6 | Analytics and reports | Date filters, gaming/product revenue separation, device/room/product/time analysis | NOT STARTED |
 
@@ -70,14 +70,13 @@ The divergent inventory branch remains review-only until its model snapshot/migr
 
 ## Immediate execution order
 
-1. Implement A1 (JWT configuration) on a focused feature branch.
-2. In parallel, complete B0 discovery only: inspect the current Next.js implementation and the Staff/Admin reference repos, then publish KEEP/MODIFY/ADD/DEFER. Do not perform a broad UI rewrite during discovery.
-3. Implement A2 login/access-token slice with tests.
-4. Start B1 Design System on its own focused branch.
-5. Implement A3 refresh-token lifecycle and A4 claims-backed actor context.
-6. Build B2/B3 shells and integrate authentication.
-7. Finish A5 endpoint protection and security tests before enabling operational write workflows.
-8. Proceed through business verticals with the quality gates below.
+1. Complete the current AUTH-03 authentication audit hardening slice and verify its audit persistence test path.
+2. Implement A3 refresh-token hashing, rotation, replay detection, session-family revocation, and tests.
+3. Implement A4 claims-backed current-user context and role/resource/shift ownership policies.
+4. Finish A5 endpoint inventory and protection with anonymous 401, role 403, ownership, and shift/session tests; keep operational access closed until this passes.
+5. Perform browser visual QA for B1 and B4 in Light/Dark at desktop/tablet/mobile breakpoints.
+6. Build the dedicated Staff shell and integrate login/password-change/session lifecycle only after A3–A5 contracts are stable.
+7. Connect real dashboard analytics after source-of-truth financial, session, inventory, and shift contracts are implemented and reconciled.
 
 ## Definition of done for every vertical
 
