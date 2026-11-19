@@ -1792,3 +1792,20 @@ Reported by user after fast-forward pull to commit `761f98ce4ead4dead43af76f262e
   - Backend API Release build: **passed**.
 - No local browser/visual QA was performed in this environment. The B1 code is **build-verified**, while visual inspection of Light/Dark, route-to-route preference persistence, and responsive breakpoints remains pending before marking the whole design-system phase VERIFIED.
 - Node/pnpm ecosystem deprecation notices appeared in CI logs; they did not fail the build and are not application compile errors.
+
+## Admin dashboard skeleton — B2/B3 (2026-11-19)
+
+- Working branch: `feature/admin-dashboard-skeleton`, based on the delivery branch after PR #23.
+- Added an Admin Overview skeleton with KPI cards, financial revenue panel, separate time/usage panel, financial source summary, shift/cash summary, product table, device/room table, insights placeholder and data-integrity notice.
+- Color contract is visible in the UI: gaming blue, products green, total collected gold, expenses/refunds red, gaming duration violet in a separate time panel. EGP and time are not mixed.
+- Every metric remains — and every table/chart shows a truthful empty state. No sample revenue, session counts, percentages, cash balances, or fabricated chart bars.
+- Existing Admin Device Management behavior is preserved.
+- Design and backend data requirements: [docs/ADMIN-DASHBOARD-SKELETON.md](./ADMIN-DASHBOARD-SKELETON.md).
+- Verification: Frontend CI pending. No local browser QA was performed. Do not mark this phase VERIFIED until production build and visual checks pass.
+
+### Admin dashboard skeleton — build verification (2026-11-19)
+
+- Frontend CI run #30 (run ID `44464844197`) passed both jobs: Next.js production build and API Release build.
+- The dashboard skeleton is **build-verified**. Visual inspection in browser at desktop/tablet/mobile and both themes remains pending because no local browser session was available.
+- The dashboard is intentionally a layout skeleton: metrics show `—`, charts/tables show empty states, and no demo financial values are present.
+- B1 shared Design System PR #23 was merged as `9eba817074b6205fb5e0c2d1ec477f1f1bed8ca0`; its Frontend CI run #27 passed Next.js production build and API Release build. Visual QA remains a separate acceptance item.

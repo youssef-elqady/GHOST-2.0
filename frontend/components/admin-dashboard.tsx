@@ -2,6 +2,7 @@
 
 import { useState } from 'react'
 import { AdminDeviceManager } from '@/components/admin-device-manager'
+import { AdminOverview } from '@/components/admin-overview'
 import { ThemeToggle } from '@/components/theme-toggle'
 import {
   Activity,
@@ -124,17 +125,23 @@ export function AdminDashboard() {
           </div>
         </header>
 
-        <div className="page-heading">
-          <div><p className="eyebrow">{current.eyebrow}</p><h1>{current.title} <span>—</span></h1><p className="subheading">{current.description}</p></div>
-          <div className="shift-pill"><ShieldCheck size={18} /><div><b>حالة الربط</b><strong>قيد التطوير</strong></div></div>
-        </div>
+        {activeNav !== 'overview' && (
+          <div className="page-heading">
+            <div><p className="eyebrow">{current.eyebrow}</p><h1>{current.title} <span>—</span></h1><p className="subheading">{current.description}</p></div>
+            <div className="shift-pill"><ShieldCheck size={18} /><div><b>حالة الربط</b><strong>قيد التطوير</strong></div></div>
+          </div>
+        )}
 
-        <div className="notice-bar">
-          <div className="notice-icon"><CurrentIcon size={17} /></div>
-          <div><strong>هذه مساحة الإدارة بنفس هوية GHOST</strong><p>{current.message}</p></div>
-        </div>
+        {activeNav !== 'overview' && (
+          <div className="notice-bar">
+            <div className="notice-icon"><CurrentIcon size={17} /></div>
+            <div><strong>هذه مساحة الإدارة بنفس هوية GHOST</strong><p>{current.message}</p></div>
+          </div>
+        )}
 
-        {activeNav === 'devices' ? (
+        {activeNav === 'overview' ? (
+          <AdminOverview />
+        ) : activeNav === 'devices' ? (
           <AdminDeviceManager />
         ) : (
           <>

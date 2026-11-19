@@ -122,3 +122,101 @@
     transition-duration: .01ms !important;
   }
 }
+
+
+/* Admin analytics dashboard skeleton */
+.admin-overview { min-width: 0; padding: 0 42px 42px; }
+.admin-period-strip { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin: 0 0 16px; padding: 10px 13px; border: 1px solid var(--line); border-radius: 9px; background: var(--card); color: var(--muted); }
+.admin-period-strip>span { display: inline-flex; align-items: center; gap: 8px; color: var(--foreground); font-size: 11px; font-weight: 600; }
+.admin-period-strip>span svg { color: var(--gold); }
+.admin-period-strip p { margin: 0; font-size: 10px; }
+.admin-kpi-grid { display: grid; grid-template-columns: repeat(5,minmax(0,1fr)); gap: 11px; margin-bottom: 14px; }
+.admin-metric-card { min-width: 0; min-height: 158px; padding: 15px; }
+.admin-metric-card__top { display: flex; align-items: center; justify-content: space-between; gap: 7px; }
+.admin-metric-card__icon { width: 36px; height: 36px; display: grid; place-items: center; border-radius: 10px; background: var(--gold-soft); color: var(--gold); }
+.admin-metric-card--blue .admin-metric-card__icon { background: var(--blue-soft); color: var(--chart-gaming); }
+.admin-metric-card--green .admin-metric-card__icon { background: var(--green-soft); color: var(--chart-products); }
+.admin-metric-card--violet .admin-metric-card__icon { background: var(--violet-soft); color: var(--chart-duration); }
+.admin-metric-card--neutral .admin-metric-card__icon { background: var(--line); color: var(--muted); }
+.admin-metric-card__label { margin: 14px 0 4px; color: var(--muted); font-size: 11px; }
+.admin-metric-card__value { display: flex; align-items: baseline; gap: 6px; color: var(--foreground); }
+.admin-metric-card__value strong { font-size: 25px; font-weight: 650; letter-spacing: -.5px; }
+.admin-metric-card__value span { color: var(--muted); font-size: 10px; }
+.admin-metric-card__note { margin: 5px 0 0; color: var(--muted); font-size: 9px; line-height: 1.6; }
+
+.admin-analytics-grid { display: grid; grid-template-columns: minmax(0,1.45fr) minmax(300px,1fr); gap: 13px; margin-bottom: 13px; }
+.admin-chart-card { min-width: 0; padding: 18px; }
+.admin-chart-card .ui-card__header { align-items: flex-start; }
+.admin-chart-legend { display: flex; align-items: center; flex-wrap: wrap; gap: 13px; margin: 17px 0 12px; }
+.admin-chart-legend__item { display: inline-flex; align-items: center; gap: 6px; color: var(--muted); font-size: 10px; }
+.admin-chart-legend__dot { width: 8px; height: 8px; border-radius: 3px; display: inline-block; }
+.admin-chart-legend__dot--gaming { background: var(--chart-gaming); }
+.admin-chart-legend__dot--products { background: var(--chart-products); }
+.admin-chart-legend__dot--total { background: var(--chart-total); }
+.admin-chart-legend__dot--expenses { background: var(--chart-expenses); }
+.admin-chart-legend__dot--duration { background: var(--chart-duration); }
+.admin-chart-empty { min-height: 246px; position: relative; display: grid; place-items: center; overflow: hidden; border: 1px dashed var(--line); border-radius: 10px; background: var(--background); }
+.admin-chart-empty__grid { position: absolute; inset: 0; opacity: .42; background-image: linear-gradient(to bottom,var(--line) 1px,transparent 1px); background-size: 100% 48px; pointer-events: none; }
+.admin-chart-empty__content { position: relative; z-index: 1; max-width: 300px; padding: 22px; text-align: center; }
+.admin-chart-empty__icon { width: 44px; height: 44px; display: grid; place-items: center; margin: 0 auto 12px; border-radius: 12px; background: var(--gold-soft); color: var(--gold); }
+.admin-chart-empty__content strong { display: block; color: var(--foreground); font-size: 12px; }
+.admin-chart-empty__content p { margin: 6px 0 8px; color: var(--muted); font-size: 10px; line-height: 1.8; }
+.admin-chart-empty__content small { color: var(--muted); font-size: 9px; }
+
+.admin-secondary-grid { display: grid; grid-template-columns: minmax(0,1fr) minmax(0,1fr); gap: 13px; margin-bottom: 13px; }
+.admin-financial-card,.admin-shift-card,.admin-table-card,.admin-insights-card { min-width: 0; padding: 18px; }
+.admin-financial-rows { margin-top: 16px; }
+.admin-financial-row { display: flex; align-items: center; gap: 9px; padding: 12px 0; border-bottom: 1px solid var(--line); }
+.admin-financial-row:last-child { border-bottom: 0; }
+.admin-financial-row__marker { width: 8px; height: 8px; flex: 0 0 auto; border-radius: 3px; }
+.admin-financial-row__marker--gaming { background: var(--chart-gaming); }
+.admin-financial-row__marker--products { background: var(--chart-products); }
+.admin-financial-row__marker--total { background: var(--chart-total); }
+.admin-financial-row__marker--expenses { background: var(--chart-expenses); }
+.admin-financial-row__label { flex: 1; color: var(--muted); font-size: 11px; }
+.admin-financial-row strong { color: var(--foreground); font-size: 13px; font-weight: 650; }
+.admin-financial-row strong small { color: var(--muted); font-size: 9px; font-weight: 400; }
+.admin-financial-note { display: flex; align-items: flex-start; gap: 8px; margin-top: 10px; padding: 10px; border-radius: 8px; background: var(--blue-soft); color: var(--blue); font-size: 9px; line-height: 1.7; }
+.admin-financial-note svg { flex: 0 0 auto; }
+.admin-shift-rows { margin: 16px 0; }
+.admin-shift-row { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 12px 0; border-bottom: 1px solid var(--line); }
+.admin-shift-row:last-child { border-bottom: 0; }
+.admin-shift-row span { color: var(--muted); font-size: 11px; }
+.admin-shift-row strong { color: var(--foreground); font-size: 12px; font-weight: 650; }
+.admin-table-card__icon { color: var(--gold); }
+.admin-table-scroll { overflow-x: auto; margin-top: 15px; }
+.admin-analytics-table { width: 100%; min-width: 430px; border-collapse: collapse; text-align: right; }
+.admin-analytics-table th { padding: 11px 9px; background: var(--background); color: var(--muted); font-size: 9px; font-weight: 600; white-space: nowrap; }
+.admin-analytics-table td { padding: 18px 9px; border-bottom: 1px solid var(--line); color: var(--muted); font-size: 10px; }
+.admin-table-empty { text-align: center; line-height: 1.8; }
+.admin-insights-empty { display: flex; align-items: flex-start; gap: 12px; margin-top: 17px; padding: 14px; border: 1px solid var(--line); border-radius: 9px; background: var(--background); }
+.admin-insights-empty>span { width: 34px; height: 34px; display: grid; place-items: center; flex: 0 0 auto; border-radius: 9px; background: var(--gold-soft); color: var(--gold); }
+.admin-insights-empty strong { color: var(--foreground); font-size: 11px; }
+.admin-insights-empty p { margin: 5px 0 0; color: var(--muted); font-size: 10px; line-height: 1.8; }
+.admin-data-integrity { display: flex; align-items: flex-start; gap: 12px; padding: 19px; border: 1px solid color-mix(in srgb,var(--green) 28%,var(--line)); border-radius: 12px; background: var(--green-soft); }
+.admin-data-integrity__icon { width: 35px; height: 35px; display: grid; place-items: center; flex: 0 0 auto; border-radius: 9px; background: var(--card); color: var(--green); }
+.admin-data-integrity strong { color: var(--foreground); font-size: 12px; }
+.admin-data-integrity p { margin: 6px 0 0; color: var(--muted); font-size: 10px; line-height: 1.8; }
+
+@media (max-width: 1200px) {
+  .admin-kpi-grid { grid-template-columns: repeat(3,minmax(0,1fr)); }
+  .admin-analytics-grid { grid-template-columns: 1fr; }
+}
+@media (max-width: 1000px) {
+  .admin-overview { padding-left: 24px; padding-right: 24px; }
+}
+@media (max-width: 760px) {
+  .admin-overview { padding: 0 16px 30px; }
+  .admin-kpi-grid { grid-template-columns: repeat(2,minmax(0,1fr)); gap: 8px; }
+  .admin-metric-card { min-height: 148px; padding: 12px; }
+  .admin-metric-card__top { align-items: flex-start; flex-direction: column; }
+  .admin-metric-card__value strong { font-size: 22px; }
+  .admin-period-strip { align-items: flex-start; flex-direction: column; }
+  .admin-secondary-grid { grid-template-columns: 1fr; }
+  .admin-chart-card,.admin-financial-card,.admin-shift-card,.admin-table-card,.admin-insights-card { padding: 14px; }
+}
+@media (max-width: 420px) {
+  .admin-kpi-grid { grid-template-columns: 1fr; }
+  .admin-metric-card { min-height: auto; }
+  .admin-metric-card__top { flex-direction: row; align-items: center; }
+}
