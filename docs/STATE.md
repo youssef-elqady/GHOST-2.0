@@ -1652,3 +1652,10 @@ Reported by user after fast-forward pull to commit `761f98ce4ead4dead43af76f262e
 1. Review PR checks and fix any compile/test issues before considering merge.
 2. Inspect Staff/Admin reference repositories and current Next.js components (B0 discovery) without rewriting UI.
 3. Implement login/access-token issuance only after this configuration slice passes.
+
+
+### AUTH-03 JWT CI correction — 2026-11-19
+
+- First CI attempt on PR #16 (run #47, run ID `44462682911`) restored dependencies and built the API successfully, then failed compiling the test project because the test referenced `DenyAnonymousAuthorizationRequirement` from the wrong namespace. It also reported an xUnit analyzer warning for a synchronous wait in an async-policy test.
+- Corrected the test to import `Microsoft.AspNetCore.Authorization.Infrastructure` and await `GetFallbackPolicyAsync()`. This is committed on `feature/auth03-jwt-configuration` as `f0a54daec91cbea9b5490f1ebfa915cb94c67c91`.
+- **Status remains IN REVIEW / CI PENDING** until a workflow run for the corrected head passes Build and Test. The failed attempt is not counted as verification.
