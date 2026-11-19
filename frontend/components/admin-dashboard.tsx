@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useState } from 'react'
 import { AdminDeviceManager } from '@/components/admin-device-manager'
 import {
   Activity,
@@ -12,15 +12,14 @@ import {
   LayoutDashboard,
   LogOut,
   Menu,
-  Moon,
   Package,
   Settings,
   ShieldCheck,
-  Sun,
   Users,
   Wallet,
   X,
 } from 'lucide-react'
+import { ThemeToggle } from '@/components/theme-toggle'
 
 type AdminSection = 'overview' | 'devices' | 'shifts' | 'staff' | 'inventory' | 'reports' | 'settings'
 
@@ -87,21 +86,10 @@ const sectionDetails: Record<AdminSection, { eyebrow: string; title: string; des
 }
 
 export function AdminDashboard() {
-  const [dark, setDark] = useState(true)
   const [activeNav, setActiveNav] = useState<AdminSection>('overview')
   const [mobileNav, setMobileNav] = useState(false)
   const current = sectionDetails[activeNav]
   const CurrentIcon = current.icon
-
-  useEffect(() => {
-    const saved = window.localStorage.getItem('ghost-theme')
-    if (saved) setDark(saved === 'dark')
-  }, [])
-
-  useEffect(() => {
-    document.documentElement.classList.toggle('dark', dark)
-    window.localStorage.setItem('ghost-theme', dark ? 'dark' : 'light')
-  }, [dark])
 
   return (
     <main className="app-shell" dir="rtl">
@@ -132,7 +120,7 @@ export function AdminDashboard() {
           <div className="top-actions">
             <div className="sync-state"><span /> واجهة تطوير</div>
             <button className="icon-button notification" aria-label="التنبيهات"><Bell size={19} /></button>
-            <button className="theme-toggle" onClick={() => setDark(!dark)} aria-label="تبديل المظهر">{dark ? <Sun size={18} /> : <Moon size={18} />}<span>{dark ? 'فاتح' : 'داكن'}</span></button>
+            <ThemeToggle />
           </div>
         </header>
 
