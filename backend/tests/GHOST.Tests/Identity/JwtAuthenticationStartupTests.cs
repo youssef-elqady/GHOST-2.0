@@ -54,6 +54,10 @@ public sealed class JwtAuthenticationStartupTests
             requirement => requirement is ClaimsAuthorizationRequirement claimRequirement &&
                 claimRequirement.ClaimType == "token_use" &&
                 claimRequirement.AllowedValues?.Contains(JwtTokenService.AccessTokenPurpose) == true);
+        Assert.Contains(
+            fallbackPolicy.Requirements,
+            requirement => requirement is RolesAuthorizationRequirement roleRequirement &&
+                roleRequirement.AllowedRoles.Contains("Admin"));
     }
 
 
