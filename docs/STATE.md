@@ -1824,3 +1824,15 @@ Reported by user after fast-forward pull to commit `761f98ce4ead4dead43af76f262e
 2. AUTH-03 refresh-token lifecycle and claims-backed actor context.
 3. Frontend login/session integration and protected Staff/Admin route experience.
 4. Build real analytics APIs only after business-day, shift, invoice/payment and session source-of-truth contracts are defined and tested.
+
+## AUTH-03 — login and access-token issuance (2026-11-19)
+
+- Working branch: `feature/auth03-login-access-token`, based on the active delivery line after the Admin dashboard skeleton.
+- Added POST /api/auth/login with generic invalid-credential handling, inactive-account denial, Identity lockout (5 attempts / 15 minutes), and short-lived access-token issuance.
+- Existing accounts are explicitly lockout-enabled during login if they predate the lockout setting. New ApplicationUser instances and first Admin bootstrap enable lockout.
+- Accounts flagged MustChangePassword receive a five-minute restricted token only; POST /api/auth/change-password requires that token, validates current/new password, clears the flag with the Identity password update, and returns a normal access token.
+- Authorization now distinguishes token purpose: fallback API policy requires token_use=access; PasswordChangeOnly requires token_use=password_change. Restricted tokens cannot access normal API endpoints.
+- Access tokens include sub, unique_name, role, full_name, jti, issuer, audience and expiry. Refresh tokens, revocation, claims-backed actor abstraction and resource/shift policies remain later work.
+- Added EF Core InMemory controller tests for successful login/role claims, MustChangePassword flow, password change, inactive account and five-attempt lockout; policy tests verify the two token-purpose policies.
+- Detailed flow and limitations: [docs/AUTH-03-LOGIN.md](./AUTH-03-LOGIN.md).
+- **Verification:** CI pending. No database connection was made; tests use EF Core InMemory. Do not mark verified until Build and Test pass.
