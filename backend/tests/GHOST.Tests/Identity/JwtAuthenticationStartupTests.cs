@@ -51,6 +51,25 @@ public sealed class JwtAuthenticationStartupTests
             requirement => requirement is DenyAnonymousAuthorizationRequirement);
     }
 
+
+    [Fact]
+    public void AddGhostJwtAuthentication_RestrictsPasswordChangePolicyToItsTokenPurpose()
+    {
+        var builder = Host.CreateApplicationBuilder();
+        builder.Services.AddGhostJwtAuthentication(CreateValidConfiguration());
+
+        using var provider = builder.Services.BuildServiceProvider();
+        var authorizationOptions = provider.GetRequiredService<IOptions<AuthorizationOptions>>().Value;
+        var policy = authorizationOptions.GetPolicy("PasswordChangeOnly");
+
+        Assert.NotNull(policy);
+        Assert.Contains(
+            policy.Requirements,
+            requirement => requirement is ClaimsAuthorizationRequirement claimRequirement &&
+                claimRequirement.ClaimType == "token_use" &&
+                claimRequirement.AllowedValues.Contains("password_change"));
+    }
+
     private static IConfiguration CreateValidConfiguration() =>
         new ConfigurationBuilder()
             .AddInMemoryCollection(new Dictionary<string, string?>
