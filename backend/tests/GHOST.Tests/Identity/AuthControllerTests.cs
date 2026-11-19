@@ -103,9 +103,9 @@ public sealed class AuthControllerTests
         Assert.Equal("test-access-token", payload.AccessToken);
         Assert.Equal("Bearer", payload.TokenType);
         Assert.False(payload.MustChangePassword);
-        Assert.Equal(["Admin"], payload.Roles);
+        Assert.Equal(new[] { "Admin" }, payload.Roles);
         Assert.True(userManager.ResetFailureCountCalled);
-        Assert.Equal(["Admin"], issuer.LastRoles);
+        Assert.Equal(new[] { "Admin" }, issuer.LastRoles);
         Assert.Contains(audit.UserEvents, item =>
             item.UserId == user.Id &&
             item.Action == "Authentication.LoginSucceeded");
