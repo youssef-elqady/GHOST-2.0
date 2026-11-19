@@ -1809,3 +1809,18 @@ Reported by user after fast-forward pull to commit `761f98ce4ead4dead43af76f262e
 - The dashboard skeleton is **build-verified**. Visual inspection in browser at desktop/tablet/mobile and both themes remains pending because no local browser session was available.
 - The dashboard is intentionally a layout skeleton: metrics show `—`, charts/tables show empty states, and no demo financial values are present.
 - B1 shared Design System PR #23 was merged as `9eba817074b6205fb5e0c2d1ec477f1f1bed8ca0`; its Frontend CI run #27 passed Next.js production build and API Release build. Visual QA remains a separate acceptance item.
+
+
+## Post-merge Admin dashboard checkpoint — 2026-11-19
+
+- PR #23 merged shared frontend Design System as `9eba817074b6205fb5e0c2d1ec477f1f1bed8ca0`. Frontend CI #27 passed Next.js production build and API Release build.
+- PR #24 merged Admin dashboard skeleton as `18f00db404b2e6da83ebcbde2f352e72546f2a8c`. Frontend CI #30 passed Next.js production build and API Release build.
+- Dashboard skeleton includes distinct gaming/product/total/expenses colors and a separate violet time-usage panel. All metrics remain unknown (`—`) until real API contracts are available; no demo values are shown.
+- **Visual QA remains pending:** inspect Light/Dark and responsive layouts in an actual browser before calling the UI phase fully VERIFIED. Build success is not visual acceptance.
+- No database was connected or modified.
+
+### Next work
+1. AUTH-03 login and short-lived access-token issuance using the existing Identity setup, with lockout, inactive-account and MustChangePassword handling.
+2. AUTH-03 refresh-token lifecycle and claims-backed actor context.
+3. Frontend login/session integration and protected Staff/Admin route experience.
+4. Build real analytics APIs only after business-day, shift, invoice/payment and session source-of-truth contracts are defined and tested.
