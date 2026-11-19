@@ -35,7 +35,7 @@ public sealed class AuthControllerTests
         Assert.Equal(user.Id, payload.User.Id);
         Assert.Contains("Admin", payload.User.Roles);
         Assert.Contains(jwt.Claims, claim => claim.Type == "token_use" && claim.Value == "access");
-        Assert.Contains(jwt.Claims, claim => claim.Type == ClaimTypes.Role && claim.Value == "Admin");
+        Assert.Contains(jwt.Claims, claim => claim.Type == "role" && claim.Value == "Admin");
         Assert.True(payload.ExpiresAtUtc > DateTimeOffset.UtcNow);
     }
 
