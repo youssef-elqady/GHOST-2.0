@@ -1767,3 +1767,19 @@ Reported by user after fast-forward pull to commit `761f98ce4ead4dead43af76f262e
 1. Start Frontend B1 on a focused branch: shared Light/Dark theme provider, unify tokens and theme toggle, reusable Button/Card/Badge/PageHeader primitives; preserve existing Staff/Admin screens and behavior.
 2. Start AUTH-03 login/access-token issuance on a separate focused branch: Identity password verification, lockout, inactive-account denial, MustChangePassword, short-lived JWT issuance, and tests.
 3. Do not connect to any database or apply migrations without explicit target approval and verified backup/restore gates.
+
+
+## Frontend B1 — shared Design System foundation (2026-11-19)
+
+- Working branch: `feature/frontend-design-system`, based on the current delivery branch after PR #22.
+- Added a shared `ThemeProvider` and `ThemeToggle`; the root layout bootstraps the saved/system theme before hydration. Staff and Admin now use the same theme state rather than maintaining duplicate localStorage effects.
+- Added reusable Button, Card, Badge and PageHeader primitives. Admin device management now uses shared Button and Badge components for add/refresh/save actions and rate-configuration status.
+- Extended semantic CSS tokens for raised surfaces, focus ring, violet, and chart series. Added keyboard focus styling, selection styling, and reduced-motion support.
+- Design contract: [docs/FRONTEND-DESIGN-SYSTEM-B1.md](./FRONTEND-DESIGN-SYSTEM-B1.md).
+- **Scope:** this is a foundation only. No financial charts, dashboard metrics, login flow, or fake data were added. Existing Staff/Admin layout and API workflows are preserved.
+- **Verification:** Frontend CI is pending; no local pnpm build was run in this environment. Do not mark B1 VERIFIED until the Next.js production build passes and the theme is visually checked in both modes.
+
+### Next actions
+1. Review Frontend CI and fix TypeScript/Next.js issues.
+2. If CI passes, visually inspect Staff and Admin in Light/Dark and verify persistence across routes.
+3. Continue with Admin shell and dashboard skeleton without adding fake figures; keep AUTH-03 login/access-token work on a separate branch.
