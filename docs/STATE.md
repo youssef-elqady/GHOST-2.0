@@ -1836,3 +1836,9 @@ Reported by user after fast-forward pull to commit `761f98ce4ead4dead43af76f262e
 - Added EF Core InMemory controller tests for successful login/role claims, MustChangePassword flow, password change, inactive account and five-attempt lockout; policy tests verify the two token-purpose policies.
 - Detailed flow and limitations: [docs/AUTH-03-LOGIN.md](./AUTH-03-LOGIN.md).
 - **Verification:** CI pending. No database connection was made; tests use EF Core InMemory. Do not mark verified until Build and Test pass.
+
+### AUTH-03 login CI review — 2026-11-19
+
+- Initial PR #27 CI run #73 passed compilation and tests: `GHOST.Tests` 77/77; `GHOST.SqlServer.Tests` 10 passed / 3 skipped; 0 build errors.
+- The build emitted two nullable-analysis warnings in the authorization-policy tests because `AllowedValues` is nullable. The tests were corrected to use a null-safe check. This is a quality correction; a clean rerun is required before merge.
+- No database was connected. The 3 SQL integration tests remained skipped.
