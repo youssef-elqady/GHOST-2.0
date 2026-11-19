@@ -38,7 +38,7 @@ public sealed class JwtTokenService
             .Where(role => !string.IsNullOrWhiteSpace(role))
             .Distinct(StringComparer.OrdinalIgnoreCase))
         {
-            claims.Add(new Claim(ClaimTypes.Role, role));
+            claims.Add(new Claim("role", role));
         }
 
         return Issue(claims, now, expiresAt);
@@ -59,9 +59,8 @@ public sealed class JwtTokenService
     private static List<Claim> CreateBaseClaims(ApplicationUser user) =>
     [
         new(JwtRegisteredClaimNames.Sub, user.Id.ToString("D")),
-        new(ClaimTypes.NameIdentifier, user.Id.ToString("D")),
         new(JwtRegisteredClaimNames.Jti, Guid.NewGuid().ToString("N")),
-        new(ClaimTypes.Name, user.UserName ?? string.Empty),
+        new(JwtRegisteredClaimNames.UniqueName, user.UserName ?? string.Empty),
         new("full_name", user.FullName)
     ];
 
