@@ -1659,3 +1659,10 @@ Reported by user after fast-forward pull to commit `761f98ce4ead4dead43af76f262e
 - First CI attempt on PR #16 (run #47, run ID `44462682911`) restored dependencies and built the API successfully, then failed compiling the test project because the test referenced `DenyAnonymousAuthorizationRequirement` from the wrong namespace. It also reported an xUnit analyzer warning for a synchronous wait in an async-policy test.
 - Corrected the test to import `Microsoft.AspNetCore.Authorization.Infrastructure` and await `GetFallbackPolicyAsync()`. This is committed on `feature/auth03-jwt-configuration` as `f0a54daec91cbea9b5490f1ebfa915cb94c67c91`.
 - **Status remains IN REVIEW / CI PENDING** until a workflow run for the corrected head passes Build and Test. The failed attempt is not counted as verification.
+
+
+### AUTH-03 JWT CI follow-up — 2026-11-19
+
+- Replacement PR #17 CI run #49 (run ID `44462949680`) confirmed the prior namespace fix, then exposed that `IAuthorizationPolicyProvider` was not available to the test project's compile-time references. API project itself built successfully; tests did not compile.
+- Simplified the test to inspect the registered `IOptions<AuthorizationOptions>.Value.FallbackPolicy` directly, retaining the assertion that anonymous users are denied by default. The test now imports the public authorization namespaces only.
+- This correction is committed on `feature/auth03-jwt-configuration-reviewed`; CI must be rerun on the corrected head. No successful test claim is made yet.
