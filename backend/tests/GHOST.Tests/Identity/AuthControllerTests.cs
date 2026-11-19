@@ -2,6 +2,7 @@ using GHOST.API.Authentication;
 using GHOST.API.Controllers;
 using GHOST.Infrastructure.Identity;
 using Microsoft.AspNetCore.Identity;
+using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
 using Microsoft.Extensions.Logging.Abstractions;
@@ -209,7 +210,7 @@ public sealed class AuthControllerTests
             int initialFailures = 0)
             : base(
                 new FakeUserStore(),
-                Options.Create(new IdentityOptions()),
+                Microsoft.Extensions.Options.Options.Create(new IdentityOptions()),
                 new PasswordHasher<ApplicationUser>(),
                 [],
                 [],
