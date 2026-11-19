@@ -1890,3 +1890,13 @@ Reported by user after fast-forward pull to commit `761f98ce4ead4dead43af76f262e
 - Added a guarded SQL Server integration test for actual audit persistence, using only the exact `GHOST_AUTH02_IT` database via `GHOST_AUTH02_TEST_CONNECTION_STRING`, and rolling back its row.
 - No login/token implementation was duplicated or overwritten. No DB connection or migration was performed.
 - **Verification:** CI pending on this audit-only hardening branch. Keep PR separate from the already merged login/password-change flow until build/tests pass. SQL persistence remains unverified unless the isolated test connection is explicitly configured.
+
+
+### AUTH-03 authentication audit hardening — CI verified (2026-11-19)
+
+- Backend CI run #89 (run ID `44466867203`) passed.
+- Release solution build: **0 warnings, 0 errors**.
+- `GHOST.Tests`: **78 passed, 0 failed**. The EF Core InMemory tests exercise login/password-change audit events and verify unknown-user credentials are not persisted.
+- `GHOST.SqlServer.Tests`: **10 passed, 4 skipped**. The dedicated SQL persistence test was skipped because `GHOST_AUTH02_TEST_CONNECTION_STRING` was not configured; no SQL Server connection was made.
+- The audit-writer and controller changes are **VERIFIED at build/unit-test level**. Actual SQL Server persistence remains unverified until the exact isolated test connection is configured.
+- PR #31 contains only the audit hardening layered on top of merged PR #29. It does not duplicate or replace the login/token flow.
