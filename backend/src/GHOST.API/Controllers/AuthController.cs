@@ -105,6 +105,8 @@ public sealed class AuthController : ControllerBase
                 passwordChangeToken.ExpiresAtUtc));
         }
 
+        await _userManager.ResetAccessFailedCountAsync(user);
+
         var roles = await _userManager.GetRolesAsync(user);
         var accessToken = _tokenService.CreateAccessToken(user, roles);
 
@@ -141,6 +143,9 @@ public sealed class AuthController : ControllerBase
         var user = await _userManager.FindByIdAsync(userId.ToString("D"));
         if (user is null || !user.IsActive || !user.MustChangePassword)
             return Forbid();
+
+        if (await _userManager.IsLockedOutAsync(user))
+            return LockedOut();
 
         // Persist the flag change together with the password hash update performed by Identity.
         user.MustChangePassword = false;
