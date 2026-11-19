@@ -1824,3 +1824,39 @@ Reported by user after fast-forward pull to commit `761f98ce4ead4dead43af76f262e
 2. AUTH-03 refresh-token lifecycle and claims-backed actor context.
 3. Frontend login/session integration and protected Staff/Admin route experience.
 4. Build real analytics APIs only after business-day, shift, invoice/payment and session source-of-truth contracts are defined and tested.
+
+## AUTH-03 — login and access-token issuance (2026-11-19)
+
+- Working branch: `feature/auth03-login-access-token`, based on the active delivery line after the Admin dashboard skeleton.
+- Added POST /api/auth/login with generic invalid-credential handling, inactive-account denial, Identity lockout (5 attempts / 15 minutes), and short-lived access-token issuance.
+- Existing accounts are explicitly lockout-enabled during login if they predate the lockout setting. New ApplicationUser instances and first Admin bootstrap enable lockout.
+- Accounts flagged MustChangePassword receive a five-minute restricted token only; POST /api/auth/change-password requires that token, validates current/new password, clears the flag with the Identity password update, and returns a normal access token.
+- Authorization now distinguishes token purpose: fallback API policy requires token_use=access; PasswordChangeOnly requires token_use=password_change. Restricted tokens cannot access normal API endpoints.
+- Access tokens include sub, unique_name, role, full_name, jti, issuer, audience and expiry. Refresh tokens, revocation, claims-backed actor abstraction and resource/shift policies remain later work.
+- Added EF Core InMemory controller tests for successful login/role claims, MustChangePassword flow, password change, inactive account and five-attempt lockout; policy tests verify the two token-purpose policies.
+- Detailed flow and limitations: [docs/AUTH-03-LOGIN.md](./AUTH-03-LOGIN.md).
+- **Verification:** CI pending. No database connection was made; tests use EF Core InMemory. Do not mark verified until Build and Test pass.
+
+### AUTH-03 login CI review — 2026-11-19
+
+- Initial PR #27 CI run #73 passed compilation and tests: `GHOST.Tests` 77/77; `GHOST.SqlServer.Tests` 10 passed / 3 skipped; 0 build errors.
+- The build emitted two nullable-analysis warnings in the authorization-policy tests because `AllowedValues` is nullable. The tests were corrected to use a null-safe check. This is a quality correction; a clean rerun is required before merge.
+- No database was connected. The 3 SQL integration tests remained skipped.
+
+
+### AUTH-03 authorization safety refinement — 2026-11-19
+
+- During final review of the login flow, identified that an authenticated non-Admin token would otherwise satisfy the fallback policy before Manager/Cashier/Staff endpoint policies exist.
+- Tightened the fallback policy to require all three: authenticated principal, `token_use=access`, and `Admin` role. The restricted password-change policy remains separate and accepts only `token_use=password_change`.
+- Added a policy test asserting the temporary Admin-only fallback. This deliberately blocks non-Admin API access until explicit role/resource/shift policies and ownership tests are implemented.
+- Updated `docs/AUTH-03-LOGIN.md`. CI must rerun on this refinement before merge.
+
+
+### AUTH-03 login/access-token CI verified — 2026-11-19
+
+- Corrected-head CI run #83 (run ID `44466252139`) passed.
+- Release solution build: **succeeded, 0 warnings, 0 errors**.
+- `GHOST.Tests`: **77 passed, 0 failed**.
+- `GHOST.SqlServer.Tests`: **10 passed, 3 skipped** because no isolated SQL integration connection was configured. No database connection was made.
+- The fallback policy is intentionally Admin-only until explicit Manager/Cashier/Staff role and resource ownership policies are implemented. Restricted password-change tokens cannot access normal endpoints.
+- Login and required password-change flow are **VERIFIED at build/unit-test level**. Refresh tokens, replay detection/revocation, current-user abstraction, fine-grained policies, and frontend login remain NOT STARTED.

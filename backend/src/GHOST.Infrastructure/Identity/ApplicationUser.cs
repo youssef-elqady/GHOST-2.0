@@ -9,6 +9,7 @@ public sealed class ApplicationUser : IdentityUser<Guid>
         Id = Guid.NewGuid();
         SecurityStamp = Guid.NewGuid().ToString();
         ConcurrencyStamp = Guid.NewGuid().ToString();
+        LockoutEnabled = true;
     }
 
     public string FullName { get; set; } = string.Empty;

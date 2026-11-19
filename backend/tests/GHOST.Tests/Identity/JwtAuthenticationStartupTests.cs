@@ -49,6 +49,34 @@ public sealed class JwtAuthenticationStartupTests
         Assert.Contains(
             fallbackPolicy.Requirements,
             requirement => requirement is DenyAnonymousAuthorizationRequirement);
+        Assert.Contains(
+            fallbackPolicy.Requirements,
+            requirement => requirement is ClaimsAuthorizationRequirement claimRequirement &&
+                claimRequirement.ClaimType == "token_use" &&
+                claimRequirement.AllowedValues?.Contains(JwtTokenService.AccessTokenPurpose) == true);
+        Assert.Contains(
+            fallbackPolicy.Requirements,
+            requirement => requirement is RolesAuthorizationRequirement roleRequirement &&
+                roleRequirement.AllowedRoles.Contains("Admin"));
+    }
+
+
+    [Fact]
+    public void AddGhostJwtAuthentication_RestrictsPasswordChangePolicyToItsTokenPurpose()
+    {
+        var builder = Host.CreateApplicationBuilder();
+        builder.Services.AddGhostJwtAuthentication(CreateValidConfiguration());
+
+        using var provider = builder.Services.BuildServiceProvider();
+        var authorizationOptions = provider.GetRequiredService<IOptions<AuthorizationOptions>>().Value;
+        var policy = authorizationOptions.GetPolicy("PasswordChangeOnly");
+
+        Assert.NotNull(policy);
+        Assert.Contains(
+            policy.Requirements,
+            requirement => requirement is ClaimsAuthorizationRequirement claimRequirement &&
+                claimRequirement.ClaimType == "token_use" &&
+                claimRequirement.AllowedValues?.Contains(JwtTokenService.PasswordChangeTokenPurpose) == true);
     }
 
     private static IConfiguration CreateValidConfiguration() =>

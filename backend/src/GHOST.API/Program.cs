@@ -50,6 +50,7 @@ builder.Services.AddDbContext<GHOSTDbContext>((serviceProvider, options) =>
 
 builder.Services.AddGhostIdentity();
 builder.Services.AddGhostJwtAuthentication(builder.Configuration);
+builder.Services.AddSingleton<JwtTokenService>();
 
 builder.Services.AddScoped<IBusinessDayRepository, BusinessDayRepository>();
 builder.Services.AddScoped<IDeviceRepository, DeviceRepository>();

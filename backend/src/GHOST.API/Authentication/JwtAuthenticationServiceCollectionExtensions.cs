@@ -5,6 +5,7 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
 using Microsoft.IdentityModel.Tokens;
+using System.IdentityModel.Tokens.Jwt;
 
 namespace GHOST.API.Authentication;
 
@@ -50,6 +51,8 @@ public static class JwtAuthenticationServiceCollectionExtensions
                     IssuerSigningKey = new SymmetricSecurityKey(
                         Encoding.UTF8.GetBytes(jwtOptions.SigningKey!)),
                     ValidAlgorithms = [SecurityAlgorithms.HmacSha256],
+                    NameClaimType = JwtRegisteredClaimNames.UniqueName,
+                    RoleClaimType = "role",
                     ClockSkew = TimeSpan.FromSeconds(30)
                 };
             });
@@ -59,7 +62,14 @@ public static class JwtAuthenticationServiceCollectionExtensions
             // Deny access by default. Public endpoints must opt out explicitly.
             options.FallbackPolicy = new AuthorizationPolicyBuilder()
                 .RequireAuthenticatedUser()
+                .RequireClaim("token_use", JwtTokenService.AccessTokenPurpose)
+                .RequireRole("Admin")
                 .Build();
+
+            // Bootstrap accounts can only use their restricted token to change a password.
+            options.AddPolicy("PasswordChangeOnly", policy =>
+                policy.RequireAuthenticatedUser()
+                    .RequireClaim("token_use", JwtTokenService.PasswordChangeTokenPurpose));
         });
 
         return services;

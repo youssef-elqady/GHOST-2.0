@@ -94,6 +94,7 @@ public sealed class AdminBootstrapService : IAdminBootstrapService
             FullName = request.FullName,
             IsActive = true,
             MustChangePassword = true,
+            LockoutEnabled = true,
             EmailConfirmed = false
         };
 
