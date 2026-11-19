@@ -1,6 +1,6 @@
 namespace GHOST.API.Authentication;
 
-public sealed class JwtOptions
+public sealed record JwtOptions
 {
     public const string SectionName = "Authentication:Jwt";
 
