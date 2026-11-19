@@ -29,7 +29,7 @@ Deliver GHOST as a reliable commercial PlayStation venue operations system with 
 
 | Step | Scope | Exit evidence | Initial status |
 |---|---|---|---|
-| A1 | Fail-closed JWT configuration and startup validation | Missing/weak issuer, audience, key and lifetime rejected; valid config builds | IN PROGRESS — next action |
+| A1 | Fail-closed JWT configuration and startup validation | Missing/weak issuer, audience, key and lifetime rejected; valid config builds | VERIFIED — PR #18 merged; CI run #51 passed |
 | A2 | Login, password verification, lockout, disabled-account checks, MustChangePassword, short-lived access tokens | Unit/API tests for valid and invalid credentials and account states | NOT STARTED |
 | A3 | Hashed refresh-token persistence, rotation, replay detection and revocation | Persistence tests and replay/revocation scenarios | NOT STARTED |
 | A4 | Claims-backed current-user context and role/resource/shift ownership policies | Actor identity comes only from claims; ownership tests | NOT STARTED |
@@ -41,8 +41,8 @@ Deliver GHOST as a reliable commercial PlayStation venue operations system with 
 
 | Step | Scope | Exit evidence | Initial status |
 |---|---|---|---|
-| B0 | Inspect existing Next.js app and Staff/Admin reference repositories; document KEEP/MODIFY/ADD/DEFER | File inventory, architecture map, visual reference review, no blind rewrite | IN PROGRESS — discovery |
-| B1 | Design System: light/dark tokens, Arabic RTL, responsive behavior, typography, buttons, cards, tables, forms, badges, charts and UI states | Both themes verified on core components and common screen sizes | NOT STARTED |
+| B0 | Inspect existing Next.js app and Staff/Admin reference repositories; document KEEP/MODIFY/ADD/DEFER | File inventory, architecture map, visual reference review, no blind rewrite | VERIFIED — discovery document published |
+| B1 | Design System: light/dark tokens, Arabic RTL, responsive behavior, typography, buttons, cards, tables, forms, badges, charts and UI states | Both themes verified on core components and common screen sizes | IN PROGRESS — shared theme provider, tokens and primitives committed; CI/visual checks pending |
 | B2 | Admin shell: sidebar, topbar, navigation, profile, theme switch | Navigation and theme persist; keyboard/mobile behavior checked | NOT STARTED |
 | B3 | Separate Staff shell optimized for shift/session workflows | Staff tasks are distinct and efficient; permission-aware navigation | NOT STARTED |
 | B4 | Admin dashboard skeleton | KPI layout, revenue panels, venue status, insights, alerts, recent activity; no fake live values | NOT STARTED |
