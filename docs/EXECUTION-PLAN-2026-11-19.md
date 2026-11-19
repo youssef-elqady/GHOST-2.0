@@ -31,7 +31,7 @@ Deliver GHOST as a reliable commercial PlayStation venue operations system with 
 |---|---|---|---|
 | A1 | Fail-closed JWT configuration and startup validation | Missing/weak issuer, audience, key and lifetime rejected; valid config builds | VERIFIED — PR #18 merged; CI #51 passed |
 | A2 | Login, password verification, lockout, disabled-account checks, MustChangePassword, short-lived access tokens and audit events | Unit/API tests for valid and invalid credentials and account states | VERIFIED — PR #29 and audit hardening PR #31; CI #89 passed. SQL audit persistence test added but skipped without approved DB. |
-| A3 | Hashed refresh-token persistence, rotation, replay detection and revocation | Persistence tests and replay/revocation scenarios | NOT STARTED |
+| A3 | Hashed refresh-token persistence, 7-day sliding / 30-day absolute family lifetime, rotation, replay detection, logout, cookie/CSRF and access-token session revocation | SQL persistence/concurrency tests, replay-family revocation, logout, cookie/Origin checks and revoked-sid validation | IN PROGRESS — design documented; implementation not started |
 | A4 | Claims-backed current-user context and role/resource/shift ownership policies | Actor identity comes only from claims; ownership tests | NOT STARTED |
 | A5 | Protect every endpoint, including existing device mutations | Endpoint inventory + anonymous 401, role 403, ownership and integration tests | NOT STARTED |
 
@@ -70,8 +70,8 @@ The divergent inventory branch remains review-only until its model snapshot/migr
 
 ## Immediate execution order
 
-1. Complete the current AUTH-03 authentication audit hardening slice and verify its audit persistence test path.
-2. Implement A3 refresh-token hashing, rotation, replay detection, session-family revocation, and tests.
+1. Review/approve the A3 refresh-token/session design in `docs/AUTH-03-REFRESH-TOKEN-DESIGN.md`.
+2. Implement A3 refresh-token hashing, rotation, replay detection, session-family revocation, cookie/CSRF protection, and tests.
 3. Implement A4 claims-backed current-user context and role/resource/shift ownership policies.
 4. Finish A5 endpoint inventory and protection with anonymous 401, role 403, ownership, and shift/session tests; keep operational access closed until this passes.
 5. Perform browser visual QA for B1 and B4 in Light/Dark at desktop/tablet/mobile breakpoints.
