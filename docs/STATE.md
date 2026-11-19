@@ -1731,3 +1731,13 @@ Reported by user after fast-forward pull to commit `761f98ce4ead4dead43af76f262e
 1. Review CI and fix any build/test issues.
 2. Merge only to `feature/auth-02-auditlog-append-only` after green checks.
 3. Then continue AUTH-03 login/access-token issuance; keep all database operations blocked until a user-approved exact target and backup/restore gates are met.
+
+
+### API database configuration safety — CI verified (2026-11-19)
+
+- PR #21 Backend CI run #57 (run ID `44463594101`) passed.
+- Release solution build: **succeeded, 0 warnings, 0 errors**.
+- `GHOST.Tests`: **71 passed, 0 failed**.
+- `GHOST.SqlServer.Tests`: **10 passed, 3 skipped** because the isolated SQL integration connection was not configured. No database connection was made by CI.
+- The API no longer has a committed `GHOST2` connection string. Startup requires explicit `ConnectionStrings__DefaultConnection` and validates server/catalog without connecting. `GHOST2`, `GHOST_AUTH02_IT`, system catalogs and attached database files are rejected.
+- This code/configuration slice is **VERIFIED at build/unit-test level**; merge remains pending review. No DB was accessed or changed.
