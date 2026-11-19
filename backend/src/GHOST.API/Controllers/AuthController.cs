@@ -92,6 +92,8 @@ public sealed class AuthController : ControllerBase
             return Unauthorized(new { error = "invalid_credentials" });
         }
 
+        await _userManager.ResetAccessFailedCountAsync(user);
+
         if (user.MustChangePassword)
         {
             var passwordChangeToken = _tokenService.CreatePasswordChangeToken(user);
