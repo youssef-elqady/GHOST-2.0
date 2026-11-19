@@ -1850,3 +1850,13 @@ Reported by user after fast-forward pull to commit `761f98ce4ead4dead43af76f262e
 - Tightened the fallback policy to require all three: authenticated principal, `token_use=access`, and `Admin` role. The restricted password-change policy remains separate and accepts only `token_use=password_change`.
 - Added a policy test asserting the temporary Admin-only fallback. This deliberately blocks non-Admin API access until explicit role/resource/shift policies and ownership tests are implemented.
 - Updated `docs/AUTH-03-LOGIN.md`. CI must rerun on this refinement before merge.
+
+
+### AUTH-03 login/access-token CI verified — 2026-11-19
+
+- Corrected-head CI run #83 (run ID `44466252139`) passed.
+- Release solution build: **succeeded, 0 warnings, 0 errors**.
+- `GHOST.Tests`: **77 passed, 0 failed**.
+- `GHOST.SqlServer.Tests`: **10 passed, 3 skipped** because no isolated SQL integration connection was configured. No database connection was made.
+- The fallback policy is intentionally Admin-only until explicit Manager/Cashier/Staff role and resource ownership policies are implemented. Restricted password-change tokens cannot access normal endpoints.
+- Login and required password-change flow are **VERIFIED at build/unit-test level**. Refresh tokens, replay detection/revocation, current-user abstraction, fine-grained policies, and frontend login remain NOT STARTED.
