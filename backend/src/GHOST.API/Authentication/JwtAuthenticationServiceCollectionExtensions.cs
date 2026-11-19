@@ -62,12 +62,13 @@ public static class JwtAuthenticationServiceCollectionExtensions
             // Deny access by default. Public endpoints must opt out explicitly.
             options.FallbackPolicy = new AuthorizationPolicyBuilder()
                 .RequireAuthenticatedUser()
+                .RequireClaim("token_use", JwtTokenService.AccessTokenPurpose)
                 .Build();
 
             // Bootstrap accounts can only use their restricted token to change a password.
             options.AddPolicy("PasswordChangeOnly", policy =>
                 policy.RequireAuthenticatedUser()
-                    .RequireClaim("token_use", "password_change"));
+                    .RequireClaim("token_use", JwtTokenService.PasswordChangeTokenPurpose));
         });
 
         return services;
