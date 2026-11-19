@@ -1741,3 +1741,29 @@ Reported by user after fast-forward pull to commit `761f98ce4ead4dead43af76f262e
 - `GHOST.SqlServer.Tests`: **10 passed, 3 skipped** because the isolated SQL integration connection was not configured. No database connection was made by CI.
 - The API no longer has a committed `GHOST2` connection string. Startup requires explicit `ConnectionStrings__DefaultConnection` and validates server/catalog without connecting. `GHOST2`, `GHOST_AUTH02_IT`, system catalogs and attached database files are rejected.
 - This code/configuration slice is **VERIFIED at build/unit-test level**; merge remains pending review. No DB was accessed or changed.
+
+
+## Post-merge checkpoint — 2026-11-19
+
+- PR #18 merged JWT configuration as `48b0d564b1db125aed6d1cdfc7c2031ee23b9f01`. Backend CI run #51 passed: Release build 0 warnings/0 errors; `GHOST.Tests` 58 passed; `GHOST.SqlServer.Tests` 10 passed / 3 skipped. The SQL integration environment was not connected.
+- PR #20 merged the execution plan and frontend discovery docs as `07a83f1a985719ada47238ac383453c7b61f0c00`.
+- PR #21 merged API database configuration hardening as `bfd2f4f7a67238d1c27a155ae84c89bcefb4fbac`. Backend CI run #57 passed: Release build 0 warnings/0 errors; `GHOST.Tests` 71 passed; `GHOST.SqlServer.Tests` 10 passed / 3 skipped. No database connection was made.
+- Issue #19 is closed. The API no longer has a committed `GHOST2` target; it requires explicit `ConnectionStrings__DefaultConnection` and rejects `GHOST2`, `GHOST_AUTH02_IT`, system catalogs and attached database files at startup.
+- **No database was accessed or modified; no migration was applied.** `GHOST2` and production remain excluded.
+
+### Current delivery statuses
+
+| Area | Status | Next action |
+|---|---|---|
+| AUTH-02 Identity registration + migration rollback safety | VERIFIED in code/CI | Database migration remains unapplied pending separate operational gates. |
+| AUTH-03 JWT validation/configuration | VERIFIED in code/CI | Login and access-token issuance. |
+| AUTH-03 login/refresh/actor/endpoint authorization | NOT STARTED beyond JWT validation/fallback policy | Implement in focused slices; test account states, refresh replay, 401/403 and ownership. |
+| API DB configuration safety | VERIFIED in code/CI | Provide a specifically approved environment connection string only when DB work is authorized. |
+| Frontend B0 discovery | VERIFIED | Completed and documented. |
+| Frontend B1 Design System | NEXT | Shared theme provider, semantic tokens, reusable primitives, Light/Dark, RTL/responsive. |
+| AUTH-02 database rollout | BLOCKED | Exact target, verified backup/restore, schema/history/data preflight. |
+
+### Immediate next actions
+1. Start Frontend B1 on a focused branch: shared Light/Dark theme provider, unify tokens and theme toggle, reusable Button/Card/Badge/PageHeader primitives; preserve existing Staff/Admin screens and behavior.
+2. Start AUTH-03 login/access-token issuance on a separate focused branch: Identity password verification, lockout, inactive-account denial, MustChangePassword, short-lived JWT issuance, and tests.
+3. Do not connect to any database or apply migrations without explicit target approval and verified backup/restore gates.
