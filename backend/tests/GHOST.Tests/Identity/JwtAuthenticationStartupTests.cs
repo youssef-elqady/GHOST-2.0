@@ -49,6 +49,11 @@ public sealed class JwtAuthenticationStartupTests
         Assert.Contains(
             fallbackPolicy.Requirements,
             requirement => requirement is DenyAnonymousAuthorizationRequirement);
+        Assert.Contains(
+            fallbackPolicy.Requirements,
+            requirement => requirement is ClaimsAuthorizationRequirement claimRequirement &&
+                claimRequirement.ClaimType == "token_use" &&
+                claimRequirement.AllowedValues.Contains(JwtTokenService.AccessTokenPurpose));
     }
 
 
@@ -67,7 +72,7 @@ public sealed class JwtAuthenticationStartupTests
             policy.Requirements,
             requirement => requirement is ClaimsAuthorizationRequirement claimRequirement &&
                 claimRequirement.ClaimType == "token_use" &&
-                claimRequirement.AllowedValues.Contains("password_change"));
+                claimRequirement.AllowedValues.Contains(JwtTokenService.PasswordChangeTokenPurpose));
     }
 
     private static IConfiguration CreateValidConfiguration() =>
