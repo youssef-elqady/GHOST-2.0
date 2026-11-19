@@ -49,6 +49,17 @@ public sealed class JwtAuthenticationStartupTests
         Assert.Contains(
             fallbackPolicy.Requirements,
             requirement => requirement is DenyAnonymousAuthorizationRequirement);
+        Assert.Contains(
+            fallbackPolicy.Requirements,
+            requirement => requirement is ClaimsAuthorizationRequirement claimRequirement &&
+                claimRequirement.ClaimType == GhostClaimTypes.BusinessAccess);
+
+        var passwordChangePolicy = authorizationOptions.GetPolicy("PasswordChangeOnly");
+        Assert.NotNull(passwordChangePolicy);
+        Assert.Contains(
+            passwordChangePolicy.Requirements,
+            requirement => requirement is ClaimsAuthorizationRequirement claimRequirement &&
+                claimRequirement.ClaimType == GhostClaimTypes.MustChangePassword);
     }
 
     private static IConfiguration CreateValidConfiguration() =>
