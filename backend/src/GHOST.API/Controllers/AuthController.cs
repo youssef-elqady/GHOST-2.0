@@ -1,8 +1,6 @@
 using System.ComponentModel.DataAnnotations;
 using GHOST.API.Authentication;
-using GHOST.Domain.Entities;
 using GHOST.Infrastructure.Identity;
-using GHOST.Infrastructure.Persistence;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
@@ -16,16 +14,16 @@ public sealed class AuthController : ControllerBase
     private const string InvalidCredentialsMessage = "اسم المستخدم أو كلمة المرور غير صحيحة.";
 
     private readonly UserManager<ApplicationUser> _userManager;
-    private readonly GHOSTDbContext _dbContext;
+    private readonly IAuthenticationAuditWriter _auditWriter;
     private readonly IAccessTokenIssuer _tokenIssuer;
 
     public AuthController(
         UserManager<ApplicationUser> userManager,
-        GHOSTDbContext dbContext,
+        IAuthenticationAuditWriter auditWriter,
         IAccessTokenIssuer tokenIssuer)
     {
         _userManager = userManager;
-        _dbContext = dbContext;
+        _auditWriter = auditWriter;
         _tokenIssuer = tokenIssuer;
     }
 
@@ -52,7 +50,7 @@ public sealed class AuthController : ControllerBase
 
         if (user is null)
         {
-            await WriteSystemAuditAsync("Authentication.LoginFailed", null, cancellationToken);
+            await _auditWriter.WriteSystemAsync("Authentication.LoginFailed", null, cancellationToken);
             return Unauthorized(new { error = InvalidCredentialsMessage });
         }
 
@@ -108,7 +106,7 @@ public sealed class AuthController : ControllerBase
         }
 
         var issued = _tokenIssuer.Issue(user, roles.ToArray());
-        await WriteUserAuditAsync(user.Id, "Authentication.LoginSucceeded", cancellationToken);
+        await _auditWriter.WriteUserAsync(user.Id, "Authentication.LoginSucceeded", cancellationToken);
 
         return Ok(new LoginResponse(
             issued.Token,
@@ -119,33 +117,4 @@ public sealed class AuthController : ControllerBase
             roles.ToArray()));
     }
 
-    private async Task WriteSystemAuditAsync(
-        string action,
-        Guid? targetUserId,
-        CancellationToken cancellationToken)
-    {
-        _dbContext.AuditLogs.Add(AuditLog.Create(
-            actorType: "System",
-            userId: null,
-            action: action,
-            entityType: "Authentication",
-            entityId: targetUserId?.ToString()));
-
-        await _dbContext.SaveChangesAsync(cancellationToken);
-    }
-
-    private async Task WriteUserAuditAsync(
-        Guid userId,
-        string action,
-        CancellationToken cancellationToken)
-    {
-        _dbContext.AuditLogs.Add(AuditLog.Create(
-            actorType: "User",
-            userId: userId,
-            action: action,
-            entityType: "User",
-            entityId: userId.ToString()));
-
-        await _dbContext.SaveChangesAsync(cancellationToken);
-    }
 }
