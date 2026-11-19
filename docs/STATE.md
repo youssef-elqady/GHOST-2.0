@@ -1666,3 +1666,14 @@ Reported by user after fast-forward pull to commit `761f98ce4ead4dead43af76f262e
 - Replacement PR #17 CI run #49 (run ID `44462949680`) confirmed the prior namespace fix, then exposed that `IAuthorizationPolicyProvider` was not available to the test project's compile-time references. API project itself built successfully; tests did not compile.
 - Simplified the test to inspect the registered `IOptions<AuthorizationOptions>.Value.FallbackPolicy` directly, retaining the assertion that anonymous users are denied by default. The test now imports the public authorization namespaces only.
 - This correction is committed on `feature/auth03-jwt-configuration-reviewed`; CI must be rerun on the corrected head. No successful test claim is made yet.
+
+
+### AUTH-03 JWT configuration — CI verified (2026-11-19)
+
+- Corrected-head Backend CI run #51 (run ID `44463074527`) passed.
+- Release solution build: **succeeded, 0 warnings, 0 errors**.
+- `GHOST.Tests`: **58 passed, 0 failed**.
+- `GHOST.SqlServer.Tests`: **10 passed, 3 skipped**. The skipped cases require the separately approved SQL Server integration environment; no SQL Server database was connected by this CI run.
+- The two earlier failed CI attempts were test-source compile issues; both were corrected before run #51. Do not count those earlier attempts as successful verification.
+- Issue #19 created to remove the committed `GHOST2` default connection string and require explicit environment configuration before any API DB operation. No database was accessed or changed.
+- AUTH-03 JWT configuration slice is **VERIFIED at build/unit-test level**; JWT login/token issuance/refresh, endpoint authorization integration and full security matrix remain NOT STARTED. The fallback policy already requires authentication by default, so existing API routes are denied anonymously; no login endpoint exists yet.
