@@ -1860,3 +1860,20 @@ Reported by user after fast-forward pull to commit `761f98ce4ead4dead43af76f262e
 - `GHOST.SqlServer.Tests`: **10 passed, 3 skipped** because no isolated SQL integration connection was configured. No database connection was made.
 - The fallback policy is intentionally Admin-only until explicit Manager/Cashier/Staff role and resource ownership policies are implemented. Restricted password-change tokens cannot access normal endpoints.
 - Login and required password-change flow are **VERIFIED at build/unit-test level**. Refresh tokens, replay detection/revocation, current-user abstraction, fine-grained policies, and frontend login remain NOT STARTED.
+
+
+## Post-merge AUTH-03 login checkpoint — 2026-11-19
+
+- PR #29 merged login and restricted password-change flow as `d7f9ec576a41f4b8621928b6d45d611f34962f91`.
+- Corrected-head Backend CI run #83 passed: Release build 0 warnings/0 errors; `GHOST.Tests` 77 passed; `GHOST.SqlServer.Tests` 10 passed / 3 skipped (no SQL integration connection configured).
+- Login supports Identity password verification, disabled-account denial, 5-attempt/15-minute lockout, short-lived access tokens, and a five-minute password-change-only token for bootstrap accounts. Password change returns a normal access token.
+- Fallback API access is intentionally Admin-only until explicit Manager/Cashier/Staff role and resource/shift ownership policies are implemented. The password-change token is purpose-restricted and cannot access operational endpoints.
+- Refresh tokens, rotation, replay detection, revocation, ICurrentUser, fine-grained endpoint policies and frontend login remain outstanding.
+- No database was connected or modified. No migration was applied.
+
+### Current priority order
+1. AUTH-03 refresh-token persistence, hashing, rotation, replay detection and revocation.
+2. Claims-backed current-user context and explicit role/resource/shift policies; expand beyond Admin only after endpoint-by-endpoint tests pass.
+3. Frontend login and required password-change screen, then session integration. Do not store long-lived refresh secrets in localStorage.
+4. Visual QA for the Admin dashboard skeleton in Light/Dark and responsive breakpoints.
+5. Real dashboard analytics APIs only after financial/session/shift source-of-truth contracts are implemented and reconciled.
