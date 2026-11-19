@@ -1846,3 +1846,11 @@ Reported by user after fast-forward pull to commit `761f98ce4ead4dead43af76f262e
 2. Run Backend CI and fix all build/test failures.
 3. Add endpoint-level tests for invalid credentials, inactive/locked users, valid login, and audit records before merging.
 4. Keep refresh-token lifecycle as A3 and password-change completion as A4.
+
+
+### AUTH-03 A2 first CI finding and correction (2026-11-19)
+
+- Backend CI run #71 (run ID `44465741575`) failed during API compilation before tests started. The failure was four stale calls to the removed controller-local `WriteSystemAuditAsync` helper after audit persistence had been extracted to `IAuthenticationAuditWriter`.
+- Corrected all remaining calls to use the injected audit writer. Fix commit: `70c22909a09eb3daff86eac64dd46c20149d6745`.
+- Added controller-level unit tests with fake Identity/audit dependencies for unknown, inactive, locked, invalid-password, valid Admin, MustChangePassword, and fifth-failure lockout scenarios.
+- The failed CI attempt is not verification. A new Backend CI run for the corrected head is pending; tests remain unverified until it passes.
