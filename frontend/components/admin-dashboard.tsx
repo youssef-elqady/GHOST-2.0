@@ -125,10 +125,12 @@ export function AdminDashboard() {
           </div>
         </header>
 
-        <div className="page-heading">
-          <div><p className="eyebrow">{current.eyebrow}</p><h1>{current.title} <span>—</span></h1><p className="subheading">{current.description}</p></div>
-          <div className="shift-pill"><ShieldCheck size={18} /><div><b>حالة الربط</b><strong>قيد التطوير</strong></div></div>
-        </div>
+        {activeNav !== 'overview' && (
+          <div className="page-heading">
+            <div><p className="eyebrow">{current.eyebrow}</p><h1>{current.title} <span>—</span></h1><p className="subheading">{current.description}</p></div>
+            <div className="shift-pill"><ShieldCheck size={18} /><div><b>حالة الربط</b><strong>قيد التطوير</strong></div></div>
+          </div>
+        )}
 
         {activeNav !== 'overview' && (
           <div className="notice-bar">
