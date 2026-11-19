@@ -11,6 +11,9 @@ public sealed record IssuedJwtToken(string Value, DateTimeOffset ExpiresAtUtc);
 
 public sealed class JwtTokenService
 {
+    public const string AccessTokenPurpose = "access";
+    public const string PasswordChangeTokenPurpose = "password_change";
+
     private static readonly TimeSpan PasswordChangeLifetime = TimeSpan.FromMinutes(5);
     private readonly JwtOptions _options;
 
@@ -29,7 +32,7 @@ public sealed class JwtTokenService
         var now = DateTimeOffset.UtcNow;
         var expiresAt = now.AddMinutes(_options.AccessTokenLifetimeMinutes);
         var claims = CreateBaseClaims(user);
-        claims.Add(new Claim("token_use", "access"));
+        claims.Add(new Claim("token_use", AccessTokenPurpose));
 
         foreach (var role in roles
             .Where(role => !string.IsNullOrWhiteSpace(role))
@@ -48,7 +51,7 @@ public sealed class JwtTokenService
         var now = DateTimeOffset.UtcNow;
         var expiresAt = now.Add(PasswordChangeLifetime);
         var claims = CreateBaseClaims(user);
-        claims.Add(new Claim("token_use", "password_change"));
+        claims.Add(new Claim("token_use", PasswordChangeTokenPurpose));
 
         return Issue(claims, now, expiresAt);
     }
