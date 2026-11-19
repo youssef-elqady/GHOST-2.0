@@ -1862,3 +1862,14 @@ Reported by user after fast-forward pull to commit `761f98ce4ead4dead43af76f262e
 - The test failures were missing `Microsoft.AspNetCore.Mvc` imports for MVC result assertions and an ambiguous `Options.Create` reference resolving to the inherited UserManager.Options property.
 - Added the MVC namespace and fully qualified `Microsoft.Extensions.Options.Options.Create`. Fix commit: `ee953dc3982f9b76b3c03cfde4f813289171dc0e`.
 - Run #72 is not verification; tests were skipped because test compilation failed. A new CI run for the corrected test head is pending.
+
+
+### AUTH-03 A2 — successful CI and audit persistence test added (2026-11-19)
+
+- Corrected-head Backend CI run #75 (run ID `44465947853`) passed.
+- Release solution build: **0 warnings, 0 errors**.
+- `GHOST.Tests`: **80 passed, 0 failed**.
+- `GHOST.SqlServer.Tests`: **10 passed, 3 skipped**. The three SQL tests were skipped because the dedicated connection environment variable was not configured; no SQL Server connection was made.
+- Added a guarded SQL Server integration test for `AuthenticationAuditWriter`. It accepts only the existing exact `GHOST_AUTH02_IT` test catalog through `SqlServerTestConnection`, checks the connected catalog, and rolls back its test row. This test is expected to skip unless the explicitly approved isolated SQL test connection is configured.
+- The project-reference and integration-test additions were made after run #75; they require a fresh CI run. A2 remains **IN REVIEW**, not VERIFIED, until that run passes and the SQL test's skip/execute behavior is confirmed.
+- No database was connected to or modified. No migration was applied.
