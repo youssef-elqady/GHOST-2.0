@@ -56,7 +56,7 @@ public sealed class AuthController : ControllerBase
 
         if (!user.IsActive)
         {
-            await WriteSystemAuditAsync(
+            await _auditWriter.WriteSystemAsync(
                 "Authentication.LoginDenied.InactiveAccount",
                 user.Id,
                 cancellationToken);
@@ -65,7 +65,7 @@ public sealed class AuthController : ControllerBase
 
         if (await _userManager.IsLockedOutAsync(user))
         {
-            await WriteSystemAuditAsync(
+            await _auditWriter.WriteSystemAsync(
                 "Authentication.LoginDenied.LockedOut",
                 user.Id,
                 cancellationToken);
@@ -80,7 +80,7 @@ public sealed class AuthController : ControllerBase
 
             var lockedOut = await _userManager.IsLockedOutAsync(user);
 
-            await WriteSystemAuditAsync(
+            await _auditWriter.WriteSystemAsync(
                 lockedOut
                     ? "Authentication.AccountLocked"
                     : "Authentication.LoginFailed",
@@ -98,7 +98,7 @@ public sealed class AuthController : ControllerBase
         if (!user.MustChangePassword &&
             (roles.Count != 1 || roles.Any(role => role is not ("Admin" or "Staff"))))
         {
-            await WriteSystemAuditAsync(
+            await _auditWriter.WriteSystemAsync(
                 "Authentication.LoginDenied.InvalidRoleAssignment",
                 user.Id,
                 cancellationToken);
@@ -116,5 +116,4 @@ public sealed class AuthController : ControllerBase
             user.FullName,
             roles.ToArray()));
     }
-
 }
