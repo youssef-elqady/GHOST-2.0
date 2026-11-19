@@ -107,5 +107,5 @@ Rules:
 
 - Existing frontend and references inspected at source level.
 - KEEP/MODIFY/ADD/DEFER decisions documented.
-- No frontend code changed in discovery.
-- Next step is Phase B1: implement shared design tokens and theme provider in a focused PR, after JWT config is reviewed.
+- Discovery itself made no UI changes; the follow-on B1 implementation is tracked separately.
+- B1 is now in progress on `feature/frontend-b1-design-system`: shared theme provider, persisted Light/Dark preference, semantic tokens, and reusable primitives. See `docs/STATE.md` for exact scope and verification status.
