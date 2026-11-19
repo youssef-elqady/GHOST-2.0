@@ -14,13 +14,16 @@ public sealed class AuthController : ControllerBase
 {
     private readonly UserManager<ApplicationUser> _userManager;
     private readonly JwtTokenService _tokenService;
+    private readonly IAuthenticationAuditWriter _auditWriter;
 
     public AuthController(
         UserManager<ApplicationUser> userManager,
-        JwtTokenService tokenService)
+        JwtTokenService tokenService,
+        IAuthenticationAuditWriter auditWriter)
     {
         _userManager = userManager;
         _tokenService = tokenService;
+        _auditWriter = auditWriter;
     }
 
     public sealed record LoginRequest(string? Username, string? Password);
@@ -50,7 +53,9 @@ public sealed class AuthController : ControllerBase
 
     [AllowAnonymous]
     [HttpPost("login")]
-    public async Task<IActionResult> Login([FromBody] LoginRequest request)
+    public async Task<IActionResult> Login(
+        [FromBody] LoginRequest request,
+        CancellationToken cancellationToken)
     {
         if (request is null ||
             string.IsNullOrWhiteSpace(request.Username) ||
@@ -64,8 +69,23 @@ public sealed class AuthController : ControllerBase
         var user = await _userManager.FindByNameAsync(request.Username.Trim());
 
         // Do not disclose whether an account exists or is disabled.
-        if (user is null || !user.IsActive)
+        if (user is null)
+        {
+            await _auditWriter.WriteSystemAsync(
+                "Authentication.LoginFailed",
+                null,
+                cancellationToken);
             return Unauthorized(new { error = "invalid_credentials" });
+        }
+
+        if (!user.IsActive)
+        {
+            await _auditWriter.WriteSystemAsync(
+                "Authentication.LoginDenied.InactiveAccount",
+                user.Id,
+                cancellationToken);
+            return Unauthorized(new { error = "invalid_credentials" });
+        }
 
         if (!user.LockoutEnabled)
         {
@@ -76,7 +96,13 @@ public sealed class AuthController : ControllerBase
         }
 
         if (await _userManager.IsLockedOutAsync(user))
+        {
+            await _auditWriter.WriteSystemAsync(
+                "Authentication.LoginDenied.LockedOut",
+                user.Id,
+                cancellationToken);
             return LockedOut();
+        }
 
         var passwordIsValid = await _userManager.CheckPasswordAsync(
             user,
@@ -86,7 +112,15 @@ public sealed class AuthController : ControllerBase
         {
             await _userManager.AccessFailedAsync(user);
 
-            if (await _userManager.IsLockedOutAsync(user))
+            var lockedOut = await _userManager.IsLockedOutAsync(user);
+            await _auditWriter.WriteSystemAsync(
+                lockedOut
+                    ? "Authentication.AccountLocked"
+                    : "Authentication.LoginFailed",
+                user.Id,
+                cancellationToken);
+
+            if (lockedOut)
                 return LockedOut();
 
             return Unauthorized(new { error = "invalid_credentials" });
@@ -97,6 +131,10 @@ public sealed class AuthController : ControllerBase
         if (user.MustChangePassword)
         {
             var passwordChangeToken = _tokenService.CreatePasswordChangeToken(user);
+            await _auditWriter.WriteUserAsync(
+                user.Id,
+                "Authentication.PasswordChangeTokenIssued",
+                cancellationToken);
 
             return Ok(new PasswordChangeRequiredResponse(
                 "password_change_required",
@@ -107,6 +145,10 @@ public sealed class AuthController : ControllerBase
 
         var roles = await _userManager.GetRolesAsync(user);
         var accessToken = _tokenService.CreateAccessToken(user, roles);
+        await _auditWriter.WriteUserAsync(
+            user.Id,
+            "Authentication.LoginSucceeded",
+            cancellationToken);
 
         return Ok(new AuthenticatedResponse(
             "authenticated",
@@ -123,7 +165,8 @@ public sealed class AuthController : ControllerBase
     [Authorize(Policy = "PasswordChangeOnly")]
     [HttpPost("change-password")]
     public async Task<IActionResult> ChangePassword(
-        [FromBody] ChangePasswordRequest request)
+        [FromBody] ChangePasswordRequest request,
+        CancellationToken cancellationToken)
     {
         if (request is null ||
             string.IsNullOrWhiteSpace(request.CurrentPassword) ||
@@ -140,10 +183,22 @@ public sealed class AuthController : ControllerBase
 
         var user = await _userManager.FindByIdAsync(userId.ToString("D"));
         if (user is null || !user.IsActive || !user.MustChangePassword)
+        {
+            await _auditWriter.WriteSystemAsync(
+                "Authentication.PasswordChangeDenied",
+                userId,
+                cancellationToken);
             return Forbid();
+        }
 
         if (await _userManager.IsLockedOutAsync(user))
+        {
+            await _auditWriter.WriteSystemAsync(
+                "Authentication.PasswordChangeDenied.LockedOut",
+                user.Id,
+                cancellationToken);
             return LockedOut();
+        }
 
         // Persist the flag change together with the password hash update performed by Identity.
         user.MustChangePassword = false;
@@ -162,8 +217,19 @@ public sealed class AuthController : ControllerBase
             {
                 await _userManager.AccessFailedAsync(user);
                 if (await _userManager.IsLockedOutAsync(user))
+                {
+                    await _auditWriter.WriteSystemAsync(
+                        "Authentication.AccountLocked",
+                        user.Id,
+                        cancellationToken);
                     return LockedOut();
+                }
             }
+
+            await _auditWriter.WriteUserAsync(
+                user.Id,
+                "Authentication.PasswordChangeFailed",
+                cancellationToken);
 
             return BadRequest(new
             {
@@ -173,6 +239,10 @@ public sealed class AuthController : ControllerBase
         }
 
         await _userManager.ResetAccessFailedCountAsync(user);
+        await _auditWriter.WriteUserAsync(
+            user.Id,
+            "Authentication.PasswordChanged",
+            cancellationToken);
 
         var roles = await _userManager.GetRolesAsync(user);
         var accessToken = _tokenService.CreateAccessToken(user, roles);
