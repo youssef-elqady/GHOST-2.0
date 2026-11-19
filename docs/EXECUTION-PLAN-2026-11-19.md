@@ -30,7 +30,7 @@ Deliver GHOST as a reliable commercial PlayStation venue operations system with 
 | Step | Scope | Exit evidence | Initial status |
 |---|---|---|---|
 | A1 | Fail-closed JWT configuration and startup validation | Missing/weak issuer, audience, key and lifetime rejected; valid config builds | IN PROGRESS — next action |
-| A2 | Login, password verification, lockout, disabled-account checks, MustChangePassword, short-lived access tokens | Unit/API tests for valid and invalid credentials and account states | IN PROGRESS — endpoint, token issuer and policy gate implemented; CI/integration tests pending |
+| A2 | Login, password verification, lockout, disabled-account checks, MustChangePassword, short-lived access tokens | Unit/API tests for valid and invalid credentials and account states | VERIFIED — CI #81: Release build clean, 80 unit/controller tests passed; SQL audit persistence test added but skipped without approved DB |
 | A3 | Hashed refresh-token persistence, rotation, replay detection and revocation | Persistence tests and replay/revocation scenarios | NOT STARTED |
 | A4 | Claims-backed current-user context and role/resource/shift ownership policies | Actor identity comes only from claims; ownership tests | NOT STARTED |
 | A5 | Protect every endpoint, including existing device mutations | Endpoint inventory + anonymous 401, role 403, ownership and integration tests | NOT STARTED |
