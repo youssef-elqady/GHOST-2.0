@@ -1802,3 +1802,10 @@ Reported by user after fast-forward pull to commit `761f98ce4ead4dead43af76f262e
 - Existing Admin Device Management behavior is preserved.
 - Design and backend data requirements: [docs/ADMIN-DASHBOARD-SKELETON.md](./ADMIN-DASHBOARD-SKELETON.md).
 - Verification: Frontend CI pending. No local browser QA was performed. Do not mark this phase VERIFIED until production build and visual checks pass.
+
+### Admin dashboard skeleton — build verification (2026-11-19)
+
+- Frontend CI run #30 (run ID `44464844197`) passed both jobs: Next.js production build and API Release build.
+- The dashboard skeleton is **build-verified**. Visual inspection in browser at desktop/tablet/mobile and both themes remains pending because no local browser session was available.
+- The dashboard is intentionally a layout skeleton: metrics show `—`, charts/tables show empty states, and no demo financial values are present.
+- B1 shared Design System PR #23 was merged as `9eba817074b6205fb5e0c2d1ec477f1f1bed8ca0`; its Frontend CI run #27 passed Next.js production build and API Release build. Visual QA remains a separate acceptance item.
