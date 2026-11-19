@@ -1873,3 +1873,14 @@ Reported by user after fast-forward pull to commit `761f98ce4ead4dead43af76f262e
 - Added a guarded SQL Server integration test for `AuthenticationAuditWriter`. It accepts only the existing exact `GHOST_AUTH02_IT` test catalog through `SqlServerTestConnection`, checks the connected catalog, and rolls back its test row. This test is expected to skip unless the explicitly approved isolated SQL test connection is configured.
 - The project-reference and integration-test additions were made after run #75; they require a fresh CI run. A2 remains **IN REVIEW**, not VERIFIED, until that run passes and the SQL test's skip/execute behavior is confirmed.
 - No database was connected to or modified. No migration was applied.
+
+
+### AUTH-03 A2 — final CI verification (2026-11-19)
+
+- Final Backend CI run #81 (run ID `44466185533`) passed after adding the guarded SQL audit-writer test.
+- Release solution build: **0 warnings, 0 errors**.
+- `GHOST.Tests`: **80 passed, 0 failed**.
+- `GHOST.SqlServer.Tests`: **10 passed, 4 skipped**. The new `AuthenticationAuditWriterSqlServerTests` was correctly skipped because `GHOST_AUTH02_TEST_CONNECTION_STRING` was not configured. No SQL Server database was connected to or modified.
+- A2 is **VERIFIED at Release build and unit/controller-test level**. The actual SQL persistence test is implemented but remains unexecuted until the isolated, explicitly approved `GHOST_AUTH02_IT` test connection is available.
+- PR #26 is ready for review and targets only `feature/auth-02-auditlog-append-only`; it has not been merged. No migration or production database work was performed.
+- Remaining AUTH work: A3 refresh-token persistence/rotation/replay/revocation; A4 password-change lifecycle; A5 claims-backed actor, role/resource/shift policies and endpoint inventory. Operational APIs remain closed because A2 tokens do not carry `ghost:business_access=true`.
