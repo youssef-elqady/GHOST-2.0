@@ -116,7 +116,7 @@ public sealed class AuthController : ControllerBase
             issued.ExpiresAt,
             user.MustChangePassword,
             user.FullName,
-            roles));
+            roles.ToArray()));
     }
 
     private async Task WriteSystemAuditAsync(
