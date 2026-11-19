@@ -1634,3 +1634,21 @@ Reported by user after fast-forward pull to commit `761f98ce4ead4dead43af76f262e
 2. Add login and short-lived access-token issuance using Identity password verification and lockout, rejecting disabled accounts and enforcing `MustChangePassword`.
 3. Then implement hashed refresh-token persistence/rotation/replay detection, claims-backed `ICurrentUser`, and endpoint/resource authorization with integration tests.
 4. Keep the API restricted to trusted local development until every mutating endpoint is protected and anonymous/role/ownership tests pass.
+
+
+## AUTH-03 — fail-closed JWT configuration slice (2026-11-19)
+
+- Tracking issue: [#14 — GHOST execution plan](https://github.com/youssef-elqady/GHOST-2.0/issues/14).
+- Working branch: `feature/auth03-jwt-configuration`, based on `feature/auth-02-auditlog-append-only`.
+- Added explicit `Authentication:Jwt` options for issuer, audience, signing key, and access-token lifetime. No secret or weak development fallback is committed.
+- Added startup validation: issuer/audience required; signing key must contain at least 32 UTF-8 bytes; access-token lifetime must be 1–30 minutes. `ValidateOnStart` makes invalid/missing settings fail startup.
+- Registered JWT bearer validation for issuer, audience, signature, expiration, and HMAC-SHA256 only; expiration is required, clock skew is 30 seconds, inbound claim remapping/token saving/detailed bearer errors are disabled. Added authentication/authorization middleware to API pipeline.
+- Added validator tests and host-startup tests for missing versus valid explicit settings. Added environment-variable configuration instructions in `docs/AUTH-03-JWT-CONFIGURATION.md`.
+- **Scope limitation:** this slice validates incoming JWTs only. It does not issue tokens, implement login/refresh, or add `[Authorize]` to endpoints. The API is not yet secured for operational use; keep it trusted-local-only until AUTH-03 endpoint protection and tests are complete.
+- **Verification status:** source changes committed to the feature branch; automated CI and Release test results are pending PR checks. No local build/test was run by this environment. Do not mark VERIFIED until CI and review pass.
+- **Database safety:** no database was connected to or modified. Existing `appsettings.json` contains a default connection string naming `GHOST2`; do not start API health/database operations or use that connection. A separate configuration-hardening action must remove accidental default targeting before any DB-connected runtime test.
+
+### Next actions
+1. Review PR checks and fix any compile/test issues before considering merge.
+2. Inspect Staff/Admin reference repositories and current Next.js components (B0 discovery) without rewriting UI.
+3. Implement login/access-token issuance only after this configuration slice passes.
