@@ -1714,3 +1714,20 @@ Reported by user after fast-forward pull to commit `761f98ce4ead4dead43af76f262e
 - JWT configuration validates required issuer, audience, signing key (minimum 32 UTF-8 bytes), and access-token lifetime (1–30 minutes) at startup; only HMAC-SHA256 is accepted; expiration is required; fallback authorization requires authenticated users by default.
 - This does **not** mean login or full API authorization is complete. No token issuance, refresh flow, claims-backed user context, role/ownership policies, or login UI exists yet.
 - No database was connected to or modified. Do not use `GHOST2`, production, or apply the pending AUTH-02 migration.
+
+
+## API database connection hardening — Issue #19 (2026-11-19)
+
+- Tracking issue: [#19 — remove hard-coded GHOST2 database target](https://github.com/youssef-elqady/GHOST-2.0/issues/19).
+- Working branch: `fix/api-database-connection-fail-closed`, based on the latest delivery branch after PR #18.
+- Removed the committed `ConnectionStrings:DefaultConnection` value that named `GHOST2` from API `appsettings.json`.
+- Added explicit `DatabaseConnectionOptions` with startup validation. API requires `ConnectionStrings__DefaultConnection`; there is no committed fallback.
+- Validation parses the SQL Server connection string without opening a connection; requires explicit data source and catalog; rejects `GHOST2`, `GHOST_AUTH02_IT`, SQL system catalogs, and attached database files.
+- API DbContext now consumes the validated options. No database connection was made by these changes or tests.
+- Added validator tests for missing/malformed values, reserved catalogs, missing server/catalog, attached files, and valid safe config; added startup validation tests.
+- **Verification status:** PR CI pending. No local build/test was run in this environment. Do not mark verified until CI passes.
+
+### Next action
+1. Review CI and fix any build/test issues.
+2. Merge only to `feature/auth-02-auditlog-append-only` after green checks.
+3. Then continue AUTH-03 login/access-token issuance; keep all database operations blocked until a user-approved exact target and backup/restore gates are met.
