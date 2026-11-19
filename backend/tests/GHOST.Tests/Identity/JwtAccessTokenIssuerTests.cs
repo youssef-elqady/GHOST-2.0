@@ -45,6 +45,7 @@ public sealed class JwtAccessTokenIssuerTests
         Assert.Equal("GHOST Admin", principal.FindFirst(GhostClaimTypes.Name)?.Value);
         Assert.True(principal.IsInRole("Admin"));
         Assert.Equal("false", principal.FindFirst(GhostClaimTypes.MustChangePassword)?.Value);
+        Assert.DoesNotContain(principal.Claims, claim => claim.Type == GhostClaimTypes.BusinessAccess);
         Assert.IsType<JwtSecurityToken>(validatedToken);
         Assert.InRange(
             issued.ExpiresAt - DateTimeOffset.UtcNow,
