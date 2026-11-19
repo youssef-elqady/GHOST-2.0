@@ -1,6 +1,7 @@
 using System.Text;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Authorization;
+using System.Security.Claims;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
@@ -50,16 +51,26 @@ public static class JwtAuthenticationServiceCollectionExtensions
                     IssuerSigningKey = new SymmetricSecurityKey(
                         Encoding.UTF8.GetBytes(jwtOptions.SigningKey!)),
                     ValidAlgorithms = [SecurityAlgorithms.HmacSha256],
-                    ClockSkew = TimeSpan.FromSeconds(30)
+                    ClockSkew = TimeSpan.FromSeconds(30),
+                    NameClaimType = GhostClaimTypes.Name,
+                    RoleClaimType = GhostClaimTypes.Role
                 };
             });
 
         services.AddAuthorization(options =>
         {
-            // Deny access by default. Public endpoints must opt out explicitly.
-            options.FallbackPolicy = new AuthorizationPolicyBuilder()
+            // Temporary-password tokens may access only the dedicated password-change flow.
+            var normalUserPolicy = new AuthorizationPolicyBuilder()
                 .RequireAuthenticatedUser()
+                .RequireAssertion(context =>
+                    !context.User.HasClaim(GhostClaimTypes.MustChangePassword, "true"))
                 .Build();
+
+            options.DefaultPolicy = normalUserPolicy;
+            options.FallbackPolicy = normalUserPolicy;
+            options.AddPolicy("PasswordChangeOnly", policy =>
+                policy.RequireAuthenticatedUser()
+                    .RequireClaim(GhostClaimTypes.MustChangePassword, "true"));
         });
 
         return services;
