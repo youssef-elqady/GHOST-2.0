@@ -23,7 +23,7 @@ public sealed class JwtAccessTokenIssuerTests
         var issuer = CreateIssuer();
 
         var issued = issuer.Issue(user, ["Admin"]);
-        var handler = new JwtSecurityTokenHandler();
+        var handler = new JwtSecurityTokenHandler { MapInboundClaims = false };
         var principal = handler.ValidateToken(
             issued.Token,
             new TokenValidationParameters
