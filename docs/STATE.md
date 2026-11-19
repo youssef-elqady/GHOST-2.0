@@ -1673,3 +1673,15 @@ Reported by user after fast-forward pull to commit `761f98ce4ead4dead43af76f262e
 - Missing data and API failures must not be shown as zero revenue. Demo data must be explicitly labelled.
 - Backend remains authoritative for money, billing, stock, session state and permissions.
 - No production/`GHOST2` access, no migration application, no destructive Git actions, and no merge to `main` without explicit authorization.
+
+
+## Frontend discovery — 2026-11-19
+
+- Completed source-level review of the existing Next.js frontend and both design reference repositories. No UI code was changed during discovery.
+- Detailed KEEP / MODIFY / ADD / DEFER decisions and dashboard visual specification: [docs/FRONTEND-DISCOVERY-2026-11-19.md](./FRONTEND-DISCOVERY-2026-11-19.md).
+- **KEEP:** existing Next.js app, separate Staff/Admin routes, Arabic RTL, IBM Plex Sans Arabic, existing semantic Light/Dark CSS tokens, API wrapper, live device/rate workflows, and explicit loading/empty/error states.
+- **MODIFY:** unify duplicated theme state into a shared theme provider; normalize `.dark` and `data-theme` approaches; replace inline styles incrementally; upgrade Admin placeholder only when real analytics contracts exist.
+- **Reference caution:** Admin-Dashboard is strong visual inspiration for KPI/revenue/shift/session hierarchy and theme language, but its sample 2,840 EGP revenue, 620 EGP sales, 42 transactions, 8,450 EGP cash, and 24-device counts are hardcoded. Staff reference also includes static devices, identities, Riyal prices, timeline and client-only messages. Reuse layout patterns only, never sample data or behavior as production facts.
+- **Admin chart rule:** gaming revenue blue, product revenue green, total collected revenue gold, expenses/refunds red, gaming duration violet in a separate time-axis chart. EGP and time must never share an axis. Profit only when reliable cost/expense data exists.
+- **Current frontend status:** Staff dashboard fetches devices from `GET /api/devices`; session/shift/product/payment/messages/history remain placeholders. Admin device manager reads/seeds devices and saves rates; other Admin sections intentionally show no fake financial data.
+- Next frontend action: Phase B1 shared design tokens/theme provider, after AUTH-03 JWT configuration review. No chart library will be added until chart requirements and real data contracts are settled.
