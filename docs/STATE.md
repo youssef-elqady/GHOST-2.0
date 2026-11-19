@@ -1677,3 +1677,40 @@ Reported by user after fast-forward pull to commit `761f98ce4ead4dead43af76f262e
 - The two earlier failed CI attempts were test-source compile issues; both were corrected before run #51. Do not count those earlier attempts as successful verification.
 - Issue #19 created to remove the committed `GHOST2` default connection string and require explicit environment configuration before any API DB operation. No database was accessed or changed.
 - AUTH-03 JWT configuration slice is **VERIFIED at build/unit-test level**; JWT login/token issuance/refresh, endpoint authorization integration and full security matrix remain NOT STARTED. The fallback policy already requires authentication by default, so existing API routes are denied anonymously; no login endpoint exists yet.
+
+
+## Execution plan and frontend discovery — 2026-11-19
+
+- User-approved working agreement: execute GHOST in explicit phases, track each status and evidence, and keep this file current. Engineering lead owns technical sequencing, review, risk reporting, and honest completion criteria.
+- Tracking issue: [#14 — GHOST execution plan](https://github.com/youssef-elqady/GHOST-2.0/issues/14).
+- Detailed plan: [docs/EXECUTION-PLAN-2026-11-19.md](./EXECUTION-PLAN-2026-11-19.md).
+- Frontend discovery and KEEP/MODIFY/ADD/DEFER: [docs/FRONTEND-DISCOVERY-2026-11-19.md](./FRONTEND-DISCOVERY-2026-11-19.md).
+
+### Status after AUTH-03 JWT configuration merge
+
+| Workstream | Status | Evidence / next action |
+|---|---|---|
+| AUTH-02 shared Identity registration | VERIFIED | PR #12 merged earlier; pending database migration remains unapplied. |
+| AUTH-03 JWT configuration | VERIFIED — configuration slice only | PR #18 merged as `48b0d564b1db125aed6d1cdfc7c2031ee23b9f01`. Backend CI run #51 passed: Release build 0 warnings/0 errors; GHOST.Tests 58/58; GHOST.SqlServer.Tests 10 passed/3 skipped (SQL integration cases skipped without approved SQL connection). |
+| AUTH-03 login/access-token issuance | NOT STARTED | Implement password verification, lockout, disabled-account checks, MustChangePassword and short-lived token creation. |
+| AUTH-03 refresh-token lifecycle and claims-backed actor | NOT STARTED | Hashed persistence, rotation, replay detection, revocation, ICurrentUser. |
+| AUTH-03 endpoint/resource authorization | IN PROGRESS — foundation in place | Fallback policy requires authentication by default. Protect/verify each workflow and test 401/403/ownership; no login endpoint exists yet. |
+| Frontend B0 discovery | VERIFIED | Existing Next.js app and Staff/Admin reference repos reviewed; decisions recorded in discovery document. No UI code changed in discovery. |
+| Frontend B1 Design System | NOT STARTED | Next frontend implementation: shared theme provider, semantic tokens, Light/Dark, RTL and reusable primitives. |
+| AUTH-02 migration rollout | BLOCKED | Exact target and backup/restore/data preflight remain unverified; no migration applied. |
+| API database configuration safety | BLOCKED / HIGH PRIORITY | Issue #19: committed API appsettings currently names `GHOST2`. Do not run DB health checks or database operations until the default is removed and explicit configuration is required. No DB was accessed. |
+
+### Immediate next actions
+
+1. Resolve Issue #19 before any API runtime operation that can touch the database: remove hard-coded `GHOST2` and require explicit environment-specific connection strings.
+2. AUTH-03 login/access-token slice with Identity verification, lockout, account state, MustChangePassword and tests.
+3. Frontend B1 shared theme provider/design tokens and reusable components on a focused branch.
+4. Continue refresh tokens, claims-backed actor identity, resource/shift ownership and endpoint security tests.
+5. Only after authentication and authorization are complete, connect the Admin and Staff shells to protected operational workflows.
+
+### Safety and verification notes
+
+- PR #18 CI run #51 was green before merge. It did not connect to SQL Server: 10 SQL guard/unit tests passed and 3 SQL integration tests were skipped due to no approved connection string.
+- JWT configuration validates required issuer, audience, signing key (minimum 32 UTF-8 bytes), and access-token lifetime (1–30 minutes) at startup; only HMAC-SHA256 is accepted; expiration is required; fallback authorization requires authenticated users by default.
+- This does **not** mean login or full API authorization is complete. No token issuance, refresh flow, claims-backed user context, role/ownership policies, or login UI exists yet.
+- No database was connected to or modified. Do not use `GHOST2`, production, or apply the pending AUTH-02 migration.
