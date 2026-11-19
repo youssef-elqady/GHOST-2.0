@@ -1783,3 +1783,12 @@ Reported by user after fast-forward pull to commit `761f98ce4ead4dead43af76f262e
 1. Review Frontend CI and fix TypeScript/Next.js issues.
 2. If CI passes, visually inspect Staff and Admin in Light/Dark and verify persistence across routes.
 3. Continue with Admin shell and dashboard skeleton without adding fake figures; keep AUTH-03 login/access-token work on a separate branch.
+
+
+### Frontend B1 build verification — 2026-11-19
+
+- Frontend CI run #27 (run ID `44464329267`) passed both jobs:
+  - Next.js production build: **compiled successfully**; routes emitted.
+  - Backend API Release build: **passed**.
+- No local browser/visual QA was performed in this environment. The B1 code is **build-verified**, while visual inspection of Light/Dark, route-to-route preference persistence, and responsive breakpoints remains pending before marking the whole design-system phase VERIFIED.
+- Node/pnpm ecosystem deprecation notices appeared in CI logs; they did not fail the build and are not application compile errors.
