@@ -2,6 +2,7 @@
 
 import { useState } from 'react'
 import { AdminDeviceManager } from '@/components/admin-device-manager'
+import { useAdminAuth } from '@/lib/admin-auth'
 import { AdminOverview } from '@/components/admin-overview'
 import { ThemeToggle } from '@/components/theme-toggle'
 import {
@@ -87,6 +88,7 @@ const sectionDetails: Record<AdminSection, { eyebrow: string; title: string; des
 }
 
 export function AdminDashboard() {
+  const { token } = useAdminAuth()
   const [activeNav, setActiveNav] = useState<AdminSection>('overview')
   const [mobileNav, setMobileNav] = useState(false)
   const current = sectionDetails[activeNav]
@@ -142,7 +144,7 @@ export function AdminDashboard() {
         {activeNav === 'overview' ? (
           <AdminOverview />
         ) : activeNav === 'devices' ? (
-          <AdminDeviceManager />
+          token ? <AdminDeviceManager token={token} /> : <div role="status">جارٍ التحقق من جلسة الإدارة…</div>
         ) : (
           <>
             <div className="section-header">

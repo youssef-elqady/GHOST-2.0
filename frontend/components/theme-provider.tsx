@@ -30,6 +30,8 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
       ? 'dark'
       : 'light'
 
+    // Mirror the pre-hydration theme bootstrap into context after the first client render.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setThemeState(currentTheme)
     setInitialized(true)
   }, [])
