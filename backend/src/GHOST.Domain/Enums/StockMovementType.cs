@@ -11,5 +11,8 @@ public enum StockMovementType
     RecipeConsumption = 6,
     StocktakeAdjustment = 7,
     ManualAdjustment = 8,
-    PurchaseReversal = 9
+    PurchaseReversal = 9,
+
+    /// <summary>Reduces stock to fix an intake entered with too large a quantity. Always linked to the original movement.</summary>
+    IntakeCorrection = 10
 }

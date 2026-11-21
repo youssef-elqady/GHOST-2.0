@@ -110,6 +110,8 @@ builder.Services.AddScoped<GHOST.Application.Sales.SaleHandler>();
 builder.Services.AddScoped<IStockReceiptRepository, StockReceiptRepository>();
 builder.Services.AddScoped<GHOST.Application.Inventory.StockReceiptHandler>();
 builder.Services.AddScoped<GHOST.Application.Inventory.InventoryHandler>();
+builder.Services.AddScoped<GHOST.Application.Inventory.IStockIntakeStore, GHOST.Infrastructure.Persistence.Repositories.StockIntakeStore>();
+builder.Services.AddScoped<GHOST.Application.Inventory.StockIntakeHandler>();
 builder.Services.AddScoped<AcknowledgeHandoverHandler>();
 builder.Services.AddScoped<OpenShiftHandler>();
 builder.Services.AddScoped<CloseShiftHandler>();

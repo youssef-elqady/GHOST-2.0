@@ -44,6 +44,7 @@ public sealed class EndpointRoleMatrixTests
         ["StocktakesController.Counts"] = S, ["StocktakesController.Submit"] = S,
         ["StocktakesController.Approve"] = A, ["StocktakesController.Reject"] = A,
         ["BusinessDayReadsController.Current"] = S, ["ShiftsController.Current"] = S, ["ShiftsController.Get"] = S, ["ShiftsController.List"] = A,
+        ["StockIntakeController.Correct"] = S, ["StockIntakeController.Report"] = A,
         ["OutageReviewController.List"] = A, ["OutageReviewController.Approve"] = A,
         ["SessionReadsController.List"] = S, ["SessionReadsController.Get"] = S,
         ["AuditLogsController.List"] = A, ["UsersController.List"] = A,
