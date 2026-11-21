@@ -53,4 +53,49 @@ public sealed class ExternalDriveGuardTests : IDisposable
     [Fact]
     public void No_identity_configured_still_checks_presence_and_writability()
         => Assert.Null(_guard.Check(Path.Combine(_root, "Backups"), null, null));
+
+    [Fact]
+    public void Marker_and_volume_serial_must_both_match()
+    {
+        var marker = Path.Combine(_root, ".ghost-backup-drive");
+        File.WriteAllText(marker, "VENUE-DRIVE-1");
+        var ok = new ExternalDriveGuard(_ => "AB12CD34", null);
+        Assert.Null(ok.Check(Path.Combine(_root, "Backups"), marker, "VENUE-DRIVE-1@ab12cd34"));
+        var copied = new ExternalDriveGuard(_ => "99999999", null);
+        var error = copied.Check(Path.Combine(_root, "Backups2"), marker, "VENUE-DRIVE-1@AB12CD34");
+        Assert.Contains("volume serial", error);
+        Assert.False(Directory.Exists(Path.Combine(_root, "Backups2")));
+    }
+
+    [Fact]
+    public void Unreadable_serial_is_refused_when_serial_is_required()
+    {
+        var marker = Path.Combine(_root, ".ghost-backup-drive");
+        File.WriteAllText(marker, "VENUE-DRIVE-1");
+        Assert.NotNull(new ExternalDriveGuard(_ => null, null).Check(_root, marker, "VENUE-DRIVE-1@AB12CD34"));
+    }
+
+    [Fact]
+    public void Relocate_leaves_paths_unchanged_when_no_other_root_matches()
+    {
+        var other = Path.Combine(Path.GetTempPath(), "ghost-drive-" + Guid.NewGuid().ToString("N"));
+        try
+        {
+            // "Configured letter" = _root (no marker there); the same drive now sits at 'other'.
+            Directory.CreateDirectory(Path.Combine(other, "ghost"));
+            File.WriteAllText(Path.Combine(other, "ghost", ".id"), "VENUE-DRIVE-1");
+            // Fake roots: Path root of both temp dirs is "/", so emulate letters with sub-roots via reader only.
+            var guard = new ExternalDriveGuard(r => "AB12CD34", () => new[] { other + Path.DirectorySeparatorChar });
+            var relocated = guard.Relocate(Path.Combine(_root, "ghost", "Backups"), Path.Combine(_root, "ghost", ".id"), "VENUE-DRIVE-1@AB12CD34");
+            Assert.Equal(Path.Combine(_root, "ghost", "Backups"), relocated.Directory);
+        }
+        finally { try { Directory.Delete(other, true); } catch { } }
+    }
+
+    [Fact]
+    public void Identity_parser_splits_id_and_serial()
+    {
+        Assert.Equal(("A", "1F"), ExternalDriveGuard.ParseIdentity("A@1F"));
+        Assert.Equal(("A", (string?)null), ExternalDriveGuard.ParseIdentity(" A "));
+    }
 }

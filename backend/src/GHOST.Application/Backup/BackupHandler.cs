@@ -20,6 +20,13 @@ public sealed record BackupOptions(
 public interface IExternalDriveGuard
 {
     string? Check(string externalDirectory, string? markerPath, string? expectedDriveId);
+
+    /// <summary>
+    /// When the drive letter changed but the drive identity (marker id and volume serial) matches, returns the
+    /// directory and marker path on the letter the drive has now. Otherwise returns the inputs unchanged.
+    /// </summary>
+    (string Directory, string? Marker) Relocate(string externalDirectory, string? markerPath, string? expectedDriveId)
+        => (externalDirectory, markerPath);
 }
 
 public sealed record BackupFileResult(long? SizeBytes);
@@ -145,10 +152,12 @@ public sealed class BackupHandler
                 {
                     // Identity, presence and writability first. Nothing is copied to a wrong or missing drive,
                     // and a copy only counts after the size check inside CopyToExternalAsync.
-                    var failure = _driveGuard?.Check(
-                        _options.ExternalDirectory, _options.ExternalDriveMarker, _options.ExternalDriveId);
+                    var (externalDirectory, externalMarker) = _driveGuard?.Relocate(
+                        _options.ExternalDirectory, _options.ExternalDriveMarker, _options.ExternalDriveId)
+                        ?? (_options.ExternalDirectory, _options.ExternalDriveMarker);
+                    var failure = _driveGuard?.Check(externalDirectory, externalMarker, _options.ExternalDriveId);
                     failure ??= await _gateway.CopyToExternalAsync(
-                        record.FilePath, _options.ExternalDirectory, Math.Max(_options.RetentionCount, 1), cancellationToken);
+                        record.FilePath, externalDirectory, Math.Max(_options.RetentionCount, 1), cancellationToken);
                     externalCopy = failure is null ? "Copied" : "Failed: " + failure;
                     if (failure is null)
                         record.MarkExternalCopied(_time.GetUtcNow());
