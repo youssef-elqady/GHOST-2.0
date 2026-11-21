@@ -135,20 +135,6 @@ public sealed class Sale : BaseEntity
     public int PrintCount { get; private set; }
     public string? IdempotencyKey { get; private set; }
 
-    /// <summary>When this invoice replaces a refunded one for the same session (Rebill): the old invoice, kept untouched.</summary>
-    public Guid? ReplacesSaleId { get; private set; }
-    public string? RebillReason { get; private set; }
-
-    public void MarkAsRebill(Guid replacesSaleId, string reason)
-    {
-        if (replacesSaleId == Guid.Empty)
-            throw new BusinessRuleValidationException("The replaced invoice is required.");
-        if (string.IsNullOrWhiteSpace(reason) || reason.Trim().Length < 3)
-            throw new BusinessRuleValidationException("A reason is required to re-bill a refunded session.");
-        ReplacesSaleId = replacesSaleId;
-        RebillReason = reason.Trim().Length > 300 ? reason.Trim()[..300] : reason.Trim();
-    }
-
     /// <summary>
     /// SHA-256 of what this checkout asked for (lines, session, discount). A retry with the same key must match it,
     /// so a key can never be reused for a different purchase. Two separate purchases use two different keys.

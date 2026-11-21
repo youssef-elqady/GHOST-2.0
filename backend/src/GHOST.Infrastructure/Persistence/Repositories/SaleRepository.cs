@@ -30,13 +30,6 @@ public sealed class SaleRepository : ISaleRepository
             s => s.SessionId == sessionId && s.Status != SaleStatus.Refunded && s.Status != SaleStatus.Voided,
             cancellationToken);
 
-    public async Task<Guid?> GetReplaceableSessionInvoiceIdAsync(Guid sessionId, CancellationToken cancellationToken = default)
-        => await _db.Sales.AsNoTracking()
-            .Where(s => s.SessionId == sessionId && (s.Status == SaleStatus.Refunded || s.Status == SaleStatus.Voided))
-            .OrderByDescending(s => s.CreatedAt)
-            .Select(s => (Guid?)s.Id)
-            .FirstOrDefaultAsync(cancellationToken);
-
     public async Task<string> NextInvoiceNumberAsync(DateTimeOffset now, CancellationToken cancellationToken = default)
     {
         var next = await _db.Database

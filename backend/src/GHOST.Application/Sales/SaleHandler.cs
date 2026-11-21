@@ -20,8 +20,7 @@ public sealed record CheckoutCommand(
     IReadOnlyList<SaleLineInput> Lines,
     Guid? SessionId,
     DiscountRequest? Discount,
-    string? IdempotencyKey,
-    string? RebillReason = null);
+    string? IdempotencyKey);
 
 public sealed record SaleItemDto(
     string ItemType, string Description, decimal Quantity, decimal UnitPrice, decimal LineTotal);
@@ -131,7 +130,6 @@ public sealed class SaleHandler
             return Result<SaleDto>.Failure("A product on the invoice was not found.");
 
         Sale.GamingLine? gaming = null;
-        Guid? replacesSaleId = null;
         if (command.SessionId is { } sessionId)
         {
             var session = await _sessions.GetByIdAsync(sessionId, cancellationToken);
@@ -143,11 +141,6 @@ public sealed class SaleHandler
 
             if (await _sales.SessionIsInvoicedAsync(sessionId, cancellationToken))
                 return Result<SaleDto>.Failure("This session already has an invoice.");
-
-            replacesSaleId = await _sales.GetReplaceableSessionInvoiceIdAsync(sessionId, cancellationToken);
-            if (replacesSaleId is not null && (string.IsNullOrWhiteSpace(command.RebillReason) || command.RebillReason.Trim().Length < 3))
-                return Result<SaleDto>.Failure(
-                    "This session's previous invoice was refunded. A reason is required to issue a replacement invoice.");
 
             gaming = new Sale.GamingLine(session, "Gaming session");
         }
@@ -170,8 +163,6 @@ public sealed class SaleHandler
                 command.IdempotencyKey);
 
             sale.SetRequestFingerprint(Fingerprint(command));
-            if (replacesSaleId is { } replaced)
-                sale.MarkAsRebill(replaced, command.RebillReason!);
             await _sales.AddAsync(sale, cancellationToken);
 
             _audit.Record(
@@ -185,9 +176,7 @@ public sealed class SaleHandler
                     sale.Subtotal,
                     sale.DiscountAmount,
                     sale.Total,
-                    sale.DiscountReason,
-                    sale.ReplacesSaleId,
-                    sale.RebillReason
+                    sale.DiscountReason
                 }));
 
             await _unitOfWork.SaveChangesAsync(cancellationToken);
