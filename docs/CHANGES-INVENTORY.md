@@ -84,3 +84,8 @@ Endpoints added:
 - BUG: ASP.NET requires ALL [Authorize] attributes (class + action). DevicesController and BusinessDaysController had class-level AdminOnly plus action-level StaffOrAdmin, so Staff got 403 on GET api/devices, open shift and close shift. Fixed: class StaffOrAdmin, AdminOnly on the admin actions (create/seed/rates device, open business day).
 - Test: Security/EndpointRoleMatrixTests.cs runs every controller action through the real policies for Admin, Staff and no role against a reviewed table. With the old attributes it fails (3 actions listed); with the fix it passes.
 - Reviewed table flags for owner decision: Staff can Create product, AdjustStock, GenerateBarcode and create stock receipts/stocktakes (approvals are Admin only).
+
+## Staff wiring groundwork (Nov 21)
+- Backend: GET api/business-days/current (Staff/Admin). Gap found: opening a shift needs a businessDayId and nothing let Staff discover it. Test added; role matrix updated (209 unit tests pass).
+- Frontend lib/ghost-api.ts: typed clients for current business day, current shift, open/close shift, sessions list/start/pause/resume/transfer/complete, checkout with client-generated idempotency key. 5 node tests pass.
+- Gap found: the Staff dashboard (route /) has no login and calls getDevices() without a token. With the Staff role now correctly allowed, Staff needs its own login screen and an auth provider shared with Admin. This is the next step before any Staff screen can use real data.

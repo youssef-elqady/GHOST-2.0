@@ -19,6 +19,10 @@ public sealed class OperationsReadQueries : IOperationsReadQueries
         select new ShiftDto(s.Id, s.BusinessDayId, s.StaffUserId, u == null ? null : u.FullName, s.Status,
             s.OpenedAt, s.ClosedAt, s.OpeningCash, s.ExpectedCash, s.ActualCash, s.CashDifference, s.ClosingReason);
 
+    public Task<BusinessDayDto?> GetOpenBusinessDayAsync(CancellationToken ct) =>
+        _db.BusinessDays.AsNoTracking().Where(b => !b.IsClosed).OrderByDescending(b => b.OpenedAt)
+            .Select(b => new BusinessDayDto(b.Id, b.BusinessDate, b.OpenedAt)).FirstOrDefaultAsync(ct);
+
     public Task<ShiftDto?> GetOpenShiftOfAsync(Guid staffUserId, CancellationToken ct) =>
         ShiftProjection(_db.Shifts.AsNoTracking().Where(s => s.StaffUserId == staffUserId && s.Status == ShiftStatus.Open))
             .OrderByDescending(s => s.OpenedAt).FirstOrDefaultAsync(ct);

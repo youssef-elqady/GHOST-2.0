@@ -77,3 +77,30 @@ export function getDevices(token?: string): Promise<ApiDevice[]> { return reques
 export function seedDefaultDevices(token?: string): Promise<{ added: number; message: string }> { return request('/api/devices/seed-defaults', { method: 'POST' }, token) }
 export function createDevice(token: string, payload: { name: string; category: string; rates: RateInput[] }) { return request<{ deviceId: string }>('/api/devices', { method: 'POST', body: JSON.stringify(payload) }, token) }
 export function updateDeviceRates(id: string, rates: RateInput[], token?: string): Promise<ApiDevice> { return request(`/api/devices/${encodeURIComponent(id)}/rates`, { method: 'PUT', body: JSON.stringify({ rates }) }, token) }
+
+// ---- Operations: business day, shifts, sessions, sales (server decides money, stock and permissions) ----
+export type PlayTypeName = 'Single' | 'Multi'
+export type ApiBusinessDay = { id: string; businessDate: string; openedAt: string }
+export type ApiShift = { id: string; businessDayId: string; staffUserId: string; staffName: string | null; status: 'Open' | 'Closed' | string; openedAt: string; closedAt: string | null; openingCash: number; expectedCash: number; actualCash: number | null; cashDifference: number | null; closingReason: string | null }
+export type ApiSessionSummary = { id: string; startShiftId: string; endShiftId: string | null; status: 'Active' | 'Completed' | 'Cancelled' | string; startedAt: string; cancelledAt: string | null; isVoided: boolean; currentDeviceId: string | null; segmentCount: number }
+export type ApiPaged<T> = { items: T[]; page: number; pageSize: number; totalCount: number }
+export type CheckoutInput = { shiftId: string; items?: { productId: string; quantity: number }[]; sessionId?: string; discount?: { type: string; value: number; reason?: string }; idempotencyKey: string }
+const enc = encodeURIComponent
+/** 404 means "none open"; callers treat it as null instead of an error. */
+async function orNull<T>(call: Promise<T>): Promise<T | null> { try { return await call } catch (e) { if (e instanceof Error && e.message.includes('HTTP 404')) return null; throw e } }
+export function getCurrentBusinessDay(token: string) { return orNull(request<ApiBusinessDay>('/api/business-days/current', undefined, token)) }
+export function getCurrentShift(token: string) { return orNull(request<ApiShift>('/api/shifts/current', undefined, token)) }
+export function openShift(token: string, businessDayId: string, staffUserId: string, openingCash: number) { return request<{ shiftId: string }>(`/api/business-days/${enc(businessDayId)}/shifts`, { method: 'POST', body: JSON.stringify({ staffUserId, openingCash }) }, token) }
+export function closeShift(token: string, businessDayId: string, shiftId: string, actualCash: number, closingReason?: string) { return request<unknown>(`/api/business-days/${enc(businessDayId)}/shifts/${enc(shiftId)}/close`, { method: 'POST', body: JSON.stringify({ actualCash, closingReason }) }, token) }
+export function listSessions(token: string, query: { status?: string; shiftId?: string; deviceId?: string; page?: number; pageSize?: number } = {}) {
+  const qs = new URLSearchParams(Object.entries(query).filter(([, v]) => v !== undefined).map(([k, v]) => [k, String(v)])).toString()
+  return request<ApiPaged<ApiSessionSummary>>(`/api/sessions${qs ? `?${qs}` : ''}`, undefined, token)
+}
+export function startSession(token: string, shiftId: string, deviceId: string, playType: PlayTypeName) { return request<{ sessionId: string }>('/api/sessions', { method: 'POST', body: JSON.stringify({ shiftId, deviceId, playType }) }, token) }
+export function pauseSession(token: string, id: string) { return request<unknown>(`/api/sessions/${enc(id)}/pause`, { method: 'POST' }, token) }
+export function resumeSession(token: string, id: string) { return request<unknown>(`/api/sessions/${enc(id)}/resume`, { method: 'POST' }, token) }
+export function transferSession(token: string, id: string, newDeviceId: string, playType: PlayTypeName) { return request<unknown>(`/api/sessions/${enc(id)}/transfer`, { method: 'POST', body: JSON.stringify({ newDeviceId, playType }) }, token) }
+export function completeSession(token: string, id: string, endShiftId: string) { return request<unknown>(`/api/sessions/${enc(id)}/complete`, { method: 'POST', body: JSON.stringify({ endShiftId }) }, token) }
+/** idempotencyKey must be created once per checkout attempt and reused on retry so a double tap never double-charges. */
+export function checkout(token: string, input: CheckoutInput) { return request<unknown>('/api/sales/checkout', { method: 'POST', body: JSON.stringify(input) }, token) }
+export function newIdempotencyKey() { return globalThis.crypto.randomUUID() }

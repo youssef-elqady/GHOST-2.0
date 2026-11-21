@@ -9,6 +9,8 @@ public sealed record ShiftDto(
     DateTimeOffset OpenedAt, DateTimeOffset? ClosedAt, decimal OpeningCash, decimal ExpectedCash,
     decimal? ActualCash, decimal? CashDifference, string? ClosingReason);
 
+public sealed record BusinessDayDto(Guid Id, DateOnly BusinessDate, DateTimeOffset OpenedAt);
+
 public sealed record PauseDto(DateTimeOffset StartedAt, DateTimeOffset? EndedAt, string? Reason);
 
 public sealed record SegmentDto(
@@ -41,6 +43,7 @@ public sealed record AuditLogFilter(
 /// <summary>Read-only projections. Every list is bounded and paged; no query loads entities per row.</summary>
 public interface IOperationsReadQueries
 {
+    Task<BusinessDayDto?> GetOpenBusinessDayAsync(CancellationToken ct);
     Task<ShiftDto?> GetOpenShiftOfAsync(Guid staffUserId, CancellationToken ct);
     Task<ShiftDto?> GetShiftAsync(Guid shiftId, CancellationToken ct);
     Task<PagedResult<ShiftDto>> ListShiftsAsync(ShiftFilter filter, int page, int pageSize, CancellationToken ct);

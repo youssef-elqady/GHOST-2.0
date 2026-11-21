@@ -19,6 +19,20 @@ internal static class ReadResponse
 
 [ApiController]
 [Authorize(Policy = AuthorizationPolicies.StaffOrAdmin)]
+[Route("api/business-days")]
+public sealed class BusinessDayReadsController : ControllerBase
+{
+    private readonly OperationsReadHandler _reads;
+    public BusinessDayReadsController(OperationsReadHandler reads) => _reads = reads;
+
+    /// <summary>The open business day (needed to open a shift), or 404 when none is open.</summary>
+    [HttpGet("current")]
+    public async Task<IActionResult> Current(CancellationToken ct) =>
+        ReadResponse.From(this, await _reads.GetCurrentBusinessDayAsync(ct));
+}
+
+[ApiController]
+[Authorize(Policy = AuthorizationPolicies.StaffOrAdmin)]
 [Route("api/shifts")]
 public sealed class ShiftsController : ControllerBase
 {

@@ -50,3 +50,19 @@ test('login 401 never triggers a refresh', async () => {
   await assert.rejects(() => api.login('a', 'b'))
   assert.equal(calls.filter((c) => c.url.endsWith('/api/auth/refresh')).length, 0)
 })
+
+test('operations client: current shift 404 becomes null, session list builds its query, checkout sends the key', async () => {
+  const seen: { url: string; body?: string }[] = []
+  globalThis.fetch = (async (url: string, init: RequestInit = {}) => {
+    seen.push({ url: String(url), body: init.body as string | undefined })
+    if (String(url).includes('/shifts/current')) return Response.json({ error: 'Not found.' }, { status: 404 })
+    return Response.json({ items: [], page: 1, pageSize: 25, totalCount: 0 })
+  }) as typeof fetch
+  api.configureApiAuth({ token: 'T' })
+  assert.equal(await api.getCurrentShift('T'), null)
+  await api.listSessions('T', { status: 'Active', page: 2 })
+  assert.ok(seen[1].url.endsWith('/api/sessions?status=Active&page=2'))
+  const key = api.newIdempotencyKey()
+  await api.checkout('T', { shiftId: 's', items: [{ productId: 'p', quantity: 1 }], idempotencyKey: key })
+  assert.equal(JSON.parse(seen[2].body!).idempotencyKey, key)
+})

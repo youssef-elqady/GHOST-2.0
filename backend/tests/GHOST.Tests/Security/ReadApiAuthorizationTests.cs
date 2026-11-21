@@ -28,6 +28,7 @@ public sealed class ReadApiAuthorizationTests
         public int LastPageSize;
         public ShiftDto? Shift;
 
+        public Task<BusinessDayDto?> GetOpenBusinessDayAsync(CancellationToken ct) { Calls++; return Task.FromResult<BusinessDayDto?>(new(Guid.NewGuid(), DateOnly.FromDateTime(DateTime.UtcNow), DateTimeOffset.UtcNow)); }
         public Task<ShiftDto?> GetOpenShiftOfAsync(Guid staffUserId, CancellationToken ct) { Calls++; return Task.FromResult(Shift?.StaffUserId == staffUserId ? Shift : null); }
         public Task<ShiftDto?> GetShiftAsync(Guid shiftId, CancellationToken ct) { Calls++; return Task.FromResult(Shift); }
         public Task<PagedResult<ShiftDto>> ListShiftsAsync(ShiftFilter f, int page, int pageSize, CancellationToken ct) { Calls++; LastPageSize = pageSize; return Task.FromResult(new PagedResult<ShiftDto>([], page, pageSize, 0)); }
@@ -52,6 +53,15 @@ public sealed class ReadApiAuthorizationTests
         Assert.Equal(ReadOutcome.Forbidden, (await h.ListAuditLogsAsync(NoAudit, null, null, default)).Outcome);
         Assert.Equal(ReadOutcome.Forbidden, (await h.ListUsersAsync(null, null, null, null, default)).Outcome);
         Assert.Equal(0, q.Calls);
+    }
+
+    [Fact]
+    public async Task CurrentBusinessDay_IsReadableByStaffAndAdmin_NotAnonymous()
+    {
+        var q = new Queries();
+        Assert.Equal(ReadOutcome.Ok, (await Handler(q, new User(Me, false, true)).GetCurrentBusinessDayAsync(default)).Outcome);
+        Assert.Equal(ReadOutcome.Ok, (await Handler(q, new User(Me, true, false)).GetCurrentBusinessDayAsync(default)).Outcome);
+        Assert.Equal(ReadOutcome.Forbidden, (await Handler(q, new User(null, false, false)).GetCurrentBusinessDayAsync(default)).Outcome);
     }
 
     [Fact]

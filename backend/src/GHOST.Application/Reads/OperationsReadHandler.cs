@@ -36,6 +36,13 @@ public sealed class OperationsReadHandler
     private static (int Page, int Size) Clamp(int? page, int? size) =>
         (Math.Max(page ?? 1, 1), Math.Clamp(size ?? DefaultPageSize, 1, MaxPageSize));
 
+    public async Task<ReadResult<BusinessDayDto>> GetCurrentBusinessDayAsync(CancellationToken ct)
+    {
+        if (!Authenticated) return ReadResult<BusinessDayDto>.Forbidden();
+        var day = await _queries.GetOpenBusinessDayAsync(ct);
+        return day is null ? ReadResult<BusinessDayDto>.NotFound() : ReadResult<BusinessDayDto>.Ok(day);
+    }
+
     public async Task<ReadResult<ShiftDto>> GetCurrentShiftAsync(CancellationToken ct)
     {
         if (!Authenticated) return ReadResult<ShiftDto>.Forbidden();

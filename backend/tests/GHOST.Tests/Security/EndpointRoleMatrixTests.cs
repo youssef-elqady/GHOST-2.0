@@ -43,7 +43,7 @@ public sealed class EndpointRoleMatrixTests
         ["StocktakesController.Start"] = S, ["StocktakesController.List"] = S, ["StocktakesController.Get"] = S,
         ["StocktakesController.Counts"] = S, ["StocktakesController.Submit"] = S,
         ["StocktakesController.Approve"] = A, ["StocktakesController.Reject"] = A,
-        ["ShiftsController.Current"] = S, ["ShiftsController.Get"] = S, ["ShiftsController.List"] = A,
+        ["BusinessDayReadsController.Current"] = S, ["ShiftsController.Current"] = S, ["ShiftsController.Get"] = S, ["ShiftsController.List"] = A,
         ["SessionReadsController.List"] = S, ["SessionReadsController.Get"] = S,
         ["AuditLogsController.List"] = A, ["UsersController.List"] = A,
         ["AuthController.ChangePassword"] = "P", // restricted password-change token, checked separately
