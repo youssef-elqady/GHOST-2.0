@@ -1950,3 +1950,9 @@ Branch `feature/auth03-refresh-tokens`, based on `origin/feature/admin-frontend-
 - `GET api/reports/dashboard?from=&to=` (Admin only): invoices, gross/gaming/product revenue, discounts, refunds, net revenue, product cost and profit, expenses, withdrawals, stock purchases, gaming hours, active sessions, pending receipts, pending-pricing products, top 5 products, low stock.
 - The EF queries are written but have NOT been run against SQL Server (no unit tests: they need a real database). Check the numbers by hand against a few test invoices.
 - Not done: PDF/Excel export, per-day series/charts data, shift report, employee report, device utilization.
+
+### More reports (offline session)
+- Admin-only: `GET api/reports/daily`, `/shifts`, `/employees`, `/devices` (all take from/to; daily also `utcOffsetMinutes`, default 120 = Cairo). Add `format=csv` for an Excel-ready CSV (UTF-8 BOM, formula-safe).
+- Device revenue is a time-share estimate at each segment's rate (before the per-session round-up), so it can differ slightly from invoiced gaming revenue.
+- Not done: real .xlsx and PDF files (CSV used so no new NuGet dependency), charts.
+- Queries are not run against SQL Server yet.
