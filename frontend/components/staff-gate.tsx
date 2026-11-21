@@ -9,5 +9,5 @@ export function StaffGate() {
   const { token, user, restoring, logout } = useAdminAuth()
   if (restoring) return <main className="admin-boot" aria-live="polite" dir="rtl">جارٍ التحقق من الجلسة…</main>
   if (!token || !user) return <AdminLogin redirectTo="/" audience="staff" />
-  return <StaffDashboard token={token} userName={user.fullName} onLogout={() => void logout()} />
+  return <StaffDashboard token={token} userId={user.id} userName={user.fullName} onLogout={() => void logout()} />
 }

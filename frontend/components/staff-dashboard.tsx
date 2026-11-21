@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from 'react'
 import { getDevices, type ApiDevice } from '@/lib/ghost-api'
+import { StaffShiftView } from '@/components/staff-shift'
 import { ThemeToggle } from '@/components/theme-toggle'
 import {
   ArrowLeftRight,
@@ -51,7 +52,7 @@ function mapApiDevice(device: ApiDevice): Device {
   }
 }
 
-export function StaffDashboard({ token, userName, onLogout }: { token: string; userName: string; onLogout: () => void }) {
+export function StaffDashboard({ token, userId, userName, onLogout }: { token: string; userId: string; userName: string; onLogout: () => void }) {
   const [devices, setDevices] = useState<Device[]>([])
   const [devicesLoading, setDevicesLoading] = useState(true)
   const [devicesError, setDevicesError] = useState<string | null>(null)
@@ -134,7 +135,7 @@ export function StaffDashboard({ token, userName, onLogout }: { token: string; u
         {activeNav === 'devices' && <DevicesView devices={devices} onBack={() => setActiveNav('overview')} onSelect={(device) => setSelectedDevice(device)} />}
         {activeNav === 'products' && <ProductsView />}
         {activeNav === 'payments' && <PaymentsView />}
-        {activeNav === 'shift' && <ShiftView onBack={() => setActiveNav('overview')} />}
+        {activeNav === 'shift' && <StaffShiftView token={token} userId={userId} onBack={() => setActiveNav('overview')} />}
         {activeNav === 'messages' && <MessagesView />}
         {activeNav === 'history' && <HistoryView />}
       </section>
@@ -169,14 +170,6 @@ function PaymentsView() {
 }
 
 function statusLabel(status: Device['status']) { return status === 'available' ? 'متاح' : status === 'playing' ? 'قيد التشغيل' : 'صيانة' }
-
-function ShiftView({ onBack }: { onBack: () => void }) {
-  return <div className="inner-page">
-    <button className="back-link" onClick={onBack}><ChevronLeft size={16} /> العودة للتشغيل</button>
-    <div className="page-heading compact"><div><p className="eyebrow">الشيفتات والخزينة</p><h1>الشيفت الحالي</h1><p className="subheading">عرض الرصيد والحركات ومطابقة النقدية قبل إغلاق الشيفت.</p></div><span className="secure-label"><ShieldCheck size={15} /> بيانات النظام فقط</span></div>
-    <div className="notice-bar"><div className="notice-icon"><ClipboardCheck size={17} /></div><div><strong>بيانات الشيفت الحالي تحتاج API للقراءة</strong><p>المتاح حاليًا هو فتح الشيفت وإغلاقه عبر API. نحتاج endpoints لاسترجاع الشيفت المفتوح وحركاته قبل إظهار أرقام مالية.</p></div></div>
-  </div>
-}
 
 function MessagesView() {
   return <div className="inner-page">

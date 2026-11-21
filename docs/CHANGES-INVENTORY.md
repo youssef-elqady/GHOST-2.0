@@ -93,3 +93,7 @@ Endpoints added:
 ## Staff login gate (Nov 21)
 - Route / now requires sign-in: components/staff-gate.tsx (restore from refresh cookie, else AdminLogin with audience=staff), app/page.tsx wraps AdminAuthProvider. StaffDashboard receives the token, user name and a real logout. getDevices now sends the token (it was anonymous, which the API would reject).
 - tsc clean, eslint 0 errors, next build ok. Not run in a browser against a live API.
+
+## Staff shift screen wired (Nov 21)
+- components/staff-shift.tsx replaces the placeholder ShiftView: reads current business day + own open shift, opens a shift with opening cash (own user id from the token), closes it with counted cash and optional reason. Expected cash and difference are decided by the server; the UI does not reveal expected cash before the count.
+- tsc clean, eslint 0 errors, next build ok. No component tests (no framework); not run in a browser against a live API.
