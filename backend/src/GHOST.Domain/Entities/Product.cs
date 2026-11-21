@@ -204,6 +204,48 @@ public sealed class Product : BaseEntity
         return movement;
     }
 
+    /// <summary>Gives a product its barcode once; a barcode is never silently replaced.</summary>
+    public void AssignBarcode(string barcode)
+    {
+        if (!string.IsNullOrEmpty(Barcode))
+            throw new BusinessRuleValidationException("This product already has a barcode.");
+
+        Barcode = OptionalCode(barcode, "Barcode", 64)
+            ?? throw new BusinessRuleValidationException("Barcode is required.");
+        MarkAsUpdated();
+    }
+
+    /// <summary>
+    /// Applies an approved stocktake difference (counted minus the system quantity at count time).
+    /// The delta is signed, so surpluses add stock and shortages remove it. Never goes below zero.
+    /// </summary>
+    public StockMovement ApplyStocktakeAdjustment(
+        decimal delta,
+        Guid userId,
+        string? reason,
+        Guid sourceId)
+    {
+        if (!TrackStock)
+            throw new BusinessRuleValidationException("This product does not track stock.");
+
+        if (delta == 0 || decimal.Round(delta, 3) != delta)
+            throw new BusinessRuleValidationException("The stocktake difference must be non-zero with at most three decimals.");
+
+        var newQuantity = StockQuantity + delta;
+        if (newQuantity < 0)
+            throw new BusinessRuleValidationException(
+                $"'{Name}': the adjustment would take stock below zero (current {StockQuantity:N3}, difference {delta:N3}).");
+
+        var movement = StockMovement.Create(
+            Id, StockMovementType.StocktakeAdjustment, delta, AvgCost, newQuantity, null, userId,
+            nameof(Stocktake), sourceId, reason);
+
+        StockQuantity = newQuantity;
+        _movements.Add(movement);
+        MarkAsUpdated();
+        return movement;
+    }
+
     public static bool IsInbound(StockMovementType type) => type is
         StockMovementType.Purchase or
         StockMovementType.SaleReturn;
