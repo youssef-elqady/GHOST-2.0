@@ -110,8 +110,9 @@ builder.Services.AddScoped<GHOST.Application.Backup.IDatabaseBackupGateway, GHOS
 builder.Services.AddScoped(sp =>
 {
     var o = sp.GetRequiredService<Microsoft.Extensions.Options.IOptions<GHOST.API.Backup.ScheduledBackupOptions>>().Value;
-    return new GHOST.Application.Backup.BackupOptions(o.Directory ?? string.Empty, Math.Clamp(o.RetentionCount, 1, 60), o.ExternalDirectory);
+    return new GHOST.Application.Backup.BackupOptions(o.Directory ?? string.Empty, Math.Clamp(o.RetentionCount, 1, 60), o.ExternalDirectory, o.ExternalDriveMarker, o.ExternalDriveId);
 });
+builder.Services.AddSingleton<GHOST.Application.Backup.IExternalDriveGuard, GHOST.Infrastructure.Persistence.ExternalDriveGuard>();
 builder.Services.AddScoped<GHOST.Application.Backup.BackupHandler>();
 builder.Services.AddHostedService<GHOST.API.Backup.ScheduledBackupService>();
 builder.Services.Configure<GHOST.API.Outage.OutageOptions>(

@@ -98,6 +98,13 @@ namespace GHOST.Infrastructure.Persistence.Migrations
                         .HasMaxLength(1000)
                         .HasColumnType("nvarchar(1000)");
 
+                    b.Property<DateTimeOffset?>("ExternalCopiedAt")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<string>("ExternalCopyError")
+                        .HasMaxLength(1000)
+                        .HasColumnType("nvarchar(1000)");
+
                     b.Property<string>("FilePath")
                         .HasMaxLength(500)
                         .HasColumnType("nvarchar(500)");

@@ -7,6 +7,9 @@ public static class AlertTypes
     public const string LargeDiscount = "LargeDiscount";
     public const string LargeWithdrawal = "LargeWithdrawal";
     public const string StocktakeLoss = "StocktakeLoss";
+    public const string BackupFailed = "BackupFailed";
+    public const string ExternalBackupFailed = "ExternalBackupFailed";
+    public const string OutageReviewPending = "OutageReviewPending";
 }
 
 /// <summary>

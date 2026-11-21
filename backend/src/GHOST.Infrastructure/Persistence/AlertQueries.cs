@@ -106,6 +106,26 @@ public sealed class AlertQueries : IAlertQueries
             AlertTypes.StocktakeLoss, Severity(l.Value, t.StocktakeLossValue), l.DecidedAt!.Value,
             "Stocktake", l.Id, l.StartedById, null, Math.Round(l.Value, 2), t.StocktakeLossValue, null)));
 
+        // 6. Backups that failed, and verified backups that could not be copied to the external drive.
+        var backups = await _db.BackupRecords.AsNoTracking()
+            .Where(b => b.CreatedAt >= rangeFrom && b.CreatedAt < rangeTo
+                        && (b.Status == BackupStatus.Failed || b.ExternalCopyError != null))
+            .OrderByDescending(b => b.CreatedAt).Take(MaxPerRule)
+            .Select(b => new { b.Id, b.CreatedAt, b.Status, b.Error, b.ExternalCopyError })
+            .ToListAsync(cancellationToken);
+        alerts.AddRange(backups.Select(b => new AlertDto(
+            b.Status == BackupStatus.Failed ? AlertTypes.BackupFailed : AlertTypes.ExternalBackupFailed,
+            "Critical", b.CreatedAt, "BackupRecord", b.Id, null, null, 0, 0, b.Status == BackupStatus.Failed ? b.Error : b.ExternalCopyError)));
+
+        // 7. Sessions waiting for an Admin after a power cut (always shown, whatever the range).
+        var pending = await _db.Sessions.AsNoTracking()
+            .Where(s => s.NeedsReview && s.Status == SessionStatus.Active)
+            .OrderBy(s => s.OutageStartedAt).Take(MaxPerRule)
+            .Select(s => new { s.Id, s.OutageEndedAt })
+            .ToListAsync(cancellationToken);
+        alerts.AddRange(pending.Select(s => new AlertDto(
+            AlertTypes.OutageReviewPending, "Critical", s.OutageEndedAt ?? rangeTo, "Session", s.Id, null, null, 0, 0, null)));
+
         return await AttachNamesAsync(alerts, cancellationToken);
     }
 

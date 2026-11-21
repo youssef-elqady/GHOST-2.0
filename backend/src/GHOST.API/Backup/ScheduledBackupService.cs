@@ -17,6 +17,15 @@ public sealed class ScheduledBackupOptions
     /// <summary>Second location (for example an external drive). Every verified backup is copied here and the newest RetentionCount are kept.</summary>
     public string? ExternalDirectory { get; set; }
 
+    /// <summary>
+    /// Full path of a marker file at the root of the external drive (for example E:\.ghost-backup-drive).
+    /// Together with ExternalDriveId it ties backups to that physical drive, not to a drive letter.
+    /// </summary>
+    public string? ExternalDriveMarker { get; set; }
+
+    /// <summary>Expected content of the marker file. Copies are refused when it is missing or different.</summary>
+    public string? ExternalDriveId { get; set; }
+
     /// <summary>Also back up after each shift close.</summary>
     public bool BackupOnShiftClose { get; set; } = true;
 

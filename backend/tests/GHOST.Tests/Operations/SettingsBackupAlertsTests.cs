@@ -219,6 +219,28 @@ public sealed class SettingsBackupAlertsTests
         Assert.Equal(BackupStatus.Succeeded, repo.Rows.Single().Status);
     }
 
+    private sealed class RejectingGuard : IExternalDriveGuard
+    {
+        public string? Check(string externalDirectory, string? markerPath, string? expectedDriveId) => "wrong drive";
+    }
+
+    [Fact]
+    public async Task WrongExternalDrive_IsNeverCopiedTo_AndTheFailureIsRecorded()
+    {
+        var repo = new FakeBackups();
+        var gateway = new FakeGateway();
+        var handler = new BackupHandler(repo, gateway, new FakeUow(), new FakeAudit(), TimeProvider.System,
+            new BackupOptions("/bk", 7, "/usb", "/usb/.marker", "ID1"), new RejectingGuard());
+
+        var result = await handler.RunAsync(BackupType.Scheduled, null);
+
+        Assert.True(result.IsSuccess);
+        Assert.Empty(gateway.Copied);
+        Assert.Equal("Failed: wrong drive", result.Value!.ExternalCopy);
+        Assert.Equal("wrong drive", repo.Rows.Single().ExternalCopyError);
+        Assert.Null(repo.Rows.Single().ExternalCopiedAt);
+    }
+
     [Fact]
     public async Task FailedBackup_IsNeverCopiedExternally()
     {

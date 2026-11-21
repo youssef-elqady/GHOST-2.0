@@ -31,6 +31,7 @@ public sealed class BackupRecordConfiguration : IEntityTypeConfiguration<BackupR
         builder.Property(x => x.Id).ValueGeneratedNever();
         builder.Property(x => x.FilePath).HasMaxLength(BackupRecord.MaxPathLength);
         builder.Property(x => x.Error).HasMaxLength(BackupRecord.MaxErrorLength);
+        builder.Property(x => x.ExternalCopyError).HasMaxLength(BackupRecord.MaxErrorLength);
         builder.HasOne<ApplicationUser>().WithMany().HasForeignKey(x => x.RequestedById)
             .IsRequired(false).OnDelete(DeleteBehavior.Restrict);
         builder.HasIndex(x => x.CreatedAt).IsDescending().HasDatabaseName("IX_BackupRecords_CreatedAt");

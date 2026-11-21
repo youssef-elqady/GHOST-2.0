@@ -6,7 +6,21 @@ using GHOST.Domain.Entities;
 
 namespace GHOST.Application.Backup;
 
-public sealed record BackupOptions(string Directory, int RetentionCount, string? ExternalDirectory = null);
+public sealed record BackupOptions(
+    string Directory,
+    int RetentionCount,
+    string? ExternalDirectory = null,
+    string? ExternalDriveMarker = null,
+    string? ExternalDriveId = null);
+
+/// <summary>
+/// Checks that the external destination is the right, present and writable drive before anything is copied.
+/// Returns null when the drive is acceptable, otherwise the reason. Never creates the drive's root.
+/// </summary>
+public interface IExternalDriveGuard
+{
+    string? Check(string externalDirectory, string? markerPath, string? expectedDriveId);
+}
 
 public sealed record BackupFileResult(long? SizeBytes);
 
@@ -55,6 +69,8 @@ public sealed class BackupHandler
     private readonly IAuditTrail _audit;
     private readonly TimeProvider _time;
     private readonly BackupOptions _options;
+    private readonly IExternalDriveGuard? _driveGuard;
+    private readonly ISystemAuditTrail? _systemAudit;
 
     public BackupHandler(
         IBackupRepository records,
@@ -62,8 +78,12 @@ public sealed class BackupHandler
         IUnitOfWork unitOfWork,
         IAuditTrail audit,
         TimeProvider time,
-        BackupOptions options)
+        BackupOptions options,
+        IExternalDriveGuard? driveGuard = null,
+        ISystemAuditTrail? systemAudit = null)
     {
+        _driveGuard = driveGuard;
+        _systemAudit = systemAudit;
         _records = records;
         _gateway = gateway;
         _unitOfWork = unitOfWork;
@@ -109,6 +129,9 @@ public sealed class BackupHandler
             }
 
             await _records.AddAsync(record, cancellationToken);
+            if (actorUserId is null && record.Status == BackupStatus.Failed)
+                _systemAudit?.Record("Backup.Failed", "BackupRecord", record.Id.ToString(),
+                    JsonSerializer.Serialize(new { type = type.ToString(), record.Error }));
             if (actorUserId is { } actor)
                 _audit.Record(actor, record.Status == BackupStatus.Succeeded ? "Backup.Created" : "Backup.Failed",
                     "BackupRecord", record.Id.ToString(),
@@ -120,12 +143,24 @@ public sealed class BackupHandler
                 await PruneAsync(record, cancellationToken);
                 if (!string.IsNullOrWhiteSpace(_options.ExternalDirectory) && record.FilePath is not null)
                 {
-                    var failure = await _gateway.CopyToExternalAsync(
+                    // Identity, presence and writability first. Nothing is copied to a wrong or missing drive,
+                    // and a copy only counts after the size check inside CopyToExternalAsync.
+                    var failure = _driveGuard?.Check(
+                        _options.ExternalDirectory, _options.ExternalDriveMarker, _options.ExternalDriveId);
+                    failure ??= await _gateway.CopyToExternalAsync(
                         record.FilePath, _options.ExternalDirectory, Math.Max(_options.RetentionCount, 1), cancellationToken);
                     externalCopy = failure is null ? "Copied" : "Failed: " + failure;
-                    if (failure is not null && actorUserId is { } who)
-                        _audit.Record(who, "Backup.ExternalCopyFailed", "BackupRecord", record.Id.ToString(),
-                            JsonSerializer.Serialize(new { _options.ExternalDirectory, failure }));
+                    if (failure is null)
+                        record.MarkExternalCopied(_time.GetUtcNow());
+                    else
+                    {
+                        record.MarkExternalCopyFailed(failure);
+                        var details = JsonSerializer.Serialize(new { _options.ExternalDirectory, failure });
+                        if (actorUserId is { } who)
+                            _audit.Record(who, "Backup.ExternalCopyFailed", "BackupRecord", record.Id.ToString(), details);
+                        else
+                            _systemAudit?.Record("Backup.ExternalCopyFailed", "BackupRecord", record.Id.ToString(), details);
+                    }
                 }
             }
 

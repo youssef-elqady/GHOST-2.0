@@ -41,6 +41,21 @@ public sealed class BackupRecord
     /// <summary>Set when the retention policy removed the file.</summary>
     public DateTimeOffset? PrunedAt { get; private set; }
 
+    /// <summary>Set when a verified copy reached the external drive.</summary>
+    public DateTimeOffset? ExternalCopiedAt { get; private set; }
+
+    /// <summary>Why the external copy did not happen. Null when it succeeded or is not configured.</summary>
+    public string? ExternalCopyError { get; private set; }
+
+    public void MarkExternalCopied(DateTimeOffset at)
+    {
+        ExternalCopiedAt = at;
+        ExternalCopyError = null;
+    }
+
+    public void MarkExternalCopyFailed(string error)
+        => ExternalCopyError = error.Length > MaxErrorLength ? error[..MaxErrorLength] : error;
+
     private BackupRecord()
     {
     }
