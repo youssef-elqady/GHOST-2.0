@@ -15,6 +15,7 @@ export function AdminOutageReview({ token }: { token: string }) {
   const [items, setItems] = useState<ApiOutageItem[]>([])
   const [shiftId, setShiftId] = useState<string | null>(null)
   const [ends, setEnds] = useState<Record<string, string>>({})
+  const [reasons, setReasons] = useState<Record<string, string>>({})
   const [busy, setBusy] = useState<string | null>(null)
   const [message, setMessage] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
@@ -45,9 +46,11 @@ export function AdminOutageReview({ token }: { token: string }) {
     if (!shiftId) { setError('افتح وردية أولًا لاعتماد الجلسة.'); return }
     const value = ends[item.sessionId]
     if (!value) { setError('حدد وقت النهاية الفعلي.'); return }
+    const reason = (reasons[item.sessionId] ?? '').trim()
+    if (reason.length < 3) { setError('اكتب سبب تحديد وقت النهاية (إجباري).'); return }
     setBusy(item.sessionId); setError(null); setMessage(null)
     try {
-      const result = await approveOutage(token, item.sessionId, shiftId, new Date(value).toISOString())
+      const result = await approveOutage(token, item.sessionId, shiftId, new Date(value).toISOString(), reason)
       setMessage(`تم اعتماد الجلسة. الإجمالي ${result.totalAmount} ج.م`)
       await load()
     } catch (e) {
@@ -69,6 +72,7 @@ export function AdminOutageReview({ token }: { token: string }) {
           <span>آخر نقطة مؤكدة {new Date(item.outageStartedAt).toLocaleString('ar-EG')}</span>
           <span>عودة النظام {new Date(item.outageEndedAt).toLocaleString('ar-EG')}</span>
           <input type="datetime-local" value={ends[item.sessionId] ?? ''} onChange={(e) => setEnds((p) => ({ ...p, [item.sessionId]: e.target.value }))} aria-label="وقت النهاية الفعلي" />
+          <input type="text" value={reasons[item.sessionId] ?? ''} onChange={(e) => setReasons((p) => ({ ...p, [item.sessionId]: e.target.value }))} placeholder="السبب (إجباري)" aria-label="سبب تحديد وقت النهاية" maxLength={300} />
           <button type="button" disabled={busy === item.sessionId || !shiftId} onClick={() => void approve(item)}>اعتماد</button>
         </div>
       ))}
