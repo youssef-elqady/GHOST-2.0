@@ -29,4 +29,9 @@ out/
 
 # OS
 .DS_Store
-Thumbs.dbdist/
+Thumbs.db
+dist/
+
+# Frontend generated
+*.tsbuildinfo
+next-env.d.ts
