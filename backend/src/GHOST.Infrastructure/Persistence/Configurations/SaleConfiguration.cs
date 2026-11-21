@@ -27,6 +27,7 @@ public sealed class SaleConfiguration : IEntityTypeConfiguration<Sale>
         builder.Property(x => x.DiscountReason).HasMaxLength(Sale.MaxReasonLength);
         builder.Property(x => x.IdempotencyKey).HasMaxLength(100);
         builder.Property(x => x.RequestFingerprint).HasMaxLength(64);
+        builder.Property(x => x.RebillReason).HasMaxLength(300);
 
         // Guards status changes (refund, print) against two writers: a second refund cannot also succeed.
         builder.Property<byte[]>("RowVersion").IsRowVersion();

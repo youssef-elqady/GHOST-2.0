@@ -36,7 +36,8 @@ public sealed class SalesController : ControllerBase
         List<CheckoutLine>? Items,
         Guid? SessionId,
         CheckoutDiscount? Discount,
-        string? IdempotencyKey);
+        string? IdempotencyKey,
+        string? RebillReason = null);
 
     public sealed record RefundRequest(string? Reason, bool ReturnToStock, Guid CashShiftId);
 
@@ -59,7 +60,8 @@ public sealed class SalesController : ControllerBase
                 request.Discount is null
                     ? null
                     : new DiscountRequest(request.Discount.Type, request.Discount.Value, request.Discount.Reason),
-                request.IdempotencyKey),
+                request.IdempotencyKey,
+                request.RebillReason),
             cancellationToken);
 
         return result.IsSuccess

@@ -643,6 +643,13 @@ namespace GHOST.Infrastructure.Persistence.Migrations
                     b.Property<int>("PrintCount")
                         .HasColumnType("int");
 
+                    b.Property<string>("RebillReason")
+                        .HasMaxLength(300)
+                        .HasColumnType("nvarchar(300)");
+
+                    b.Property<Guid?>("ReplacesSaleId")
+                        .HasColumnType("uniqueidentifier");
+
                     b.Property<string>("RequestFingerprint")
                         .HasMaxLength(64)
                         .HasColumnType("nvarchar(64)");
