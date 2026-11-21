@@ -1,3 +1,4 @@
+using Serilog;
 using System.Text.Json.Serialization;
 using GHOST.API.Authentication;
 using GHOST.API.Configuration;
@@ -19,6 +20,22 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
 
 var builder = WebApplication.CreateBuilder(args);
+
+// One venue PC: listen on loopback only, run as a Windows Service when installed as one, log to rolling files.
+GHOST.API.Configuration.LocalBindingPolicy.Validate(builder.Configuration["urls"] ?? builder.Configuration["ASPNETCORE_URLS"]);
+builder.Host.UseWindowsService(options => options.ServiceName = "GHOST API");
+builder.Host.UseSerilog((context, services, logger) => logger
+    .MinimumLevel.Information()
+    .MinimumLevel.Override("Microsoft.AspNetCore", Serilog.Events.LogEventLevel.Warning)
+    .MinimumLevel.Override("Microsoft.EntityFrameworkCore", Serilog.Events.LogEventLevel.Warning)
+    .Enrich.FromLogContext()
+    .WriteTo.Console()
+    .WriteTo.File(
+        Path.Combine(context.Configuration["Logging:File:Directory"] ?? Path.Combine(AppContext.BaseDirectory, "logs"), "ghost-api-.log"),
+        rollingInterval: RollingInterval.Day,
+        retainedFileCountLimit: 30,
+        shared: false,
+        outputTemplate: "{Timestamp:yyyy-MM-dd HH:mm:ss.fff zzz} [{Level:u3}] {SourceContext} {Message:lj} {Properties:j}{NewLine}{Exception}"));
 
 builder.Services
     .AddControllers()
@@ -136,6 +153,28 @@ if (app.Environment.IsDevelopment())
 
 app.MapControllers();
 app.MapGet("/", () => "GHOST 2.0 API is running");
+
+// Liveness: the process answers. Readiness: database reachable AND every migration applied. Anonymous, local only,
+// and it never returns connection details.
+app.MapGet("/health/live", () => Results.Ok(new { status = "Live" })).AllowAnonymous();
+app.MapGet("/health/ready", async (GHOSTDbContext db, CancellationToken ct) =>
+{
+    var databaseReachable = false;
+    var migrationsApplied = false;
+    try
+    {
+        databaseReachable = await db.Database.CanConnectAsync(ct);
+        migrationsApplied = databaseReachable && !(await db.Database.GetPendingMigrationsAsync(ct)).Any();
+    }
+    catch (Exception)
+    {
+        // Reported as not ready below; the reason is in the log, never in the response.
+    }
+
+    var ready = databaseReachable && migrationsApplied;
+    return Results.Json(new { status = ready ? "Ready" : "NotReady", databaseReachable, migrationsApplied },
+        statusCode: ready ? StatusCodes.Status200OK : StatusCodes.Status503ServiceUnavailable);
+}).AllowAnonymous();
 
 app.MapGet("/health/database", async (
     GHOSTDbContext db,
