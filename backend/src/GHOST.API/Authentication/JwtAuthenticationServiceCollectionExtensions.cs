@@ -55,6 +55,11 @@ public static class JwtAuthenticationServiceCollectionExtensions
                     RoleClaimType = "role",
                     ClockSkew = TimeSpan.FromSeconds(30)
                 };
+
+                bearerOptions.Events = new JwtBearerEvents
+                {
+                    OnTokenValidated = SessionTokenValidator.ValidateAsync
+                };
             });
 
         services.AddAuthorization(options =>

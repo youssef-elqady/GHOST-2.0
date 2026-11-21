@@ -5,6 +5,8 @@ using GHOST.Infrastructure.Identity;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.Extensions.Hosting;
+using Microsoft.Extensions.Options;
 
 namespace GHOST.API.Controllers;
 
@@ -15,15 +17,24 @@ public sealed class AuthController : ControllerBase
     private readonly UserManager<ApplicationUser> _userManager;
     private readonly JwtTokenService _tokenService;
     private readonly IAuthenticationAuditWriter _auditWriter;
+    private readonly RefreshTokenService _refreshTokens;
+    private readonly RefreshTokenOptions _refreshOptions;
+    private readonly IHostEnvironment _environment;
 
     public AuthController(
         UserManager<ApplicationUser> userManager,
         JwtTokenService tokenService,
-        IAuthenticationAuditWriter auditWriter)
+        IAuthenticationAuditWriter auditWriter,
+        RefreshTokenService refreshTokens,
+        IOptions<RefreshTokenOptions> refreshOptions,
+        IHostEnvironment environment)
     {
         _userManager = userManager;
         _tokenService = tokenService;
         _auditWriter = auditWriter;
+        _refreshTokens = refreshTokens;
+        _refreshOptions = refreshOptions.Value;
+        _environment = environment;
     }
 
     public sealed record LoginRequest(string? Username, string? Password);
@@ -144,7 +155,9 @@ public sealed class AuthController : ControllerBase
         }
 
         var roles = await _userManager.GetRolesAsync(user);
-        var accessToken = _tokenService.CreateAccessToken(user, roles);
+        var refreshToken = await _refreshTokens.StartFamilyAsync(user.Id, cancellationToken);
+        SetRefreshCookie(refreshToken);
+        var accessToken = _tokenService.CreateAccessToken(user, roles, refreshToken.FamilyId);
         await _auditWriter.WriteUserAsync(
             user.Id,
             "Authentication.LoginSucceeded",
@@ -244,8 +257,20 @@ public sealed class AuthController : ControllerBase
             "Authentication.PasswordChanged",
             cancellationToken);
 
+        // A password change ends every older session and starts a fresh family.
+        await _refreshTokens.RevokeAllForUserAsync(
+            user.Id,
+            RefreshTokenService.SessionsRevokedReason,
+            cancellationToken);
+        await _auditWriter.WriteUserAsync(
+            user.Id,
+            "Authentication.SessionsRevoked",
+            cancellationToken);
+
         var roles = await _userManager.GetRolesAsync(user);
-        var accessToken = _tokenService.CreateAccessToken(user, roles);
+        var refreshToken = await _refreshTokens.StartFamilyAsync(user.Id, cancellationToken);
+        SetRefreshCookie(refreshToken);
+        var accessToken = _tokenService.CreateAccessToken(user, roles, refreshToken.FamilyId);
 
         return Ok(new AuthenticatedResponse(
             "authenticated",
@@ -257,6 +282,119 @@ public sealed class AuthController : ControllerBase
                 user.UserName ?? string.Empty,
                 user.FullName,
                 roles.ToArray())));
+    }
+
+    [AllowAnonymous]
+    [HttpPost("refresh")]
+    public async Task<IActionResult> Refresh(CancellationToken cancellationToken)
+    {
+        if (!RefreshRequestGuard.IsTrusted(Request, _refreshOptions))
+            return StatusCode(StatusCodes.Status403Forbidden, new { error = "untrusted_request" });
+
+        Request.Cookies.TryGetValue(RefreshTokenOptions.CookieName, out var rawToken);
+        var result = await _refreshTokens.RotateAsync(rawToken, cancellationToken);
+
+        switch (result.Outcome)
+        {
+            case RefreshOutcome.ReplayDetected:
+                await _auditWriter.WriteSystemAsync(
+                    "Authentication.RefreshReplayDetected",
+                    result.UserId,
+                    cancellationToken);
+                await _auditWriter.WriteSystemAsync(
+                    "Authentication.RefreshFamilyRevoked",
+                    result.UserId,
+                    cancellationToken);
+                return RefreshRejected();
+
+            case RefreshOutcome.Rejected:
+                await _auditWriter.WriteSystemAsync(
+                    "Authentication.RefreshRejected",
+                    result.UserId,
+                    cancellationToken);
+                return RefreshRejected();
+        }
+
+        var user = await _userManager.FindByIdAsync(result.UserId!.Value.ToString("D"));
+        if (user is null ||
+            !user.IsActive ||
+            user.MustChangePassword ||
+            await _userManager.IsLockedOutAsync(user))
+        {
+            await _refreshTokens.RevokeAllForUserAsync(
+                result.UserId.Value,
+                RefreshTokenService.SessionsRevokedReason,
+                cancellationToken);
+            await _auditWriter.WriteSystemAsync(
+                "Authentication.RefreshRejected",
+                result.UserId,
+                cancellationToken);
+            return RefreshRejected();
+        }
+
+        SetRefreshCookie(result.Replacement!);
+
+        var roles = await _userManager.GetRolesAsync(user);
+        var accessToken = _tokenService.CreateAccessToken(user, roles, result.FamilyId!.Value);
+        await _auditWriter.WriteUserAsync(
+            user.Id,
+            "Authentication.RefreshSucceeded",
+            cancellationToken);
+
+        return Ok(new AuthenticatedResponse(
+            "authenticated",
+            "Bearer",
+            accessToken.Value,
+            accessToken.ExpiresAtUtc,
+            new AuthenticatedUserResponse(
+                user.Id,
+                user.UserName ?? string.Empty,
+                user.FullName,
+                roles.ToArray())));
+    }
+
+    [AllowAnonymous]
+    [HttpPost("logout")]
+    public async Task<IActionResult> Logout(CancellationToken cancellationToken)
+    {
+        if (!RefreshRequestGuard.IsTrusted(Request, _refreshOptions))
+            return StatusCode(StatusCodes.Status403Forbidden, new { error = "untrusted_request" });
+
+        Request.Cookies.TryGetValue(RefreshTokenOptions.CookieName, out var rawToken);
+        var revoked = await _refreshTokens.RevokeFamilyByTokenAsync(
+            rawToken,
+            RefreshTokenService.LogoutReason,
+            cancellationToken);
+
+        if (revoked is not null)
+        {
+            await _auditWriter.WriteUserAsync(
+                revoked.UserId,
+                "Authentication.Logout",
+                cancellationToken);
+        }
+
+        ClearRefreshCookie();
+        return NoContent();
+    }
+
+    private void SetRefreshCookie(IssuedRefreshToken token) =>
+        Response.Cookies.Append(
+            RefreshTokenOptions.CookieName,
+            token.RawValue,
+            RefreshRequestGuard.CreateCookieOptions(
+                _environment.IsDevelopment(),
+                token.ExpiresAtUtc));
+
+    private void ClearRefreshCookie() =>
+        Response.Cookies.Delete(
+            RefreshTokenOptions.CookieName,
+            RefreshRequestGuard.CreateCookieOptions(_environment.IsDevelopment(), null));
+
+    private IActionResult RefreshRejected()
+    {
+        ClearRefreshCookie();
+        return Unauthorized(new { error = "invalid_session" });
     }
 
     private ObjectResult LockedOut() =>

@@ -22,17 +22,24 @@ public sealed class JwtTokenService
         _options = options.Value;
     }
 
+    public const string SessionIdClaim = "sid";
+
     public IssuedJwtToken CreateAccessToken(
         ApplicationUser user,
-        IEnumerable<string> roles)
+        IEnumerable<string> roles,
+        Guid sessionFamilyId)
     {
         ArgumentNullException.ThrowIfNull(user);
         ArgumentNullException.ThrowIfNull(roles);
+
+        if (sessionFamilyId == Guid.Empty)
+            throw new ArgumentException("Session family ID is required.", nameof(sessionFamilyId));
 
         var now = DateTimeOffset.UtcNow;
         var expiresAt = now.AddMinutes(_options.AccessTokenLifetimeMinutes);
         var claims = CreateBaseClaims(user);
         claims.Add(new Claim("token_use", AccessTokenPurpose));
+        claims.Add(new Claim(SessionIdClaim, sessionFamilyId.ToString("D")));
 
         foreach (var role in roles
             .Where(role => !string.IsNullOrWhiteSpace(role))

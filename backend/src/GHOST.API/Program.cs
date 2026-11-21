@@ -31,7 +31,8 @@ builder.Services.AddCors(options =>
                 "http://localhost:3000",
                 "http://127.0.0.1:3000")
             .AllowAnyHeader()
-            .AllowAnyMethod());
+            .AllowAnyMethod()
+            .AllowCredentials());
 });
 
 builder.Services.AddGhostDatabaseConnection(builder.Configuration);
@@ -51,6 +52,11 @@ builder.Services.AddDbContext<GHOSTDbContext>((serviceProvider, options) =>
 builder.Services.AddGhostIdentity();
 builder.Services.AddGhostJwtAuthentication(builder.Configuration);
 builder.Services.AddSingleton<JwtTokenService>();
+builder.Services.AddSingleton(TimeProvider.System);
+builder.Services
+    .AddOptions<RefreshTokenOptions>()
+    .Bind(builder.Configuration.GetSection(RefreshTokenOptions.SectionName));
+builder.Services.AddScoped<RefreshTokenService>();
 builder.Services.AddScoped<IAuthenticationAuditWriter, AuthenticationAuditWriter>();
 
 builder.Services.AddScoped<IBusinessDayRepository, BusinessDayRepository>();
