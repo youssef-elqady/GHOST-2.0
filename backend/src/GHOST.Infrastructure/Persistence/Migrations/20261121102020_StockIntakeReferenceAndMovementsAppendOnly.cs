@@ -23,26 +23,12 @@ namespace GHOST.Infrastructure.Persistence.Migrations
                 type: "nvarchar(500)",
                 maxLength: 500,
                 nullable: true);
-
-            migrationBuilder.Sql("""
-                CREATE TRIGGER [dbo].[TR_StockMovements_AppendOnly]
-                ON [dbo].[StockMovements]
-                AFTER UPDATE, DELETE
-                AS
-                BEGIN
-                    SET NOCOUNT ON;
-                    THROW 51002, 'StockMovements is append-only.', 1;
-                END;
-                """);
+            // The append-only trigger on StockMovements is created once, by AddProductsAndStockMovements.
         }
 
         /// <inheritdoc />
         protected override void Down(MigrationBuilder migrationBuilder)
         {
-            migrationBuilder.Sql("""
-                IF OBJECT_ID(N'[dbo].[TR_StockMovements_AppendOnly]', N'TR') IS NOT NULL
-                    DROP TRIGGER [dbo].[TR_StockMovements_AppendOnly];
-                """);
 
             migrationBuilder.DropColumn(
                 name: "InvoiceReference",
