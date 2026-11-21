@@ -105,5 +105,8 @@ export function transferSession(token: string, id: string, newDeviceId: string, 
 export function completeSession(token: string, id: string, endShiftId: string) { return request<unknown>(`/api/sessions/${enc(id)}/complete`, { method: 'POST', body: JSON.stringify({ endShiftId }) }, token) }
 /** idempotencyKey must be created once per checkout attempt and reused on retry so a double tap never double-charges. */
 export function checkout(token: string, input: CheckoutInput) { return request<ApiSale>('/api/sales/checkout', { method: 'POST', body: JSON.stringify(input) }, token) }
+export type ApiInvoicePrint = { sale: ApiSale; isCopy: boolean; label: string }
+/** Registers the print on the server (audited, first print is the original, later ones are copies). Staff can print only their own invoices. */
+export function printInvoice(token: string, saleId: string) { return request<ApiInvoicePrint>(`/api/sales/${enc(saleId)}/print`, { method: 'POST' }, token) }
 export function newIdempotencyKey() { return globalThis.crypto.randomUUID() }
 export function getProducts(token: string, search?: string) { return request<ApiProduct[]>(`/api/products?status=Active${search ? `&search=${enc(search)}` : ''}`, undefined, token) }

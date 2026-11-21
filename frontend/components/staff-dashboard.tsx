@@ -55,7 +55,7 @@ function mapApiDevice(device: ApiDevice): Device {
   }
 }
 
-export function StaffDashboard({ token, userId, userName, onLogout }: { token: string; userId: string; userName: string; onLogout: () => void }) {
+export function StaffDashboard({ token, userId, userName, isAdmin = false, onLogout }: { token: string; userId: string; userName: string; isAdmin?: boolean; onLogout: () => void }) {
   const [devices, setDevices] = useState<Device[]>([])
   const [devicesLoading, setDevicesLoading] = useState(true)
   const [devicesError, setDevicesError] = useState<string | null>(null)
@@ -165,7 +165,7 @@ export function StaffDashboard({ token, userId, userName, onLogout }: { token: s
         </>}
 
         {activeNav === 'devices' && <DevicesView devices={devices} onBack={() => setActiveNav('overview')} onSelect={(device) => setSelectedDevice(device)} />}
-        {activeNav === 'products' && <StaffPos token={token} shiftId={shift?.id ?? null} />}
+        {activeNav === 'products' && <StaffPos token={token} shiftId={shift?.id ?? null} isAdmin={isAdmin} />}
         {activeNav === 'payments' && <PaymentsView />}
         {activeNav === 'shift' && <StaffShiftView token={token} userId={userId} onChanged={refresh} onBack={() => setActiveNav('overview')} />}
         {activeNav === 'messages' && <MessagesView />}
