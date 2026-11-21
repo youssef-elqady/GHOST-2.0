@@ -6,7 +6,7 @@ const calls: Call[] = []
 let mode: 'refresh-ok' | 'refresh-fail' = 'refresh-ok'
 const auth = (t: string) => ({ status: 'authenticated', tokenType: 'Bearer', accessToken: t, expiresAtUtc: '2099-01-01T00:00:00Z', user: { id: '1', username: 'a', fullName: 'A', roles: ['Admin'] } })
 
-;(globalThis as any).window = { dispatchEvent() {} }
+;(globalThis as unknown as { window: unknown }).window = { dispatchEvent() {} }
 globalThis.fetch = (async (url: string, init: RequestInit = {}) => {
   const headers = new Headers(init.headers)
   calls.push({ url: String(url), auth: headers.get('Authorization'), credentials: init.credentials })

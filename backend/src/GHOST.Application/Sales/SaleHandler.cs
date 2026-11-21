@@ -207,7 +207,7 @@ public sealed class SaleHandler
         Guid adminUserId,
         string reason,
         bool returnToStock,
-        Guid cashShiftId,
+        Guid? cashShiftId,
         CancellationToken cancellationToken = default)
     {
         var result = await RefundCoreAsync(saleId, adminUserId, reason, returnToStock, cashShiftId, cancellationToken);
@@ -221,16 +221,20 @@ public sealed class SaleHandler
         Guid adminUserId,
         string reason,
         bool returnToStock,
-        Guid cashShiftId,
+        Guid? requestedShiftId,
         CancellationToken cancellationToken)
     {
         var sale = await _sales.GetAsync(saleId, cancellationToken);
         if (sale is null)
             return Result<SaleDto>.Failure("Invoice was not found.");
 
-        var shift = await _shifts.GetWithCashAsync(cashShiftId, cancellationToken);
+        // The server decides where the cash comes from: the acting Admin's own shift that is open right now.
+        // A shift id sent by the client is only a check; it can never choose a different shift.
+        var shift = await _shifts.GetOpenShiftForUserWithCashAsync(adminUserId, cancellationToken);
         if (shift is null)
-            return Result<SaleDto>.Failure("Shift was not found.");
+            return Result<SaleDto>.Failure("A refund needs your own open shift. Open a shift first.");
+        if (requestedShiftId is { } requested && requested != shift.Id)
+            return Result<SaleDto>.Failure("That shift is not allowed for this refund. Refunds post to your own open shift.");
 
         var ids = sale.Items.Where(i => i.ProductId is not null).Select(i => i.ProductId!.Value).Distinct().ToList();
         var products = (await _products.GetManyAsync(ids, cancellationToken)).ToDictionary(p => p.Id);

@@ -34,14 +34,20 @@ public sealed class StockIntakeStore : IStockIntakeStore
             .Join(_db.Products.AsNoTracking(), m => m.ProductId, p => p.Id, (m, p) => new { m.UserId, m.ProductId, p.Name, m.Type, m.QtyDelta, m.UnitCost })
             .ToListAsync(cancellationToken);
 
+        var userIds = rows.Select(r => r.UserId).Distinct().ToList();
+        var names = await _db.Users.AsNoTracking()
+            .Where(u => userIds.Contains(u.Id))
+            .Select(u => new { u.Id, u.FullName, u.UserName })
+            .ToDictionaryAsync(u => u.Id, u => string.IsNullOrWhiteSpace(u.FullName) ? u.UserName : u.FullName, cancellationToken);
+
         return rows
             .GroupBy(r => new { r.UserId, r.ProductId, r.Name })
             .Select(g => new IntakeReportRow(
-                g.Key.UserId, g.Key.ProductId, g.Key.Name,
+                g.Key.UserId, names.GetValueOrDefault(g.Key.UserId), g.Key.ProductId, g.Key.Name,
                 g.Count(r => r.Type == StockMovementType.Purchase),
                 g.Sum(r => r.QtyDelta),
                 g.Sum(r => r.QtyDelta * r.UnitCost)))
-            .OrderBy(r => r.UserId).ThenBy(r => r.ProductName)
+            .OrderBy(r => r.UserName ?? "").ThenBy(r => r.UserId).ThenBy(r => r.ProductName)
             .ToList();
     }
 }

@@ -71,6 +71,17 @@ internal static partial class ScratchDb
         return (admin, staff, shift.Id);
     }
 
+    /// <summary>Opens a shift for an existing user on a fresh far-future business day.</summary>
+    internal static async Task OpenShiftForUserAsync(Guid userId, decimal openingCash = 100m)
+    {
+        await using var db = NewContext();
+        var date = DateOnly.FromDayNumber(new Random().Next(DateOnly.Parse("2100-01-01").DayNumber, DateOnly.Parse("2900-01-01").DayNumber));
+        var day = new BusinessDay(date);
+        day.OpenShift(userId, openingCash);
+        db.BusinessDays.Add(day);
+        await db.SaveChangesAsync();
+    }
+
     internal static async Task<Guid> SeedProductAsync(Guid createdBy, decimal price, decimal stock)
     {
         await using var db = NewContext();

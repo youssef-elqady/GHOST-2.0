@@ -115,7 +115,7 @@ export function getOutageReview(token: string) { return request<ApiOutageItem[]>
 export function approveOutage(token: string, sessionId: string, endShiftId: string, actualEndAt: string, note?: string) { return request<{ sessionId: string; totalAmount: number; billableSeconds: number }>(`/api/sessions/outage-review/${enc(sessionId)}/approve`, { method: 'POST', body: JSON.stringify({ endShiftId, actualEndAt, note }) }, token) }
 export type ApiStockMovement = { id: string; type: string; qtyDelta: number; unitCost: number; balanceAfter: number; shiftId: string | null; userId: string; reason: string; createdAt: string }
 export type ApiReceipt = { id: string; shiftId: string; createdById: string; supplierName: string | null; invoiceReference: string | null; notes: string | null; status: string; totalCost: number; rejectionReason: string | null; createdAt: string; items: { productId: string; quantity: number; unitCost: number; lineTotal: number }[] }
-export type IntakeReportRow = { userId: string; productId: string; productName: string; operations: number; quantity: number; cost: number }
+export type IntakeReportRow = { userId: string; userName: string | null; productId: string; productName: string; operations: number; quantity: number; cost: number }
 export function createStockReceipt(token: string, input: { shiftId: string; supplierName?: string; invoiceReference?: string; notes?: string; items: { productId: string; quantity: number; unitCost: number }[] }) { return request<ApiReceipt>('/api/stock-receipts', { method: 'POST', body: JSON.stringify(input) }, token) }
 export function listStockReceipts(token: string) { return request<ApiReceipt[]>('/api/stock-receipts', undefined, token) }
 export function getProductMovements(token: string, productId: string, take = 30) { return request<ApiStockMovement[]>(`/api/products/${enc(productId)}/movements?take=${take}`, undefined, token) }
@@ -125,4 +125,4 @@ export function listSales(token: string, query: { shiftId?: string; status?: str
   const p = new URLSearchParams(); if (query.shiftId) p.set('shiftId', query.shiftId); if (query.status) p.set('status', query.status)
   return request<ApiSale[]>(`/api/sales${p.size ? `?${p}` : ''}`, undefined, token)
 }
-export function refundSale(token: string, saleId: string, input: { reason: string; returnToStock: boolean; cashShiftId: string }) { return request<ApiSale>(`/api/sales/${enc(saleId)}/refund`, { method: 'POST', body: JSON.stringify(input) }, token) }
+export function refundSale(token: string, saleId: string, input: { reason: string; returnToStock: boolean }) { return request<ApiSale>(`/api/sales/${enc(saleId)}/refund`, { method: 'POST', body: JSON.stringify(input) }, token) }

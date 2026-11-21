@@ -51,7 +51,7 @@ export function AdminIntakeReport({ token }: { token: string }) {
           ))}
           <h3>لكل منتج</h3>
           {rows.map((r) => (
-            <div key={`${r.userId}-${r.productId}`} style={{ padding: '4px 0' }}>{r.productName} · موظف {r.userId.slice(0, 8)} · {r.operations} عملية · كمية {r.quantity} · تكلفة {money(r.cost)}</div>
+            <div key={`${r.userId}-${r.productId}`} style={{ padding: '4px 0' }}>{r.productName} · موظف {r.userName ?? 'غير معروف'} · {r.operations} عملية · كمية {r.quantity} · تكلفة {money(r.cost)}</div>
           ))}
           <strong>الإجمالي: {money(totalCost)}</strong>
         </>

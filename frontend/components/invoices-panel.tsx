@@ -32,10 +32,10 @@ export function InvoicesPanel({ token, isAdmin }: { token: string; isAdmin: bool
     const reason = (reasons[sale.id] ?? '').trim()
     if (!openShiftId) { setError('افتح وردية أولًا. الاسترداد يخرج من الوردية المفتوحة.'); return }
     if (reason.length < 3) { setError('اكتب سبب الاسترداد (إجباري).'); return }
-    if (!window.confirm(`استرداد الفاتورة ${sale.invoiceNumber} بمبلغ ${money(sale.total)} نقدًا من الدرج؟`)) return
+    if (!window.confirm(`استرداد الفاتورة ${sale.invoiceNumber} كاملة بمبلغ ${money(sale.total)} نقدًا من الدرج؟ الاسترداد للفاتورة بالكامل وليس جزئيًا.${toStock[sale.id] ? '\nسيتم إرجاع الأصناف للمخزون بناءً على تأكيدك أنها استُلمت وصالحة للبيع.' : '\nلن يتم إرجاع شيء للمخزون.'}`)) return
     setBusy(sale.id)
     try {
-      await refundSale(token, sale.id, { reason, returnToStock: toStock[sale.id] ?? true, cashShiftId: openShiftId })
+      await refundSale(token, sale.id, { reason, returnToStock: toStock[sale.id] === true })
       setMessage(`تم استرداد الفاتورة ${sale.invoiceNumber}.`)
       setKey((k) => k + 1)
     } catch (e) { setError(e instanceof Error ? e.message : 'تعذر الاسترداد.') }
@@ -53,7 +53,8 @@ export function InvoicesPanel({ token, isAdmin }: { token: string; isAdmin: bool
           {isAdmin && s.status === 'Paid' && (
             <>
               <input placeholder="سبب الاسترداد (إجباري)" value={reasons[s.id] ?? ''} onChange={(e) => setReasons((p) => ({ ...p, [s.id]: e.target.value }))} maxLength={300} aria-label="سبب الاسترداد" />
-              <label><input type="checkbox" checked={toStock[s.id] ?? true} onChange={(e) => setToStock((p) => ({ ...p, [s.id]: e.target.checked }))} /> إرجاع للمخزون</label>
+              <label><input type="checkbox" checked={toStock[s.id] === true} onChange={(e) => setToStock((p) => ({ ...p, [s.id]: e.target.checked }))} /> تم استلام البضاعة فعليًا وهي صالحة للبيع، أرجعها للمخزون</label>
+              <span className="subheading">الاسترداد للفاتورة كاملة وليس جزئيًا لكل منتج. الافتراضي: لا يرجع شيء للمخزون.</span>
               <button type="button" disabled={busy === s.id} onClick={() => void refund(s)}>استرداد</button>
             </>
           )}

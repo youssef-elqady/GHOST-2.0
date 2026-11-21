@@ -169,6 +169,8 @@ public sealed class ScratchSuiteTests
     {
         var (admin, staff, shiftId) = await ScratchDb.SeedOpenShiftAsync();
         var admin2 = await ScratchDb.SeedUserAsync("adm2");
+        await ScratchDb.OpenShiftForUserAsync(admin);
+        await ScratchDb.OpenShiftForUserAsync(admin2);
         var productId = await ScratchDb.SeedProductAsync(admin, 20m, stock: 10);
 
         var (sh, sdb) = ScratchDb.NewSaleHandler();
@@ -180,7 +182,7 @@ public sealed class ScratchSuiteTests
         {
             var (handler, db) = ScratchDb.NewSaleHandler();
             await using var _ = db;
-            return (await handler.RefundAsync(sale.Id, who, "scratch test", true, shiftId)).IsSuccess;
+            return (await handler.RefundAsync(sale.Id, who, "scratch test", true, null)).IsSuccess;
         }
 
         var results = await Task.WhenAll(Refund(admin), Refund(admin2));

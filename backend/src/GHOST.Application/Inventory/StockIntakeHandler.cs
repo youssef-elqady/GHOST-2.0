@@ -11,7 +11,7 @@ namespace GHOST.Application.Inventory;
 
 public sealed record IntakeMovementInfo(Guid Id, Guid ProductId, StockMovementType Type, decimal QtyDelta, Guid UserId);
 
-public sealed record IntakeReportRow(Guid UserId, Guid ProductId, string ProductName, int Operations, decimal Quantity, decimal Cost);
+public sealed record IntakeReportRow(Guid UserId, string? UserName, Guid ProductId, string ProductName, int Operations, decimal Quantity, decimal Cost);
 
 /// <summary>Read and lookup side for stock intake, kept separate from IProductRepository.</summary>
 public interface IStockIntakeStore

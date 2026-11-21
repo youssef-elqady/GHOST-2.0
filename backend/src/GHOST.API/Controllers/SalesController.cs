@@ -38,7 +38,8 @@ public sealed class SalesController : ControllerBase
         CheckoutDiscount? Discount,
         string? IdempotencyKey);
 
-    public sealed record RefundRequest(string? Reason, bool ReturnToStock, Guid CashShiftId);
+    /// <summary>Whole-invoice refund. ReturnToStock is false unless the Admin explicitly confirms the goods came back and can be sold. CashShiftId is optional and only checked against the Admin's own open shift.</summary>
+    public sealed record RefundRequest(string? Reason, bool ReturnToStock = false, Guid? CashShiftId = null);
 
     [HttpPost("checkout")]
     public async Task<IActionResult> Checkout([FromBody] CheckoutRequest request, CancellationToken cancellationToken)

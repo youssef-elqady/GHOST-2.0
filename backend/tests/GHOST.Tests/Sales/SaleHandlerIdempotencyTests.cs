@@ -62,6 +62,14 @@ public sealed class SaleHandlerIdempotencyTests
     private sealed class Shifts : IShiftRepository
     {
         public Shift Shift = null!;
+        public Shift? AdminShift;
+        public Dictionary<Guid, Shift> OtherOpenShifts = new();
+
+        public Task<Shift?> GetOpenShiftForUserWithCashAsync(Guid userId, CancellationToken ct = default)
+        {
+            if (userId == Admin && AdminShift is { Status: ShiftStatus.Open }) return Task.FromResult<Shift?>(AdminShift);
+            return Task.FromResult(OtherOpenShifts.GetValueOrDefault(userId));
+        }
 
         public Task<Shift?> GetWithCashAsync(Guid shiftId, CancellationToken ct = default) => Task.FromResult<Shift?>(Shift);
         public Task<Shift?> GetAsync(Guid shiftId, CancellationToken ct = default) => Task.FromResult<Shift?>(Shift);
@@ -86,6 +94,13 @@ public sealed class SaleHandlerIdempotencyTests
             => Actions.Add(action);
     }
 
+    private sealed class Rejections : IRejectionAudit
+    {
+        public List<string> Actions = new();
+        public Task RecordAsync(Guid? actorUserId, string action, string entityType, string? entityId, string reason, CancellationToken ct = default)
+        { Actions.Add(action); return Task.CompletedTask; }
+    }
+
     private sealed class Uow : IUnitOfWork
     {
         public int Saves;
@@ -105,17 +120,20 @@ public sealed class SaleHandlerIdempotencyTests
         public Products Products = new();
         public Shifts Shifts = new();
         public Audit Audit = new();
+        public Rejections Rejections = new();
         public Uow Uow = new();
         public Product Cola;
         public SaleHandler Handler;
 
         public World()
         {
-            Shifts.Shift = new BusinessDay(new DateOnly(2026, 11, 21)).OpenShift(Staff, 100m);
+            var day = new BusinessDay(new DateOnly(2026, 11, 21));
+            Shifts.Shift = day.OpenShift(Staff, 100m);
+            Shifts.AdminShift = day.OpenShift(Admin, 200m);
             Cola = Product.CreateActive("Cola", null, null, "Drinks", "can", 20m, Admin);
             Cola.ApplyMovement(StockMovementType.Purchase, 10, Admin, "seed", unitCost: 12m);
             Products.Map[Cola.Id] = Cola;
-            Handler = new SaleHandler(Sales, Products, Shifts, new NoSessions(), Uow, Audit);
+            Handler = new SaleHandler(Sales, Products, Shifts, new NoSessions(), Uow, Audit, Rejections);
         }
 
         public CheckoutCommand Command(string? key, DiscountRequest? discount = null, bool admin = false) => new(
@@ -244,12 +262,73 @@ public sealed class SaleHandlerIdempotencyTests
         var w = new World();
         var sale = (await w.Handler.CheckoutCashAsync(w.Command("k-6"))).Value!;
 
-        var first = await w.Handler.RefundAsync(sale.Id, Admin, "customer returned", true, w.Shifts.Shift.Id);
-        var second = await w.Handler.RefundAsync(sale.Id, Admin, "again", true, w.Shifts.Shift.Id);
+        var first = await w.Handler.RefundAsync(sale.Id, Admin, "customer returned", true, null);
+        var second = await w.Handler.RefundAsync(sale.Id, Admin, "again", true, null);
 
         Assert.True(first.IsSuccess);
         Assert.False(second.IsSuccess);
         Assert.Equal(10m, w.Cola.StockQuantity);
-        Assert.Equal(100m, w.Shifts.Shift.ExpectedCash);
+        Assert.Equal(140m, w.Shifts.AdminShift!.ExpectedCash); // 200 - 60 once
+        Assert.Equal(160m, w.Shifts.Shift.ExpectedCash); // the sale's own shift is untouched by the refund
+    }
+
+    [Fact]
+    public async Task Refund_posts_to_the_admins_own_open_shift_even_if_client_sends_nothing()
+    {
+        var w = new World();
+        var sale = (await w.Handler.CheckoutCashAsync(w.Command("k-7"))).Value!;
+        var result = await w.Handler.RefundAsync(sale.Id, Admin, "returned", false, null);
+        Assert.True(result.IsSuccess);
+        Assert.Equal(140m, w.Shifts.AdminShift!.ExpectedCash);
+    }
+
+    [Fact]
+    public async Task Refund_with_someone_elses_shift_id_is_rejected_and_changes_nothing()
+    {
+        var w = new World();
+        var sale = (await w.Handler.CheckoutCashAsync(w.Command("k-8"))).Value!;
+        var result = await w.Handler.RefundAsync(sale.Id, Admin, "returned", true, w.Shifts.Shift.Id); // staff's shift
+        Assert.False(result.IsSuccess);
+        Assert.Contains("not allowed", result.Error!, StringComparison.OrdinalIgnoreCase);
+        Assert.Equal(7m, w.Cola.StockQuantity);
+        Assert.Equal(160m, w.Shifts.Shift.ExpectedCash);
+        Assert.Equal(200m, w.Shifts.AdminShift!.ExpectedCash);
+        Assert.Contains("Sale.RefundRejected", w.Rejections.Actions);
+    }
+
+    [Fact]
+    public async Task Refund_with_no_open_shift_is_blocked_before_any_change()
+    {
+        var w = new World();
+        var sale = (await w.Handler.CheckoutCashAsync(w.Command("k-9"))).Value!;
+        w.Shifts.AdminShift!.Close(w.Shifts.AdminShift.ExpectedCash, null);
+        var result = await w.Handler.RefundAsync(sale.Id, Admin, "returned", true, null);
+        Assert.False(result.IsSuccess);
+        Assert.Equal(7m, w.Cola.StockQuantity);
+        Assert.Equal(200m, w.Shifts.AdminShift.ExpectedCash);
+    }
+
+    [Fact]
+    public async Task A_user_without_an_open_shift_cannot_refund()
+    {
+        var w = new World();
+        var sale = (await w.Handler.CheckoutCashAsync(w.Command("k-10"))).Value!;
+        var result = await w.Handler.RefundAsync(sale.Id, Guid.NewGuid(), "returned", true, null);
+        Assert.False(result.IsSuccess);
+        Assert.Equal(7m, w.Cola.StockQuantity);
+    }
+
+    [Fact]
+    public async Task Refund_without_restock_leaves_stock_alone_and_with_explicit_restock_returns_it()
+    {
+        var a = new World();
+        var saleA = (await a.Handler.CheckoutCashAsync(a.Command("k-11"))).Value!;
+        Assert.True((await a.Handler.RefundAsync(saleA.Id, Admin, "damaged goods", false, null)).IsSuccess);
+        Assert.Equal(7m, a.Cola.StockQuantity);
+
+        var b = new World();
+        var saleB = (await b.Handler.CheckoutCashAsync(b.Command("k-12"))).Value!;
+        Assert.True((await b.Handler.RefundAsync(saleB.Id, Admin, "checked and resalable", true, null)).IsSuccess);
+        Assert.Equal(10m, b.Cola.StockQuantity);
     }
 }
