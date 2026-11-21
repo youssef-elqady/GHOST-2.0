@@ -13,11 +13,14 @@ public interface IShiftRepository
         Guid shiftId,
         CancellationToken cancellationToken = default);
 
-    /// <summary>The shift this user currently has open (with its cash ledger), or null. Used to decide where a refund posts.</summary>
-    Task<Shift?> GetOpenShiftForUserWithCashAsync(
+    /// <summary>
+    /// Every shift this user currently has open (with its cash ledger). Used to decide where a refund posts.
+    /// Callers must treat more than one as an unexpected state and refuse, never pick one.
+    /// </summary>
+    Task<IReadOnlyList<Shift>> GetOpenShiftsForUserWithCashAsync(
         Guid userId,
         CancellationToken cancellationToken = default)
-        => Task.FromResult<Shift?>(null);
+        => Task.FromResult<IReadOnlyList<Shift>>([]);
 
     /// <summary>True when either shift already takes part in a recorded handover.</summary>
     Task<bool> HandoverExistsAsync(

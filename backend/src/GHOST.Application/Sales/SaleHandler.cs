@@ -230,9 +230,16 @@ public sealed class SaleHandler
 
         // The server decides where the cash comes from: the acting Admin's own shift that is open right now.
         // A shift id sent by the client is only a check; it can never choose a different shift.
-        var shift = await _shifts.GetOpenShiftForUserWithCashAsync(adminUserId, cancellationToken);
-        if (shift is null)
+        var openShifts = await _shifts.GetOpenShiftsForUserWithCashAsync(adminUserId, cancellationToken);
+        if (openShifts.Count == 0)
             return Result<SaleDto>.Failure("A refund needs your own open shift. Open a shift first.");
+        if (openShifts.Count > 1)
+        {
+            // Unexpected state: never guess which shift the cash should leave from.
+            await _rejections.RejectedAsync(adminUserId, "Sale.RefundRejected", "Sale", saleId, "More than one open shift for this Admin.", cancellationToken);
+            return Result<SaleDto>.Failure("You have more than one open shift. Close the extra shift before refunding.");
+        }
+        var shift = openShifts[0];
         if (requestedShiftId is { } requested && requested != shift.Id)
             return Result<SaleDto>.Failure("That shift is not allowed for this refund. Refunds post to your own open shift.");
 

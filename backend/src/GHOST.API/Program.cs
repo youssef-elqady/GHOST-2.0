@@ -200,3 +200,6 @@ app.MapGet("/health/database", async (
 });
 
 app.Run();
+
+/// <summary>Exposes the entry point to the HTTP-level integration tests.</summary>
+public partial class Program { }

@@ -4,7 +4,7 @@ Branch `feature/auth03-refresh-tokens`. Main is untouched. This report records e
 ## Staged readiness
 | Stage | Status |
 |---|---|
-| S1 Build successful (compiles, unit tests) | YES: backend unit 280 passed, 0 failed; frontend tsc clean, next build OK |
+| S1 Build successful (compiles, unit tests) | YES: backend unit 291 passed, 0 failed; frontend tsc clean, next build OK |
 | S2 Package assembled | PARTIAL: pieces built individually (API, Bootstrap, migration bundle, frontend standalone, node.exe), zip about 245 MB, checksums written. build-release.sh not run end to end |
 | S3 Installer executed on Windows | NOT RUN |
 | S4 Clean Windows installation passed | NOT RUN (checklist rows 1-21 all NOT RUN) |
@@ -14,7 +14,7 @@ Production Ready: NO.
 ## The eight statuses
 **Implemented:** refresh tokens and session design; outage detection (120 s threshold, 30 s heartbeat) with NeedsReview and Admin approval that now requires a reason; admin outage review panel; audit for session, shift, refund, stock and rejected attempts (IRejectionAudit); refund requires an open shift before any change; stock intake references and append-only StockMovements trigger; intake correction endpoint and Admin intake report endpoint; Staff intake and correction screen; external drive identity = marker id + volume serial with letter-change follow; installer scripts, uninstaller, evidence-collection script; engineering and deployment docs.
 **Build Verified:** API, Bootstrap, migration bundle, frontend standalone build (Linux sandbox). PowerShell scripts parse with the PowerShell 7.4 parser (syntax only).
-**Automated Tests Passed:** backend unit tests 280 passed, 0 failed (includes drive guard serial tests, rejection audit, refund cross-shift and closed-shift tests, intake correction tests, refund shift tamper/closed/duplicate/restock handler tests). SQL project: 18 passed, 13 skipped (need real SQL Server).
+**Automated Tests Passed:** backend unit tests 291 passed (includes 10 HTTP-level refund authorization tests on EF in-memory, not SQL Server), 0 failed (includes drive guard serial tests, rejection audit, refund cross-shift and closed-shift tests, intake correction tests, refund shift tamper/closed/duplicate/restock handler tests). SQL project: 18 passed, 13 skipped (need real SQL Server).
 **SQL Server Integration Tested:** NONE. Scratch suite SC-01..SC-10 and migrations 13-16 have not run on SQL Server.
 **Manually Tested:** NONE. No browser walk-through, no Windows run.
 **Not Tested:** Windows installer and service behavior, offline and restart behavior, power-pull test, backup/restore into a new DB, uninstall keeps DB and backups, drive swap with real volume serial (Windows API and CIM read untested), frontend screens in a browser, concurrent intake on SQL Server.
