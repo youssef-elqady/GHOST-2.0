@@ -270,6 +270,10 @@ public sealed class Sale : BaseEntity
         if (Status != SaleStatus.Paid)
             throw new BusinessRuleValidationException("Only a paid invoice can be refunded.");
 
+        // Cash is returned from the shift open NOW, not the invoice's own shift. Check before changing anything.
+        if (cashShift.Status != ShiftStatus.Open)
+            throw new BusinessRuleValidationException("A refund needs an open shift. Open a shift first.");
+
         if (string.IsNullOrWhiteSpace(reason))
             throw new BusinessRuleValidationException("A refund reason is required.");
 

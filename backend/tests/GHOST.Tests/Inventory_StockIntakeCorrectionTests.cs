@@ -46,6 +46,16 @@ public sealed class StockIntakeCorrectionTests
         public void Record(Guid actorUserId, string action, string entityType, string entityId, string? newValuesJson = null) => Actions.Add(action);
     }
 
+    private sealed class Rejections : IRejectionAudit
+    {
+        public List<(string Action, string Reason)> Rows = new();
+        public Task RecordAsync(Guid? actorUserId, string action, string entityType, string? entityId, string reason, CancellationToken ct = default)
+        {
+            Rows.Add((action, reason));
+            return Task.CompletedTask;
+        }
+    }
+
     private sealed class Uow : IUnitOfWork
     {
         public int Saves;
@@ -130,5 +140,32 @@ public sealed class StockIntakeCorrectionTests
         w.Store.Movements.Add(waste);
         var result = await w.Handler.CorrectAsync(new CorrectIntakeCommand(waste.Id, Staff, false, 1m, "x", null));
         Assert.False(result.IsSuccess);
+    }
+
+    [Fact]
+    public async Task Rejected_correction_is_recorded_without_changing_stock_or_saving()
+    {
+        var w = Arrange();
+        var rejections = new Rejections();
+        var handler = new StockIntakeHandler(w.Products, w.Store, w.Uow, w.Audit, rejections);
+
+        var result = await handler.CorrectAsync(new CorrectIntakeCommand(w.Intake.Id, OtherStaff, false, 1m, "x", null));
+
+        Assert.False(result.IsSuccess);
+        var row = Assert.Single(rejections.Rows);
+        Assert.Equal("Stock.IntakeCorrectionRejected", row.Action);
+        Assert.Contains("only correct intakes you entered", row.Reason);
+        Assert.Equal(10m, w.Products.P.StockQuantity);
+        Assert.Equal(0, w.Uow.Saves);
+    }
+
+    [Fact]
+    public async Task Successful_correction_records_no_rejection()
+    {
+        var w = Arrange();
+        var rejections = new Rejections();
+        var handler = new StockIntakeHandler(w.Products, w.Store, w.Uow, w.Audit, rejections);
+        Assert.True((await handler.CorrectAsync(new CorrectIntakeCommand(w.Intake.Id, Staff, false, 1m, "typo", null))).IsSuccess);
+        Assert.Empty(rejections.Rows);
     }
 }

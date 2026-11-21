@@ -96,6 +96,7 @@ builder.Services.AddSingleton(
     builder.Configuration.GetSection(SessionPolicy.SectionName).Get<SessionPolicy>()
     ?? new SessionPolicy());
 builder.Services.AddScoped<IAuditTrail, AuditTrail>();
+builder.Services.AddSingleton<GHOST.Application.Abstractions.Auditing.IRejectionAudit, GHOST.Infrastructure.Persistence.RejectionAudit>();
 builder.Services.AddScoped<CancelSessionHandler>();
 builder.Services.AddScoped<SessionLifecycleHandler>();
 builder.Services.AddScoped<TransferSessionHandler>();

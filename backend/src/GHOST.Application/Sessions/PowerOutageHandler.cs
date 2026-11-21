@@ -42,13 +42,17 @@ public sealed class PowerOutageHandler
     private readonly IAuditTrail _audit;
     private readonly ISystemAuditTrail _systemAudit;
 
+    private readonly IRejectionAudit? _rejections;
+
     public PowerOutageHandler(
         IOutageRepository outages,
         ISessionRepository sessions,
         IUnitOfWork unitOfWork,
         IAuditTrail audit,
-        ISystemAuditTrail systemAudit)
+        ISystemAuditTrail systemAudit,
+        IRejectionAudit? rejections = null)
     {
+        _rejections = rejections;
         _outages = outages;
         _sessions = sessions;
         _unitOfWork = unitOfWork;
@@ -143,6 +147,15 @@ public sealed class PowerOutageHandler
 
     public async Task<Result<OutageApprovalResult>> ApproveAsync(
         ApproveOutageCommand command, DateTimeOffset now, CancellationToken cancellationToken = default)
+    {
+        var result = await ApproveCoreAsync(command, now, cancellationToken);
+        if (!result.IsSuccess)
+            await _rejections.RejectedAsync(command.AdminUserId, "Session.OutageApprovalRejected", "Session", command.SessionId, result.Error, cancellationToken);
+        return result;
+    }
+
+    private async Task<Result<OutageApprovalResult>> ApproveCoreAsync(
+        ApproveOutageCommand command, DateTimeOffset now, CancellationToken cancellationToken)
     {
         if (command.SessionId == Guid.Empty || command.EndShiftId == Guid.Empty || command.AdminUserId == Guid.Empty)
             return Result<OutageApprovalResult>.Failure("SessionId, EndShiftId and the acting user are required.");

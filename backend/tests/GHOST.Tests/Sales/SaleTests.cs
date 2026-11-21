@@ -130,6 +130,39 @@ public sealed class SaleTests
     }
 
     [Fact]
+    public void Refund_AfterOriginalShiftClosed_PostsCashOnTheOpenShift_AndKeepsInvoiceReference()
+    {
+        var shiftA = OpenShift();
+        var cola = Stocked("Cola", 20m, 10, 12m);
+        var sale = Sale.CheckoutCash(shiftA, Staff, "GS-1", new[] { Line(cola, 3) }, null, null, null);
+        shiftA.Close(shiftA.ExpectedCash, null);
+        var shiftB = new BusinessDay(new DateOnly(2026, 11, 22)).OpenShift(Guid.NewGuid(), 500m);
+        var products = new Dictionary<Guid, Product> { [cola.Id] = cola };
+
+        sale.RefundAll(Admin, "customer returned next day", true, shiftB, products);
+
+        Assert.Equal(440m, shiftB.ExpectedCash);
+        Assert.Equal(160m, shiftA.ExpectedCash);
+        var refundRow = shiftB.CashTransactions.Single(t => t.Type == CashTransactionType.Refund);
+        Assert.Equal(sale.Id, refundRow.SourceId);
+        Assert.Equal(shiftA.Id, sale.ShiftId);
+    }
+
+    [Fact]
+    public void Refund_IsBlockedWhenTheGivenShiftIsClosed_AndChangesNothing()
+    {
+        var shiftA = OpenShift();
+        var cola = Stocked("Cola", 20m, 10, 12m);
+        var sale = Sale.CheckoutCash(shiftA, Staff, "GS-1", new[] { Line(cola, 3) }, null, null, null);
+        shiftA.Close(shiftA.ExpectedCash, null);
+        var products = new Dictionary<Guid, Product> { [cola.Id] = cola };
+
+        Assert.Throws<BusinessRuleValidationException>(() => sale.RefundAll(Admin, "late", true, shiftA, products));
+        Assert.Equal(SaleStatus.Paid, sale.Status);
+        Assert.Equal(7m, cola.StockQuantity);
+    }
+
+    [Fact]
     public void RefundAll_WithoutReturnToStock_KeepsStockDown()
     {
         var shift = OpenShift();

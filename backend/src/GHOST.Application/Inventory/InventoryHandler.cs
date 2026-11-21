@@ -77,8 +77,11 @@ public sealed class InventoryHandler
     private readonly IUnitOfWork _unitOfWork;
     private readonly IAuditTrail _audit;
 
-    public InventoryHandler(IProductRepository products, IUnitOfWork unitOfWork, IAuditTrail audit)
+    private readonly IRejectionAudit? _rejections;
+
+    public InventoryHandler(IProductRepository products, IUnitOfWork unitOfWork, IAuditTrail audit, IRejectionAudit? rejections = null)
     {
+        _rejections = rejections;
         _products = products;
         _unitOfWork = unitOfWork;
         _audit = audit;
@@ -205,6 +208,17 @@ public sealed class InventoryHandler
         AdjustStockCommand command,
         bool actorIsAdmin,
         CancellationToken cancellationToken = default)
+    {
+        var result = await AdjustStockCoreAsync(command, actorIsAdmin, cancellationToken);
+        if (!result.IsSuccess)
+            await _rejections.RejectedAsync(command.ActorUserId, "Stock.AdjustRejected", "Product", command.ProductId, result.Error, cancellationToken);
+        return result;
+    }
+
+    private async Task<Result<StockMovementDto>> AdjustStockCoreAsync(
+        AdjustStockCommand command,
+        bool actorIsAdmin,
+        CancellationToken cancellationToken)
     {
         if (!actorIsAdmin && !ManualTypes.Contains(command.Type))
             return Result<StockMovementDto>.Failure("Only an Admin can record this movement type.");

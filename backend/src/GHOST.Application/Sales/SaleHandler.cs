@@ -53,6 +53,7 @@ public sealed class SaleHandler
     private readonly ISessionRepository _sessions;
     private readonly IUnitOfWork _unitOfWork;
     private readonly IAuditTrail _audit;
+    private readonly IRejectionAudit? _rejections;
 
     public SaleHandler(
         ISaleRepository sales,
@@ -60,8 +61,10 @@ public sealed class SaleHandler
         IShiftRepository shifts,
         ISessionRepository sessions,
         IUnitOfWork unitOfWork,
-        IAuditTrail audit)
+        IAuditTrail audit,
+        IRejectionAudit? rejections = null)
     {
+        _rejections = rejections;
         _sales = sales;
         _products = products;
         _shifts = shifts;
@@ -91,6 +94,16 @@ public sealed class SaleHandler
     public async Task<Result<SaleDto>> CheckoutCashAsync(
         CheckoutCommand command,
         CancellationToken cancellationToken = default)
+    {
+        var result = await CheckoutCoreAsync(command, cancellationToken);
+        if (!result.IsSuccess)
+            await _rejections.RejectedAsync(command.ActorUserId, "Sale.CheckoutRejected", "Shift", command.ShiftId, result.Error, cancellationToken);
+        return result;
+    }
+
+    private async Task<Result<SaleDto>> CheckoutCoreAsync(
+        CheckoutCommand command,
+        CancellationToken cancellationToken)
     {
         // Same key again returns the original invoice instead of charging twice (FR-54).
         if (!string.IsNullOrWhiteSpace(command.IdempotencyKey))
@@ -196,6 +209,20 @@ public sealed class SaleHandler
         bool returnToStock,
         Guid cashShiftId,
         CancellationToken cancellationToken = default)
+    {
+        var result = await RefundCoreAsync(saleId, adminUserId, reason, returnToStock, cashShiftId, cancellationToken);
+        if (!result.IsSuccess)
+            await _rejections.RejectedAsync(adminUserId, "Sale.RefundRejected", "Sale", saleId, result.Error, cancellationToken);
+        return result;
+    }
+
+    private async Task<Result<SaleDto>> RefundCoreAsync(
+        Guid saleId,
+        Guid adminUserId,
+        string reason,
+        bool returnToStock,
+        Guid cashShiftId,
+        CancellationToken cancellationToken)
     {
         var sale = await _sales.GetAsync(saleId, cancellationToken);
         if (sale is null)

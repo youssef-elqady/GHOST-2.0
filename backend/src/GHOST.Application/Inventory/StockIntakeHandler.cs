@@ -39,9 +39,11 @@ public sealed class StockIntakeHandler
     private readonly IStockIntakeStore _store;
     private readonly IUnitOfWork _unitOfWork;
     private readonly IAuditTrail _audit;
+    private readonly IRejectionAudit? _rejections;
 
-    public StockIntakeHandler(IProductRepository products, IStockIntakeStore store, IUnitOfWork unitOfWork, IAuditTrail audit)
+    public StockIntakeHandler(IProductRepository products, IStockIntakeStore store, IUnitOfWork unitOfWork, IAuditTrail audit, IRejectionAudit? rejections = null)
     {
+        _rejections = rejections;
         _products = products;
         _store = store;
         _unitOfWork = unitOfWork;
@@ -49,6 +51,14 @@ public sealed class StockIntakeHandler
     }
 
     public async Task<Result<StockMovementDto>> CorrectAsync(CorrectIntakeCommand command, CancellationToken cancellationToken = default)
+    {
+        var result = await CorrectCoreAsync(command, cancellationToken);
+        if (!result.IsSuccess)
+            await _rejections.RejectedAsync(command.ActorUserId, "Stock.IntakeCorrectionRejected", "StockMovement", command.MovementId, result.Error, cancellationToken);
+        return result;
+    }
+
+    private async Task<Result<StockMovementDto>> CorrectCoreAsync(CorrectIntakeCommand command, CancellationToken cancellationToken)
     {
         if (string.IsNullOrWhiteSpace(command.Reason))
             return Result<StockMovementDto>.Failure("A correction reason is required.");
