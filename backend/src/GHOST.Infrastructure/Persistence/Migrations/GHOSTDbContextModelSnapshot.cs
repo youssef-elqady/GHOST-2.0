@@ -22,6 +22,8 @@ namespace GHOST.Infrastructure.Persistence.Migrations
 
             SqlServerModelBuilderExtensions.UseIdentityColumns(modelBuilder);
 
+            modelBuilder.HasSequence("InternalBarcodes");
+
             modelBuilder.HasSequence("InvoiceNumbers");
 
             modelBuilder.Entity("GHOST.Domain.Entities.AuditLog", b =>
@@ -1076,6 +1078,91 @@ namespace GHOST.Infrastructure.Persistence.Migrations
                         });
                 });
 
+            modelBuilder.Entity("GHOST.Domain.Entities.Stocktake", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<DateTimeOffset?>("DecidedAt")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<Guid?>("DecidedById")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("DecisionNote")
+                        .HasMaxLength(500)
+                        .HasColumnType("nvarchar(500)");
+
+                    b.Property<byte[]>("RowVersion")
+                        .IsConcurrencyToken()
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("rowversion");
+
+                    b.Property<Guid>("StartedById")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<int>("Status")
+                        .HasColumnType("int");
+
+                    b.Property<DateTimeOffset?>("SubmittedAt")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<DateTimeOffset?>("UpdatedAt")
+                        .HasColumnType("datetimeoffset");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("DecidedById");
+
+                    b.HasIndex("StartedById");
+
+                    b.HasIndex("Status")
+                        .IsUnique()
+                        .HasDatabaseName("UX_Stocktakes_OnePerActiveState")
+                        .HasFilter("[Status] IN (1, 2)");
+
+                    b.ToTable("Stocktakes", null, t =>
+                        {
+                            t.HasCheckConstraint("CK_Stocktakes_Status", "[Status] IN (1, 2, 3, 4)");
+                        });
+                });
+
+            modelBuilder.Entity("GHOST.Domain.Entities.StocktakeItem", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<decimal?>("CountedQuantity")
+                        .HasColumnType("decimal(18,3)");
+
+                    b.Property<Guid>("ProductId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("ProductName")
+                        .IsRequired()
+                        .HasMaxLength(150)
+                        .HasColumnType("nvarchar(150)");
+
+                    b.Property<Guid>("StocktakeId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<decimal>("SystemQuantity")
+                        .HasColumnType("decimal(18,3)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ProductId");
+
+                    b.HasIndex("StocktakeId", "ProductId")
+                        .IsUnique()
+                        .HasDatabaseName("UX_StocktakeItems_Stocktake_Product");
+
+                    b.ToTable("StocktakeItems", (string)null);
+                });
+
             modelBuilder.Entity("GHOST.Infrastructure.Identity.ApplicationUser", b =>
                 {
                     b.Property<Guid>("Id")
@@ -1581,6 +1668,35 @@ namespace GHOST.Infrastructure.Persistence.Migrations
                         .IsRequired();
                 });
 
+            modelBuilder.Entity("GHOST.Domain.Entities.Stocktake", b =>
+                {
+                    b.HasOne("GHOST.Infrastructure.Identity.ApplicationUser", null)
+                        .WithMany()
+                        .HasForeignKey("DecidedById")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.HasOne("GHOST.Infrastructure.Identity.ApplicationUser", null)
+                        .WithMany()
+                        .HasForeignKey("StartedById")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("GHOST.Domain.Entities.StocktakeItem", b =>
+                {
+                    b.HasOne("GHOST.Domain.Entities.Product", null)
+                        .WithMany()
+                        .HasForeignKey("ProductId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("GHOST.Domain.Entities.Stocktake", null)
+                        .WithMany("Items")
+                        .HasForeignKey("StocktakeId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+                });
+
             modelBuilder.Entity("Microsoft.AspNetCore.Identity.IdentityRoleClaim<System.Guid>", b =>
                 {
                     b.HasOne("Microsoft.AspNetCore.Identity.IdentityRole<System.Guid>", null)
@@ -1674,6 +1790,11 @@ namespace GHOST.Infrastructure.Persistence.Migrations
                 });
 
             modelBuilder.Entity("GHOST.Domain.Entities.StockReceipt", b =>
+                {
+                    b.Navigation("Items");
+                });
+
+            modelBuilder.Entity("GHOST.Domain.Entities.Stocktake", b =>
                 {
                     b.Navigation("Items");
                 });

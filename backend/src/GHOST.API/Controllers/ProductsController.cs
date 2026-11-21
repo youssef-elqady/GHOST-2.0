@@ -18,11 +18,13 @@ namespace GHOST.API.Controllers;
 public sealed class ProductsController : ControllerBase
 {
     private readonly InventoryHandler _handler;
+    private readonly StocktakeHandler _stocktakeHandler;
     private readonly ICurrentUser _currentUser;
 
-    public ProductsController(InventoryHandler handler, ICurrentUser currentUser)
+    public ProductsController(InventoryHandler handler, StocktakeHandler stocktakeHandler, ICurrentUser currentUser)
     {
         _handler = handler;
+        _stocktakeHandler = stocktakeHandler;
         _currentUser = currentUser;
     }
 
@@ -137,6 +139,17 @@ public sealed class ProductsController : ControllerBase
         return result.IsSuccess
             ? StatusCode(StatusCodes.Status201Created, result.Value)
             : BadRequest(new { error = result.Error });
+    }
+
+    /// <summary>Gives a product without a manufacturer barcode its own internal EAN-13.</summary>
+    [HttpPost("{id:guid}/barcode")]
+    public async Task<IActionResult> GenerateBarcode(Guid id, CancellationToken cancellationToken)
+    {
+        if (_currentUser.UserId is not { } actorId)
+            return Unauthorized();
+
+        var result = await _stocktakeHandler.GenerateBarcodeAsync(id, actorId, cancellationToken);
+        return result.IsSuccess ? Ok(result.Value) : BadRequest(new { error = result.Error });
     }
 
     private async Task<IActionResult> SetStatus(Guid id, bool enabled, CancellationToken cancellationToken)

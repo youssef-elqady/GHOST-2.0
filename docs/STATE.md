@@ -1956,3 +1956,10 @@ Branch `feature/auth03-refresh-tokens`, based on `origin/feature/admin-frontend-
 - Device revenue is a time-share estimate at each segment's rate (before the per-session round-up), so it can differ slightly from invoiced gaming revenue.
 - Not done: real .xlsx and PDF files (CSV used so no new NuGet dependency), charts.
 - Queries are not run against SQL Server yet.
+
+### Blind stocktake and barcodes (offline session)
+- `api/stocktakes`: start (snapshots system quantities of tracked products; one active at a time), `PUT counts`, `submit` (every product must be counted), Admin `approve` or `reject`. Staff never see system quantity or difference while the count is open; they see them after submit.
+- Approval adjusts stock by counted minus the quantity at snapshot time, so sales made during the count are kept. Each adjustment is an append-only StocktakeAdjustment movement with the reason.
+- `POST api/products/{id}/barcode`: internal EAN-13 (prefix 200, SQL sequence `InternalBarcodes`) for products without a manufacturer barcode.
+- Migration `AddStocktakesAndBarcodes` not applied anywhere.
+- Not done: ProductUnits (per-unit barcodes), label printing, recount of single products after submit.
