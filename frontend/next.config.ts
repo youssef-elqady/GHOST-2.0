@@ -1,6 +1,8 @@
 import type { NextConfig } from 'next'
 
 const nextConfig: NextConfig = {
+  // Self-contained server bundle for the offline single-PC installer (see scripts/release/build-release.sh).
+  output: 'standalone',
   async headers() {
     return [{
       source: '/:path*',

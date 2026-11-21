@@ -1,0 +1,27 @@
+# Clean Windows machine test checklist (all items NOT YET RUN)
+
+Fill in Result and Evidence (screenshot or log line). Any FAIL means NOT READY. Use a fresh Windows 10/11 PC or VM with NO internet, NO Node, NO .NET, NO dev tools.
+
+| # | Test | Expected | Result | Evidence |
+|---|------|----------|--------|----------|
+| 1 | Run installer without admin rights | Stops with a clear message | | |
+| 2 | Install with SQL Express in prereq | Installs, DB GHOST created after typing the phrase, API READY | | |
+| 3 | Run installer again | No data loss, same login keeps working, nothing duplicated | | |
+| 4 | DB named GHOST already exists | Installer stops, DB untouched | | |
+| 5 | Check-GHOST.ps1 | all OK, listening on loopback only | | |
+| 6 | Another PC on the network opens http://<this-pc>:3000 | Cannot connect | | |
+| 7 | Unplug network, reboot | GHOST opens from the Desktop icon, full POS flow works offline | | |
+| 8 | Reboot with SQL Server slow | Screen waits for READY, no error page | | |
+| 9 | Kill GHOST.API.exe in Task Manager | Service restarts within about 5 s | | |
+| 10 | Kill node.exe | Task restarts the screen within about 1 min | | |
+| 11 | Close shift | Local backup file appears, audit row exists | | |
+| 12 | Unplug external drive, close shift | Close succeeds, alert shown, no false success | | |
+| 13 | Plug in WRONG drive (other marker) | Copy refused, alert | | |
+| 14 | Plug right drive, close shift | Copy verified | | |
+| 15 | Restore latest backup into a NEW database name, compare counts | Counts match | | |
+| 16 | Start a session, pull the power plug, start PC | Session NeedsReview, outage not billed, Admin sets end time and approves once | | |
+| 17 | Normal shutdown during a session, start | Session still Active, no outage flag (gap under threshold) or flagged per threshold | | |
+| 18 | Log in, reload browser, restart API | Session persists per refresh design | | |
+| 19 | Uninstall | Services and icons gone, DB and backups still there | | |
+| 20 | Uninstall -RemoveBackups, answer wrong phrase | Backups kept | | |
+| 21 | Scratch suite (SC-01..SC-10) on this SQL Server | all pass | | |
