@@ -25,3 +25,10 @@ Fill in Result and Evidence (screenshot or log line). Any FAIL means NOT READY. 
 | 19 | Uninstall | Services and icons gone, DB and backups still there | | |
 | 20 | Uninstall -RemoveBackups, answer wrong phrase | Backups kept | | |
 | 21 | Scratch suite (SC-01..SC-10) on this SQL Server | all pass | | |
+
+## Build-machine evidence (2026-11-21, Linux sandbox, steps run individually, same commands as build-release.sh)
+- API win-x64 self-contained publish: OK (401 files). Bootstrap publish: OK. EF migration bundle (ghost-migrate.exe, dotnet-ef 11.0.0 with EF 10 project): built OK, NOT executed (needs Windows and a scratch DB).
+- Frontend `pnpm build` (standalone): OK. The standalone `node server.js` started on Linux and answered HTTP 200 on / and /admin/shifts. Not browser-tested.
+- node.exe 22.11.0 downloaded; package assembled, SHA256SUMS written (2358 files), zip about 245 MB. The zip was built from the pieces, the script itself was not executed end to end.
+- PowerShell: all installer and deploy scripts parse with the PowerShell 7.4 parser (syntax only). They have NOT been run.
+- Nothing above proves the installer works on Windows. Rows 1-21 stay NOT RUN.
