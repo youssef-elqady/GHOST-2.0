@@ -71,3 +71,11 @@ Endpoints added:
 - Visibility: Admin all. Staff: own shifts only (others look like 404); sessions that are Active or started/ended in own shifts. Lists of shifts, audit logs and users are Admin only. User DTO excludes hashes and stamps.
 - Migration 11: AddAuditLogAtIndex (IX_AuditLogs_At).
 - Tests: Security/ReadApiAuthorizationTests.cs (15 tests).
+
+
+## Frontend: refresh-on-401 (Nov 21)
+- lib/ghost-api.ts: all calls send credentials; on 401 (not login/change-password/refresh/logout) one shared refresh, then one retry with the new token; failed refresh ends the session. Added refreshAccessToken, logoutRequest, configureApiAuth.
+- lib/admin-auth.tsx: restores the session on page load from the refresh cookie (no password), refreshes 60 s before expiry, real logout call, `restoring` flag.
+- components/admin-shell.tsx, admin-login.tsx: wait for restore before redirecting; logged-in visitors skip the login page.
+- tests/ghost-api-refresh.test.mts (4 tests, `pnpm test`): result 4 pass, 0 fail. `tsc --noEmit` clean, eslint 0 errors (9 old warnings), `next build` succeeds.
+- Not verified: real browser against a running API (needs SQL Server), cookie behaviour on a LAN HTTP origin (see LOCAL-DEPLOYMENT-REVIEW).

@@ -47,7 +47,7 @@ function readAdminPreferences(): AdminPreferences {
 }
 
 export function AdminShell({ section = 'overview', deviceId, recordId }: { section?: string; deviceId?: string; recordId?: string }) {
-  const { token, user, clearSession } = useAdminAuth()
+  const { token, restoring, user, logout: endSession } = useAdminAuth()
   const router = useRouter()
   const [menuOpen, setMenuOpen] = useState(false)
   const [collapsed, setCollapsed] = useState(false)
@@ -57,7 +57,7 @@ export function AdminShell({ section = 'overview', deviceId, recordId }: { secti
   const [timezone, setTimezone] = useState(initialPreferences.timezone)
   const [demoMode, setDemoMode] = useState(initialPreferences.demoMode)
   const title = useMemo(() => titles[section] ?? 'لوحة الإدارة', [section])
-  useEffect(() => { if (!token) router.replace('/admin/login') }, [token, router])
+  useEffect(() => { if (!token && !restoring) router.replace('/admin/login') }, [token, restoring, router])
   useEffect(() => {
     document.documentElement.classList.toggle('admin-theme-dark', dark)
     return () => document.documentElement.classList.remove('admin-theme-dark')
@@ -67,7 +67,7 @@ export function AdminShell({ section = 'overview', deviceId, recordId }: { secti
     window.localStorage.setItem('ghost-admin-theme', nextDark ? 'dark' : 'light')
     setDark(nextDark)
   }
-  const logout = () => { clearSession(); router.replace('/admin/login') }
+  const logout = () => { void endSession().then(() => router.replace('/admin/login')) }
   return <main className={`admin-v2 ${collapsed ? 'is-collapsed' : ''}`} dir="rtl">
     {menuOpen && <button className="admin-scrim" aria-label="إغلاق القائمة" onClick={() => setMenuOpen(false)} />}
     <aside className={`admin-sidebar ${menuOpen ? 'is-open' : ''} ${collapsed ? 'is-collapsed' : ''}`}>

@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, type FormEvent } from 'react'
+import { useEffect, useState, type FormEvent } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { ArrowLeft, Eye, EyeOff, LockKeyhole, ShieldCheck } from 'lucide-react'
@@ -9,8 +9,9 @@ import { useAdminAuth } from '@/lib/admin-auth'
 
 export function AdminLogin() {
   const router = useRouter()
-  const { setSession } = useAdminAuth()
+  const { setSession, token: restoredToken } = useAdminAuth()
   const [step, setStep] = useState<'login' | 'password'>('login')
+  useEffect(() => { if (restoredToken && step === 'login') router.replace('/admin') }, [restoredToken, step, router])
   const [username, setUsername] = useState('')
   const [password, setPassword] = useState('')
   const [newPassword, setNewPassword] = useState('')
