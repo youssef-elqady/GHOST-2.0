@@ -153,6 +153,15 @@ public sealed class SaleHandler
         }
         catch (PersistenceConflictException)
         {
+            // Two identical requests at the same instant (double tap, retry after timeout): the other one
+            // won the unique index on the idempotency key. Return its invoice instead of an error.
+            if (!string.IsNullOrWhiteSpace(command.IdempotencyKey))
+            {
+                var winner = await _sales.GetByIdempotencyKeyAsync(command.IdempotencyKey.Trim(), cancellationToken);
+                if (winner is not null && winner.CreatedById == command.ActorUserId && winner.ShiftId == command.ShiftId)
+                    return Result<SaleDto>.Success(ToDto(winner));
+            }
+
             return Result<SaleDto>.Failure(
                 "The stock or the drawer changed while you were selling. Please try again.");
         }

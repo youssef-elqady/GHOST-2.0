@@ -15,6 +15,9 @@ public sealed class StockReceiptConfiguration : IEntityTypeConfiguration<StockRe
             table.HasCheckConstraint("CK_StockReceipts_TotalCost", "[TotalCost] >= 0");
         });
 
+        // Guards approve vs reject: only one decision can win.
+        builder.Property<byte[]>("RowVersion").IsRowVersion();
+
         builder.HasKey(x => x.Id);
         builder.Property(x => x.Id).ValueGeneratedNever();
         builder.Property(x => x.SupplierName).HasMaxLength(150);

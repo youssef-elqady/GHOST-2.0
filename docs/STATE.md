@@ -1965,3 +1965,10 @@ Branch `feature/auth03-refresh-tokens`, based on `origin/feature/admin-frontend-
 - `POST api/products/{id}/barcode`: internal EAN-13 (prefix 200, SQL sequence `InternalBarcodes`) for products without a manufacturer barcode.
 - Migration `AddStocktakesAndBarcodes` not applied anywhere.
 - Not done: ProductUnits (per-unit barcodes), label printing, recount of single products after submit.
+
+## 2026-11-21 (evening): settings, alerts, backups, review fixes
+
+- Done in code: `SystemSettings` (Admin, audited, validated catalog), computed smart alerts (`GET api/alerts`), verified backups with retention (`api/backups`, daily job), report indexes, and review fixes R1 to R5 (see `CODE-REVIEW-SALES-INVENTORY-CASH.md`).
+- Tests: 191 unit tests pass, SQL Server tests 10 pass 4 skipped. 10 migrations generated, none applied to a real SQL Server yet.
+- New review docs: `CODE-REVIEW-SALES-INVENTORY-CASH.md`, `LOCAL-DEPLOYMENT-REVIEW.md` (local-only deployment, awaiting owner decisions).
+- Next: read APIs (current shift, sessions, shifts, audit logs, users), then frontend wiring (refresh-on-401 first), SQL Server scratch verification.

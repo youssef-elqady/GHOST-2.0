@@ -633,6 +633,11 @@ namespace GHOST.Infrastructure.Persistence.Migrations
                     b.Property<int>("PrintCount")
                         .HasColumnType("int");
 
+                    b.Property<byte[]>("RowVersion")
+                        .IsConcurrencyToken()
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("rowversion");
+
                     b.Property<Guid?>("SessionId")
                         .HasColumnType("uniqueidentifier");
 
@@ -1073,6 +1078,11 @@ namespace GHOST.Infrastructure.Persistence.Migrations
                     b.Property<string>("RejectionReason")
                         .HasMaxLength(500)
                         .HasColumnType("nvarchar(500)");
+
+                    b.Property<byte[]>("RowVersion")
+                        .IsConcurrencyToken()
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("rowversion");
 
                     b.Property<Guid>("ShiftId")
                         .HasColumnType("uniqueidentifier");

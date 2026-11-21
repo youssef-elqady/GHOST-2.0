@@ -16,7 +16,8 @@ public sealed class SaleRepository : ISaleRepository
     private IQueryable<Sale> WithChildren() => _db.Sales
         .Include(s => s.Items)
         .Include(s => s.Payments)
-        .Include(s => s.Refunds);
+        .Include(s => s.Refunds)
+        .AsSplitQuery();
 
     public Task<Sale?> GetAsync(Guid id, CancellationToken cancellationToken = default)
         => WithChildren().FirstOrDefaultAsync(s => s.Id == id, cancellationToken);
@@ -44,7 +45,7 @@ public sealed class SaleRepository : ISaleRepository
         Guid? createdById,
         CancellationToken cancellationToken = default)
     {
-        var query = _db.Sales.AsNoTracking().Include(s => s.Items).Include(s => s.Payments).Include(s => s.Refunds).AsQueryable();
+        var query = _db.Sales.AsNoTracking().Include(s => s.Items).Include(s => s.Payments).Include(s => s.Refunds).AsSplitQuery().AsQueryable();
         if (shiftId is not null) query = query.Where(s => s.ShiftId == shiftId);
         if (status is not null) query = query.Where(s => s.Status == status);
         if (createdById is not null) query = query.Where(s => s.CreatedById == createdById);

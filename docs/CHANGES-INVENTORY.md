@@ -53,3 +53,12 @@ Endpoints added:
 ## Docs
 
 `STATE.md` (updated), `STATUS-2026-11-21.md`, `NEXT-STEPS-AND-THINKING.md`, `FRONTEND-WIRING-PLAN.md`, this file.
+
+## Added later on 2026-11-21
+
+- Domain: `SystemSetting`, `BackupRecord` (`BackupType`, `BackupStatus`).
+- Application: `SettingsCatalog`, `SettingsHandler`, `AlertsHandler`, `IAlertQueries`, `BackupHandler`, `IDatabaseBackupGateway`, repository interfaces `ISettingsRepository`, `IBackupRepository`.
+- Infrastructure: `AlertQueries`, `SqlServerBackupGateway`, repositories, configurations; row versions on `Sale` and `StockReceipt`; indexes `IX_Sales_PaidAt`, `IX_CashTransactions_Type_CreatedAt`, `IX_Shifts_ClosedAt`, `IX_Sessions_CancelledAt`; migrations `AddSettingsBackupsAndReportIndexes` and `AddSaleAndReceiptRowVersions`.
+- API: `GET/PUT api/settings` (Admin), `GET api/alerts` (Admin), `GET/POST api/backups` (Admin), hosted `ScheduledBackupService`, `Backup:*` configuration (disabled by default).
+- Fixes: checkout idempotency race (R1), double-refund and approve/reject races (R2, R3), split queries (R4).
+- Tests: 191 unit tests (was 169).
