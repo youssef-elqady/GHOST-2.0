@@ -97,3 +97,9 @@ Endpoints added:
 ## Staff shift screen wired (Nov 21)
 - components/staff-shift.tsx replaces the placeholder ShiftView: reads current business day + own open shift, opens a shift with opening cash (own user id from the token), closes it with counted cash and optional reason. Expected cash and difference are decided by the server; the UI does not reveal expected cash before the count.
 - tsc clean, eslint 0 errors, next build ok. No component tests (no framework); not run in a browser against a live API.
+
+## Staff sessions wired (Nov 21)
+- staff-dashboard.tsx: loads own open shift and active sessions (GET api/sessions?status=Active) next to devices; start-session button now calls POST api/sessions with the open shift id (disabled with a hint when no shift is open); busy states block double taps.
+- components/staff-session-controls.tsx: pause/resume, complete (end shift = current shift), transfer to an available device with play type. Playing devices are now clickable. All rules stay on the server; its Arabic error is shown.
+- Opening/closing a shift refreshes the dashboard.
+- tsc clean, eslint 0 errors, next build ok. Not browser-tested against a live API; no component test framework.

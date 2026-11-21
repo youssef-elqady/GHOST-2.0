@@ -1,7 +1,8 @@
 'use client'
 
 import { useEffect, useMemo, useState } from 'react'
-import { getDevices, type ApiDevice } from '@/lib/ghost-api'
+import { getCurrentShift, getDevices, listSessions, startSession, type ApiDevice, type ApiSessionSummary, type ApiShift } from '@/lib/ghost-api'
+import { SessionControls } from '@/components/staff-session-controls'
 import { StaffShiftView } from '@/components/staff-shift'
 import { ThemeToggle } from '@/components/theme-toggle'
 import {
@@ -34,7 +35,7 @@ import {
   Zap,
 } from 'lucide-react'
 
-type Device = { id: string; name: string; type: string; room: string; status: 'available' | 'playing' | 'maintenance'; rates?: ApiDevice['rates']; duration?: string; game?: string; price?: string }
+type Device = { id: string; name: string; type: string; room: string; status: 'available' | 'playing' | 'maintenance'; rates?: ApiDevice['rates']; apiStatus?: string; duration?: string; game?: string; price?: string }
 
 function mapApiDevice(device: ApiDevice): Device {
   const status = device.status.toLowerCase()
@@ -49,6 +50,7 @@ function mapApiDevice(device: ApiDevice): Device {
     room: 'الأجهزة المسجلة',
     status: uiStatus,
     rates: device.rates,
+    apiStatus: device.status,
   }
 }
 
@@ -60,6 +62,20 @@ export function StaffDashboard({ token, userId, userName, onLogout }: { token: s
   const [selectedDevice, setSelectedDevice] = useState<Device | null>(null)
   const [mode, setMode] = useState<'single' | 'multi'>('single')
   const [mobileNav, setMobileNav] = useState(false)
+  const [shift, setShift] = useState<ApiShift | null>(null)
+  const [activeSessions, setActiveSessions] = useState<ApiSessionSummary[]>([])
+  const [refreshKey, setRefreshKey] = useState(0)
+  const [startBusy, setStartBusy] = useState(false)
+  const [startError, setStartError] = useState('')
+  const refresh = () => setRefreshKey((key) => key + 1)
+
+  useEffect(() => {
+    let cancelled = false
+    Promise.all([getCurrentShift(token), listSessions(token, { status: 'Active', pageSize: 100 })])
+      .then(([currentShift, sessions]) => { if (!cancelled) { setShift(currentShift); setActiveSessions(sessions.items) } })
+      .catch(() => { /* devices error banner already explains connectivity */ })
+    return () => { cancelled = true }
+  }, [token, refreshKey])
 
   useEffect(() => {
     let cancelled = false
@@ -81,7 +97,22 @@ export function StaffDashboard({ token, userId, userName, onLogout }: { token: s
     return () => {
       cancelled = true
     }
-  }, [token])
+  }, [token, refreshKey])
+
+  async function startNow() {
+    if (!selectedDevice || !shift || startBusy) return
+    setStartBusy(true)
+    setStartError('')
+    try {
+      await startSession(token, shift.id, selectedDevice.id, mode === 'single' ? 'Single' : 'Multi')
+      setSelectedDevice(null)
+      refresh()
+    } catch (reason) {
+      setStartError(reason instanceof Error ? reason.message : 'تعذر بدء الجلسة.')
+    } finally {
+      setStartBusy(false)
+    }
+  }
 
   const grouped = useMemo(() => {
     return devices.reduce<Record<string, Device[]>>((acc, device) => {
@@ -135,18 +166,19 @@ export function StaffDashboard({ token, userId, userName, onLogout }: { token: s
         {activeNav === 'devices' && <DevicesView devices={devices} onBack={() => setActiveNav('overview')} onSelect={(device) => setSelectedDevice(device)} />}
         {activeNav === 'products' && <ProductsView />}
         {activeNav === 'payments' && <PaymentsView />}
-        {activeNav === 'shift' && <StaffShiftView token={token} userId={userId} onBack={() => setActiveNav('overview')} />}
+        {activeNav === 'shift' && <StaffShiftView token={token} userId={userId} onChanged={refresh} onBack={() => setActiveNav('overview')} />}
         {activeNav === 'messages' && <MessagesView />}
         {activeNav === 'history' && <HistoryView />}
       </section>
 
-      {selectedDevice && <div className="modal-backdrop" onClick={() => setSelectedDevice(null)}><div className="session-modal" onClick={(e) => e.stopPropagation()}><div className="modal-header"><div><span className="eyebrow session-step">الخطوة 1 من 2 · إعداد الجلسة</span><h2>بدء جلسة جديدة</h2><p><strong>{selectedDevice.name}</strong> · {selectedDevice.room}</p></div><button className="icon-button" onClick={() => setSelectedDevice(null)} aria-label="إغلاق"><X size={18} /></button></div><div className="mode-select"><label>نوع الجلسة</label><div className="mode-buttons"><button className={mode === 'single' ? 'selected' : ''} onClick={() => setMode('single')}><Gamepad2 size={18} /><strong>فردية</strong><span>Single player</span></button><button className={mode === 'multi' ? 'selected' : ''} onClick={() => setMode('multi')}><Users size={18} /><strong>متعددة</strong><span>Multiplayer</span></button></div></div><div className="form-grid"><div><label>التسعيرة المعتمدة</label><strong>{(() => { const rate = selectedDevice.rates?.find((item) => item.playType.toLowerCase() === mode); return rate ? `${rate.hourlyRate.toFixed(2)} ج.م / ساعة` : 'لا توجد تسعيرة لهذا النوع' })()}</strong></div><div><label>حالة الربط</label><strong>بدء الجلسة ينتظر تحديد الشيفت والموظف</strong></div></div><div className="modal-note"><ShieldCheck size={16} /> الأسعار المعروضة من إعدادات الجهاز المحفوظة في النظام.</div><button className="primary-button" disabled title="يجب ربط الشيفت المفتوح والتحقق من هوية الموظف أولاً">بدء الجلسة بعد ربط الشيفت <ChevronLeft size={16} /></button></div></div>}
+      {selectedDevice && selectedDevice.status === 'available' && <div className="modal-backdrop" onClick={() => setSelectedDevice(null)}><div className="session-modal" onClick={(e) => e.stopPropagation()}><div className="modal-header"><div><span className="eyebrow session-step">الخطوة 1 من 2 · إعداد الجلسة</span><h2>بدء جلسة جديدة</h2><p><strong>{selectedDevice.name}</strong> · {selectedDevice.room}</p></div><button className="icon-button" onClick={() => setSelectedDevice(null)} aria-label="إغلاق"><X size={18} /></button></div><div className="mode-select"><label>نوع الجلسة</label><div className="mode-buttons"><button className={mode === 'single' ? 'selected' : ''} onClick={() => setMode('single')}><Gamepad2 size={18} /><strong>فردية</strong><span>Single player</span></button><button className={mode === 'multi' ? 'selected' : ''} onClick={() => setMode('multi')}><Users size={18} /><strong>متعددة</strong><span>Multiplayer</span></button></div></div><div className="form-grid"><div><label>التسعيرة المعتمدة</label><strong>{(() => { const rate = selectedDevice.rates?.find((item) => item.playType.toLowerCase() === mode); return rate ? `${rate.hourlyRate.toFixed(2)} ج.م / ساعة` : 'لا توجد تسعيرة لهذا النوع' })()}</strong></div><div><label>حالة الربط</label><strong>{shift ? 'الشيفت المفتوح جاهز' : 'افتح شيفتك أولًا من شاشة شيفتي'}</strong></div></div><div className="modal-note"><ShieldCheck size={16} /> الأسعار المعروضة من إعدادات الجهاز المحفوظة في النظام.</div>{startError && <p className="admin-login-error" role="alert">{startError}</p>}<button className="primary-button" disabled={!shift || startBusy} onClick={startNow}>{startBusy ? 'جارٍ البدء…' : 'بدء الجلسة'} <ChevronLeft size={16} /></button></div></div>}
+      {selectedDevice && selectedDevice.status === 'playing' && <SessionControls token={token} device={{ id: selectedDevice.id, name: selectedDevice.name, apiStatus: selectedDevice.apiStatus ?? '' }} sessionId={activeSessions.find((x) => x.currentDeviceId === selectedDevice.id)?.id ?? null} shiftId={shift?.id ?? null} targets={devices.filter((d) => d.status === 'available').map((d) => ({ id: d.id, name: d.name }))} onClose={() => setSelectedDevice(null)} onDone={() => { setSelectedDevice(null); refresh() }} />}
     </main>
   )
 }
 
 function DevicesView({ devices, onBack, onSelect }: { devices: Device[]; onBack: () => void; onSelect: (device: Device) => void }) {
-  return <div className="inner-page"><button className="back-link" onClick={onBack}><ChevronLeft size={16} /> العودة للرئيسية</button><div className="page-heading compact"><div><p className="eyebrow">التشغيل اليومي · الأجهزة المصرّح بها</p><h1>الأجهزة والجلسات</h1><p className="subheading">اختر جهازاً متاحاً لبدء جلسة وفق التسعيرة المعتمدة.</p></div><span className="secure-label"><ShieldCheck size={15} /> صلاحيات الموظف</span></div><div className="device-groups">{Object.entries(devices.reduce<Record<string, Device[]>>((a, d) => { a[d.room] = [...(a[d.room] || []), d]; return a }, {})).map(([room, items]) => <section className="room-section" key={room}><div className="room-title"><div><h3>{room}</h3><span>{items.length} أجهزة · <b>{items.filter((d) => d.status === 'available').length} متاحة</b></span></div></div><div className="device-grid">{items.map((device) => <button className={`device-card ${device.status}`} key={device.id} disabled={device.status !== 'available'} onClick={() => onSelect(device)}><div className="device-card-top"><span className="device-id">{device.id}</span><span className={`status-label ${device.status}`}><i />{statusLabel(device.status)}</span></div><div className="device-icon"><Gamepad2 size={23} /></div><h4>{device.name}</h4><p>{device.type}</p>{device.status === 'available' ? <span className="start-hint">بدء جلسة فردية أو متعددة <Zap size={14} /></span> : <span className="maintenance-note">{device.status === 'playing' ? 'جلسة قيد التشغيل' : 'غير متاح مؤقتاً'}</span>}</button>)}</div></section>)}</div></div>
+  return <div className="inner-page"><button className="back-link" onClick={onBack}><ChevronLeft size={16} /> العودة للرئيسية</button><div className="page-heading compact"><div><p className="eyebrow">التشغيل اليومي · الأجهزة المصرّح بها</p><h1>الأجهزة والجلسات</h1><p className="subheading">اختر جهازاً متاحاً لبدء جلسة وفق التسعيرة المعتمدة.</p></div><span className="secure-label"><ShieldCheck size={15} /> صلاحيات الموظف</span></div><div className="device-groups">{Object.entries(devices.reduce<Record<string, Device[]>>((a, d) => { a[d.room] = [...(a[d.room] || []), d]; return a }, {})).map(([room, items]) => <section className="room-section" key={room}><div className="room-title"><div><h3>{room}</h3><span>{items.length} أجهزة · <b>{items.filter((d) => d.status === 'available').length} متاحة</b></span></div></div><div className="device-grid">{items.map((device) => <button className={`device-card ${device.status}`} key={device.id} disabled={device.status === 'maintenance'} onClick={() => onSelect(device)}><div className="device-card-top"><span className="device-id">{device.id}</span><span className={`status-label ${device.status}`}><i />{statusLabel(device.status)}</span></div><div className="device-icon"><Gamepad2 size={23} /></div><h4>{device.name}</h4><p>{device.type}</p>{device.status === 'available' ? <span className="start-hint">بدء جلسة فردية أو متعددة <Zap size={14} /></span> : <span className="maintenance-note">{device.status === 'playing' ? 'إدارة الجلسة الجارية' : 'غير متاح مؤقتاً'}</span>}</button>)}</div></section>)}</div></div>
 }
 
 function ProductsView() {
