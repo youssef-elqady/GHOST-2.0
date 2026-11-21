@@ -110,3 +110,6 @@ export type ApiInvoicePrint = { sale: ApiSale; isCopy: boolean; label: string }
 export function printInvoice(token: string, saleId: string) { return request<ApiInvoicePrint>(`/api/sales/${enc(saleId)}/print`, { method: 'POST' }, token) }
 export function newIdempotencyKey() { return globalThis.crypto.randomUUID() }
 export function getProducts(token: string, search?: string) { return request<ApiProduct[]>(`/api/products?status=Active${search ? `&search=${enc(search)}` : ''}`, undefined, token) }
+export type ApiOutageItem = { sessionId: string; deviceId: string | null; deviceName: string | null; startedAt: string; outageStartedAt: string; outageEndedAt: string; amountIfEndedAtOutageStart: number; billableSecondsSoFar: number }
+export function getOutageReview(token: string) { return request<ApiOutageItem[]>('/api/sessions/outage-review', undefined, token) }
+export function approveOutage(token: string, sessionId: string, endShiftId: string, actualEndAt: string, note?: string) { return request<{ sessionId: string; totalAmount: number; billableSeconds: number }>(`/api/sessions/outage-review/${enc(sessionId)}/approve`, { method: 'POST', body: JSON.stringify({ endShiftId, actualEndAt, note }) }, token) }

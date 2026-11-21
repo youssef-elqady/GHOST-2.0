@@ -9,6 +9,7 @@ import { Badge, type BadgeTone } from '@/components/ui/badge'
 import { Empty } from '@/components/ui/empty'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { PageHeader } from '@/components/ui/page-header'
+import { AdminOutageReview } from '@/components/admin-outage-review'
 import { AdminDeviceManager } from '@/components/admin-device-manager'
 import { clearDeviceQueryCache, getDeviceQuery } from '@/lib/device-query'
 import { formatCurrency, formatDate, formatDigits, type DigitMode } from '@/lib/admin-format'
@@ -336,6 +337,6 @@ function DemoPage({ section, token, deviceId, recordId, digits, timezone, demoMo
 
 export function AdminSectionView(props: SectionProps) {
   const { section, token, ...rest } = props
-  if (section === 'overview') return <AdminOverview token={token} digits={rest.digits} timezone={rest.timezone} demoMode={rest.demoMode} />
+  if (section === 'overview') return <><AdminOutageReview token={token} /><AdminOverview token={token} digits={rest.digits} timezone={rest.timezone} demoMode={rest.demoMode} /></>
   return <DemoPage section={section} token={token} {...rest} />
 }
