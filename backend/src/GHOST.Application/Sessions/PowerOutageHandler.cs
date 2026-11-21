@@ -160,6 +160,9 @@ public sealed class PowerOutageHandler
         if (command.SessionId == Guid.Empty || command.EndShiftId == Guid.Empty || command.AdminUserId == Guid.Empty)
             return Result<OutageApprovalResult>.Failure("SessionId, EndShiftId and the acting user are required.");
 
+        if (string.IsNullOrWhiteSpace(command.Note) || command.Note.Trim().Length < 3)
+            return Result<OutageApprovalResult>.Failure("A reason is required to set the real end time of an outage session.");
+
         var session = await _sessions.GetByIdAsync(command.SessionId, cancellationToken);
         if (session is null)
             return Result<OutageApprovalResult>.Failure("Session was not found.");
