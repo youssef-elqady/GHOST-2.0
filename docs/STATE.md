@@ -1945,3 +1945,8 @@ Branch `feature/auth03-refresh-tokens`, based on `origin/feature/admin-frontend-
 - Product has a RowVersion so two sales cannot take the last unit (FR-37).
 - Not done: partial refunds, non-cash payments, draft invoices, the actual 80mm print layout, customers.
 - Migration `AddSalesAndInvoices` not applied anywhere (includes the sequence and filtered unique indexes).
+
+### Reports (offline session)
+- `GET api/reports/dashboard?from=&to=` (Admin only): invoices, gross/gaming/product revenue, discounts, refunds, net revenue, product cost and profit, expenses, withdrawals, stock purchases, gaming hours, active sessions, pending receipts, pending-pricing products, top 5 products, low stock.
+- The EF queries are written but have NOT been run against SQL Server (no unit tests: they need a real database). Check the numbers by hand against a few test invoices.
+- Not done: PDF/Excel export, per-day series/charts data, shift report, employee report, device utilization.

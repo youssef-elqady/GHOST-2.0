@@ -84,6 +84,7 @@ builder.Services.AddScoped<IShiftRepository, ShiftRepository>();
 builder.Services.AddScoped<ShiftCashHandler>();
 builder.Services.AddScoped<IProductRepository, ProductRepository>();
 builder.Services.AddScoped<ISaleRepository, SaleRepository>();
+builder.Services.AddScoped<GHOST.Application.Reports.IReportQueries, GHOST.Infrastructure.Persistence.ReportQueries>();
 builder.Services.AddScoped<GHOST.Application.Sales.SaleHandler>();
 builder.Services.AddScoped<IStockReceiptRepository, StockReceiptRepository>();
 builder.Services.AddScoped<GHOST.Application.Inventory.StockReceiptHandler>();
