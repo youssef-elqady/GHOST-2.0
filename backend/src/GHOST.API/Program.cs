@@ -28,12 +28,14 @@ builder.Services
 
 builder.Services.AddOpenApi();
 
+var allowedOrigins = GHOST.API.Authentication.LocalOriginPolicy.Validate(
+    builder.Configuration.GetSection("Authentication:RefreshToken:AllowedOrigins").Get<string[]>()
+    ?? new GHOST.API.Authentication.RefreshTokenOptions().AllowedOrigins);
+
 builder.Services.AddCors(options =>
 {
     options.AddPolicy("GhostFrontend", policy =>
-        policy.WithOrigins(
-                "http://localhost:3000",
-                "http://127.0.0.1:3000")
+        policy.WithOrigins(allowedOrigins)
             .AllowAnyHeader()
             .AllowAnyMethod()
             .AllowCredentials());
