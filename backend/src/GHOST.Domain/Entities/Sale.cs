@@ -134,6 +134,14 @@ public sealed class Sale : BaseEntity
     public decimal PaidTotal { get; private set; }
     public int PrintCount { get; private set; }
     public string? IdempotencyKey { get; private set; }
+
+    /// <summary>
+    /// SHA-256 of what this checkout asked for (lines, session, discount). A retry with the same key must match it,
+    /// so a key can never be reused for a different purchase. Two separate purchases use two different keys.
+    /// </summary>
+    public string? RequestFingerprint { get; private set; }
+
+    public void SetRequestFingerprint(string fingerprint) => RequestFingerprint = fingerprint;
     public DateTimeOffset? PaidAt { get; private set; }
 
     public IReadOnlyCollection<SaleItem> Items => _items.AsReadOnly();

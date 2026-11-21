@@ -643,6 +643,10 @@ namespace GHOST.Infrastructure.Persistence.Migrations
                     b.Property<int>("PrintCount")
                         .HasColumnType("int");
 
+                    b.Property<string>("RequestFingerprint")
+                        .HasMaxLength(64)
+                        .HasColumnType("nvarchar(64)");
+
                     b.Property<byte[]>("RowVersion")
                         .IsConcurrencyToken()
                         .ValueGeneratedOnAddOrUpdate()

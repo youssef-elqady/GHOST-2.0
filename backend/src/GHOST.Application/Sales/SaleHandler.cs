@@ -70,6 +70,24 @@ public sealed class SaleHandler
         _audit = audit;
     }
 
+    private static bool SameCheckout(Sale existing, CheckoutCommand command)
+        => existing.CreatedById == command.ActorUserId
+           && existing.ShiftId == command.ShiftId
+           && (existing.RequestFingerprint is null || existing.RequestFingerprint == Fingerprint(command));
+
+    /// <summary>Canonical hash of the request content. Order of lines does not matter.</summary>
+    internal static string Fingerprint(CheckoutCommand command)
+    {
+        var lines = string.Join(";", command.Lines
+            .OrderBy(l => l.ProductId)
+            .Select(l => FormattableString.Invariant($"{l.ProductId:N}x{l.Quantity:0.####}")));
+        var discount = command.Discount is { Type: not DiscountType.None } d
+            ? FormattableString.Invariant($"{(int)d.Type}:{d.Value:0.####}")
+            : "none";
+        var raw = FormattableString.Invariant($"{command.ShiftId:N}|{command.SessionId:N}|{lines}|{discount}");
+        return Convert.ToHexString(System.Security.Cryptography.SHA256.HashData(System.Text.Encoding.UTF8.GetBytes(raw)));
+    }
+
     public async Task<Result<SaleDto>> CheckoutCashAsync(
         CheckoutCommand command,
         CancellationToken cancellationToken = default)
@@ -80,7 +98,7 @@ public sealed class SaleHandler
             var existing = await _sales.GetByIdempotencyKeyAsync(command.IdempotencyKey.Trim(), cancellationToken);
             if (existing is not null)
             {
-                return existing.CreatedById == command.ActorUserId && existing.ShiftId == command.ShiftId
+                return SameCheckout(existing, command)
                     ? Result<SaleDto>.Success(ToDto(existing))
                     : Result<SaleDto>.Failure("This idempotency key was already used for a different invoice.");
             }
@@ -131,6 +149,7 @@ public sealed class SaleHandler
                 discount,
                 command.IdempotencyKey);
 
+            sale.SetRequestFingerprint(Fingerprint(command));
             await _sales.AddAsync(sale, cancellationToken);
 
             _audit.Record(
@@ -161,7 +180,7 @@ public sealed class SaleHandler
             if (!string.IsNullOrWhiteSpace(command.IdempotencyKey))
             {
                 var winner = await _sales.GetByIdempotencyKeyAsync(command.IdempotencyKey.Trim(), cancellationToken);
-                if (winner is not null && winner.CreatedById == command.ActorUserId && winner.ShiftId == command.ShiftId)
+                if (winner is not null && SameCheckout(winner, command))
                     return Result<SaleDto>.Success(ToDto(winner));
             }
 

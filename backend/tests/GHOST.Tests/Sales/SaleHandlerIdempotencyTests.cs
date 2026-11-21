@@ -157,6 +157,37 @@ public sealed class SaleHandlerIdempotencyTests
     }
 
     [Fact]
+    public async Task TwoSeparatePurchases_WithIdenticalCart_AndDifferentKeys_BothGoThrough()
+    {
+        var w = new World();
+
+        var first = await w.Handler.CheckoutCashAsync(w.Command("buy-1"));
+        var second = await w.Handler.CheckoutCashAsync(w.Command("buy-2"));
+
+        Assert.True(first.IsSuccess);
+        Assert.True(second.IsSuccess);
+        Assert.NotEqual(first.Value!.Id, second.Value!.Id);
+        Assert.Equal(2, w.Sales.Rows.Count);
+        Assert.Equal(4m, w.Cola.StockQuantity);
+        Assert.Equal(220m, w.Shifts.Shift.ExpectedCash);
+    }
+
+    [Fact]
+    public async Task SameKey_ForDifferentCartContent_IsRejected_AndChargesNothingExtra()
+    {
+        var w = new World();
+        await w.Handler.CheckoutCashAsync(w.Command("k-9"));
+
+        var different = new CheckoutCommand(w.Shifts.Shift.Id, Staff, false,
+            new[] { new SaleLineInput(w.Cola.Id, 5) }, null, null, "k-9");
+        var result = await w.Handler.CheckoutCashAsync(different);
+
+        Assert.False(result.IsSuccess);
+        Assert.Single(w.Sales.Rows);
+        Assert.Equal(7m, w.Cola.StockQuantity);
+    }
+
+    [Fact]
     public async Task KeyUsedByAnotherStaff_IsRejected_NotReplayed()
     {
         var w = new World();
