@@ -121,3 +121,8 @@ export function listStockReceipts(token: string) { return request<ApiReceipt[]>(
 export function getProductMovements(token: string, productId: string, take = 30) { return request<ApiStockMovement[]>(`/api/products/${enc(productId)}/movements?take=${take}`, undefined, token) }
 export function correctIntake(token: string, movementId: string, quantity: number, reason: string, shiftId?: string) { return request<unknown>(`/api/stock-intake/movements/${enc(movementId)}/correct`, { method: 'POST', body: JSON.stringify({ quantity, reason, shiftId }) }, token) }
 export function getIntakeReport(token: string, rangeFrom: string, rangeTo: string) { return request<IntakeReportRow[]>(`/api/stock-intake/report?rangeFrom=${enc(rangeFrom)}&rangeTo=${enc(rangeTo)}`, undefined, token) }
+export function listSales(token: string, query: { shiftId?: string; status?: string } = {}) {
+  const p = new URLSearchParams(); if (query.shiftId) p.set('shiftId', query.shiftId); if (query.status) p.set('status', query.status)
+  return request<ApiSale[]>(`/api/sales${p.size ? `?${p}` : ''}`, undefined, token)
+}
+export function refundSale(token: string, saleId: string, input: { reason: string; returnToStock: boolean; cashShiftId: string }) { return request<ApiSale>(`/api/sales/${enc(saleId)}/refund`, { method: 'POST', body: JSON.stringify(input) }, token) }
