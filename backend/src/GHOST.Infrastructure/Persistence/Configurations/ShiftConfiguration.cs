@@ -63,6 +63,11 @@ public sealed class ShiftConfiguration : IEntityTypeConfiguration<Shift>
         builder.Property<byte[]>("RowVersion")
             .IsRowVersion();
 
+        builder.Metadata.FindNavigation(nameof(Shift.CashTransactions))?
+            .SetField("_cashTransactions");
+        builder.Metadata.FindNavigation(nameof(Shift.CashTransactions))?
+            .SetPropertyAccessMode(PropertyAccessMode.Field);
+
         builder.HasIndex(s => s.BusinessDayId);
         builder.HasIndex(s => s.StaffUserId);
         builder.HasIndex(s => s.Status);

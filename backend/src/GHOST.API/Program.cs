@@ -5,6 +5,7 @@ using GHOST.API.Security;
 using GHOST.Application.Abstractions.CurrentUser;
 using GHOST.Application.Abstractions.Persistence;
 using GHOST.Application.BusinessDays.CloseShift;
+using GHOST.Application.Cash;
 using GHOST.Application.BusinessDays.OpenBusinessDay;
 using GHOST.Application.BusinessDays.OpenShift;
 using GHOST.Application.Devices.CreateDevice;
@@ -73,6 +74,8 @@ builder.Services.AddScoped<ISessionRepository, SessionRepository>();
 builder.Services.AddScoped<StartSessionHandler>();
 builder.Services.AddScoped<SessionLifecycleHandler>();
 builder.Services.AddScoped<TransferSessionHandler>();
+builder.Services.AddScoped<IShiftRepository, ShiftRepository>();
+builder.Services.AddScoped<ShiftCashHandler>();
 builder.Services.AddScoped<OpenShiftHandler>();
 builder.Services.AddScoped<CloseShiftHandler>();
 

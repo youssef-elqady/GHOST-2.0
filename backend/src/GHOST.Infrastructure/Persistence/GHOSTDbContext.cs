@@ -17,6 +17,7 @@ public sealed class GHOSTDbContext
     public DbSet<SessionSegment> SessionSegments => Set<SessionSegment>();
     public DbSet<SessionPause> SessionPauses => Set<SessionPause>();
     public DbSet<AuditLog> AuditLogs => Set<AuditLog>();
+    public DbSet<CashTransaction> CashTransactions => Set<CashTransaction>();
     public DbSet<RefreshToken> RefreshTokens => Set<RefreshToken>();
 
     public GHOSTDbContext(DbContextOptions<GHOSTDbContext> options) : base(options)

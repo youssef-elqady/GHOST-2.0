@@ -12,7 +12,7 @@ public sealed class CloseShiftHandlerTests
     {
         var day = new BusinessDay(new DateOnly(2026, 10, 19));
         var shift = day.OpenShift(Guid.NewGuid(), 250m);
-        shift.UpdateExpectedCash(400m);
+        shift.RecordCash(GHOST.Domain.Enums.CashTransactionType.StockPurchaseReversal, GHOST.Domain.Enums.CashDirection.In, 150m, shift.StaffUserId, "test top-up");
         var repository = new FakeBusinessDayRepository(day);
         var unitOfWork = new FakeUnitOfWork();
         var handler = new CloseShiftHandler(repository, unitOfWork);
@@ -35,7 +35,7 @@ public sealed class CloseShiftHandlerTests
     {
         var day = new BusinessDay(new DateOnly(2026, 10, 19));
         var shift = day.OpenShift(Guid.NewGuid(), 250m);
-        shift.UpdateExpectedCash(400m);
+        shift.RecordCash(GHOST.Domain.Enums.CashTransactionType.StockPurchaseReversal, GHOST.Domain.Enums.CashDirection.In, 150m, shift.StaffUserId, "test top-up");
         var repository = new FakeBusinessDayRepository(day);
         var unitOfWork = new FakeUnitOfWork();
         var handler = new CloseShiftHandler(repository, unitOfWork);

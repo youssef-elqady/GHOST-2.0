@@ -6,6 +6,10 @@ namespace GHOST.Domain.Entities;
 
 public sealed class Shift : BaseEntity
 {
+    private readonly List<CashTransaction> _cashTransactions = new();
+
+    public IReadOnlyCollection<CashTransaction> CashTransactions => _cashTransactions.AsReadOnly();
+
     public Guid BusinessDayId { get; private set; }
 
     public Guid StaffUserId { get; private set; }
@@ -47,22 +51,72 @@ public sealed class Shift : BaseEntity
         ExpectedCash = openingCash;
         Status = ShiftStatus.Open;
         OpenedAt = DateTimeOffset.UtcNow;
+
+        _cashTransactions.Add(CashTransaction.Create(
+            Id,
+            CashTransactionType.OpeningBalance,
+            CashDirection.In,
+            openingCash,
+            staffUserId,
+            reason: null,
+            category: null,
+            beneficiaryUserId: null,
+            sourceType: null,
+            sourceId: null,
+            idempotencyKey: null,
+            OpenedAt));
     }
 
-    public void UpdateExpectedCash(decimal newExpectedCash)
+    /// <summary>
+    /// Appends a cash movement to this shift's ledger and moves <see cref="ExpectedCash"/> by
+    /// the signed amount. Expected cash is never set directly. Re-sending the same
+    /// idempotency key returns the original entry without a second movement.
+    /// </summary>
+    public CashTransaction RecordCash(
+        CashTransactionType type,
+        CashDirection direction,
+        decimal amount,
+        Guid createdById,
+        string? reason = null,
+        string? category = null,
+        Guid? beneficiaryUserId = null,
+        string? sourceType = null,
+        Guid? sourceId = null,
+        string? idempotencyKey = null)
     {
         if (Status != ShiftStatus.Open)
+            throw new BusinessRuleValidationException("Cannot record cash on a closed shift.");
+
+        if (type == CashTransactionType.OpeningBalance)
+            throw new BusinessRuleValidationException("The opening balance is recorded when the shift opens.");
+
+        var key = string.IsNullOrWhiteSpace(idempotencyKey) ? null : idempotencyKey.Trim();
+        if (key is not null)
         {
-            throw new BusinessRuleValidationException("Cannot update expected cash on a closed shift.");
+            var existing = _cashTransactions.FirstOrDefault(item => item.IdempotencyKey == key);
+            if (existing is not null)
+            {
+                if (existing.Type != type || existing.Direction != direction || existing.Amount != amount)
+                    throw new BusinessRuleValidationException(
+                        "This idempotency key was already used for a different cash movement.");
+
+                return existing;
+            }
         }
 
-        if (newExpectedCash < 0)
-        {
-            throw new BusinessRuleValidationException("Expected cash cannot be negative.");
-        }
+        var entry = CashTransaction.Create(
+            Id, type, direction, amount, createdById, reason, category,
+            beneficiaryUserId, sourceType, sourceId, key, DateTimeOffset.UtcNow);
 
-        ExpectedCash = newExpectedCash;
+        var newExpected = ExpectedCash + entry.SignedAmount;
+        if (newExpected < 0)
+            throw new BusinessRuleValidationException(
+                $"The drawer does not hold enough cash for this movement (available: {ExpectedCash:N2}).");
+
+        _cashTransactions.Add(entry);
+        ExpectedCash = newExpected;
         MarkAsUpdated();
+        return entry;
     }
 
     public void Close(decimal actualCash, string? closingReason)

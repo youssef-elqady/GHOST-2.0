@@ -120,6 +120,73 @@ namespace GHOST.Infrastructure.Persistence.Migrations
                     b.ToTable("BusinessDays", (string)null);
                 });
 
+            modelBuilder.Entity("GHOST.Domain.Entities.CashTransaction", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<decimal>("Amount")
+                        .HasColumnType("decimal(18,2)");
+
+                    b.Property<Guid?>("BeneficiaryUserId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("Category")
+                        .HasMaxLength(50)
+                        .HasColumnType("nvarchar(50)");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("datetimeoffset(7)");
+
+                    b.Property<Guid>("CreatedById")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<int>("Direction")
+                        .HasColumnType("int");
+
+                    b.Property<string>("IdempotencyKey")
+                        .HasMaxLength(64)
+                        .HasColumnType("nvarchar(64)");
+
+                    b.Property<string>("Reason")
+                        .HasMaxLength(500)
+                        .HasColumnType("nvarchar(500)");
+
+                    b.Property<Guid>("ShiftId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<Guid?>("SourceId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("SourceType")
+                        .HasMaxLength(50)
+                        .HasColumnType("nvarchar(50)");
+
+                    b.Property<int>("Type")
+                        .HasColumnType("int");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("BeneficiaryUserId");
+
+                    b.HasIndex("CreatedById");
+
+                    b.HasIndex("ShiftId", "CreatedAt")
+                        .HasDatabaseName("IX_CashTransactions_ShiftId_CreatedAt");
+
+                    b.HasIndex("ShiftId", "IdempotencyKey")
+                        .IsUnique()
+                        .HasDatabaseName("UX_CashTransactions_ShiftId_IdempotencyKey")
+                        .HasFilter("[IdempotencyKey] IS NOT NULL");
+
+                    b.ToTable("CashTransactions", null, t =>
+                        {
+                            t.HasCheckConstraint("CK_CashTransactions_Amount", "[Amount] > 0 OR ([Amount] = 0 AND [Type] = 1)");
+
+                            t.HasCheckConstraint("CK_CashTransactions_Direction", "[Direction] IN (1, 2)");
+                        });
+                });
+
             modelBuilder.Entity("GHOST.Domain.Entities.Device", b =>
                 {
                     b.Property<Guid>("Id")
@@ -671,6 +738,26 @@ namespace GHOST.Infrastructure.Persistence.Migrations
                         .OnDelete(DeleteBehavior.Restrict);
                 });
 
+            modelBuilder.Entity("GHOST.Domain.Entities.CashTransaction", b =>
+                {
+                    b.HasOne("GHOST.Infrastructure.Identity.ApplicationUser", null)
+                        .WithMany()
+                        .HasForeignKey("BeneficiaryUserId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.HasOne("GHOST.Infrastructure.Identity.ApplicationUser", null)
+                        .WithMany()
+                        .HasForeignKey("CreatedById")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("GHOST.Domain.Entities.Shift", null)
+                        .WithMany("CashTransactions")
+                        .HasForeignKey("ShiftId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+                });
+
             modelBuilder.Entity("GHOST.Domain.Entities.DeviceRate", b =>
                 {
                     b.HasOne("GHOST.Domain.Entities.Device", null)
@@ -811,6 +898,11 @@ namespace GHOST.Infrastructure.Persistence.Migrations
             modelBuilder.Entity("GHOST.Domain.Entities.SessionSegment", b =>
                 {
                     b.Navigation("Pauses");
+                });
+
+            modelBuilder.Entity("GHOST.Domain.Entities.Shift", b =>
+                {
+                    b.Navigation("CashTransactions");
                 });
 #pragma warning restore 612, 618
         }
