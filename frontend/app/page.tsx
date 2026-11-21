@@ -1,5 +1,6 @@
-import { StaffDashboard } from '@/components/staff-dashboard'
+import { StaffGate } from '@/components/staff-gate'
+import { AdminAuthProvider } from '@/lib/admin-auth'
 
 export default function Page() {
-  return <StaffDashboard />
+  return <AdminAuthProvider><StaffGate /></AdminAuthProvider>
 }

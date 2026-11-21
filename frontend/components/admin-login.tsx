@@ -7,11 +7,11 @@ import { ArrowLeft, Eye, EyeOff, LockKeyhole, ShieldCheck } from 'lucide-react'
 import { changePassword, login, type PasswordChangeRequired } from '@/lib/ghost-api'
 import { useAdminAuth } from '@/lib/admin-auth'
 
-export function AdminLogin() {
+export function AdminLogin({ redirectTo = '/admin', audience = 'admin' }: { redirectTo?: string; audience?: 'admin' | 'staff' } = {}) {
   const router = useRouter()
   const { setSession, token: restoredToken } = useAdminAuth()
   const [step, setStep] = useState<'login' | 'password'>('login')
-  useEffect(() => { if (restoredToken && step === 'login') router.replace('/admin') }, [restoredToken, step, router])
+  useEffect(() => { if (restoredToken && step === 'login') router.replace(redirectTo) }, [restoredToken, step, router, redirectTo])
   const [username, setUsername] = useState('')
   const [password, setPassword] = useState('')
   const [newPassword, setNewPassword] = useState('')
@@ -33,12 +33,12 @@ export function AdminLogin() {
           return
         }
         setSession(result.accessToken, result.user, result.expiresAtUtc)
-        router.replace('/admin')
+        router.replace(redirectTo)
         return
       }
       const result = await changePassword(passwordToken, password, newPassword)
       setSession(result.accessToken, result.user, result.expiresAtUtc)
-      router.replace('/admin')
+      router.replace(redirectTo)
     } catch (reason) {
       setError(reason instanceof Error ? reason.message : 'تعذر تسجيل الدخول.')
     } finally {
@@ -51,7 +51,7 @@ export function AdminLogin() {
       <aside className="admin-login-aside">
         <Link href="/" className="admin-login-brand" aria-label="GHOST الرئيسية"><span className="admin-login-brand-mark">G</span> GHOST</Link>
         <div className="admin-login-pitch">
-          <p>مساحة الإدارة</p>
+          <p>{audience === 'staff' ? 'مساحة الموظفين' : 'مساحة الإدارة'}</p>
           <h1>رؤية واضحة لتشغيل المكان.</h1>
           <span>تابع الأجهزة والتقارير والإعدادات من لوحة واحدة. تُعرض البيانات التجريبية بوضوح منفصلة عن بيانات النظام.</span>
         </div>
@@ -62,7 +62,7 @@ export function AdminLogin() {
         <div className="admin-login-card">
           <span className="admin-source admin-source--live"><i /> مصادقة عبر GHOST API</span>
           <h2>{step === 'login' ? 'تسجيل الدخول' : 'تغيير كلمة المرور'}</h2>
-          <p>{step === 'login' ? 'أدخل بيانات حساب الإدارة للمتابعة.' : 'يتطلب الحساب كلمة مرور جديدة قبل فتح لوحة الإدارة.'}</p>
+          <p>{step === 'login' ? (audience === 'staff' ? 'أدخل بيانات حسابك للمتابعة إلى لوحة التشغيل.' : 'أدخل بيانات حساب الإدارة للمتابعة.') : 'يتطلب الحساب كلمة مرور جديدة قبل فتح لوحة الإدارة.'}</p>
           <form className="admin-login-form" onSubmit={submit}>
             {step === 'login' && <label>اسم المستخدم<input autoComplete="username" required maxLength={256} value={username} onChange={(event) => setUsername(event.target.value)} placeholder="اسم المستخدم" /></label>}
             <label>{step === 'login' ? 'كلمة المرور' : 'كلمة المرور الحالية'}

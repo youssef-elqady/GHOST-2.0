@@ -89,3 +89,7 @@ Endpoints added:
 - Backend: GET api/business-days/current (Staff/Admin). Gap found: opening a shift needs a businessDayId and nothing let Staff discover it. Test added; role matrix updated (209 unit tests pass).
 - Frontend lib/ghost-api.ts: typed clients for current business day, current shift, open/close shift, sessions list/start/pause/resume/transfer/complete, checkout with client-generated idempotency key. 5 node tests pass.
 - Gap found: the Staff dashboard (route /) has no login and calls getDevices() without a token. With the Staff role now correctly allowed, Staff needs its own login screen and an auth provider shared with Admin. This is the next step before any Staff screen can use real data.
+
+## Staff login gate (Nov 21)
+- Route / now requires sign-in: components/staff-gate.tsx (restore from refresh cookie, else AdminLogin with audience=staff), app/page.tsx wraps AdminAuthProvider. StaffDashboard receives the token, user name and a real logout. getDevices now sends the token (it was anonymous, which the API would reject).
+- tsc clean, eslint 0 errors, next build ok. Not run in a browser against a live API.

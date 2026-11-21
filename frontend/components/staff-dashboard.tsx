@@ -51,7 +51,7 @@ function mapApiDevice(device: ApiDevice): Device {
   }
 }
 
-export function StaffDashboard() {
+export function StaffDashboard({ token, userName, onLogout }: { token: string; userName: string; onLogout: () => void }) {
   const [devices, setDevices] = useState<Device[]>([])
   const [devicesLoading, setDevicesLoading] = useState(true)
   const [devicesError, setDevicesError] = useState<string | null>(null)
@@ -63,7 +63,7 @@ export function StaffDashboard() {
   useEffect(() => {
     let cancelled = false
 
-    getDevices()
+    getDevices(token)
       .then((items) => {
         if (cancelled) return
         setDevices(items.filter((item) => item.isActive).map(mapApiDevice))
@@ -80,7 +80,7 @@ export function StaffDashboard() {
     return () => {
       cancelled = true
     }
-  }, [])
+  }, [token])
 
   const grouped = useMemo(() => {
     return devices.reduce<Record<string, Device[]>>((acc, device) => {
@@ -117,7 +117,7 @@ export function StaffDashboard() {
             return <button key={item.id} className={`nav-item ${activeNav === item.id ? 'active' : ''}`} onClick={() => { setActiveNav(item.id); setMobileNav(false) }}><Icon size={19} /><span>{item.label}<small>{item.en}</small></span></button>
           })}
         </nav>
-        <div className="sidebar-bottom"><div className="user-card"><div className="avatar">G</div><div><strong>موظف GHOST</strong><small>حساب الكاشير</small></div><MoreHorizontal size={18} /></div><button className="logout"><LogOut size={17} /> تسجيل الخروج</button></div>
+        <div className="sidebar-bottom"><div className="user-card"><div className="avatar">G</div><div><strong>{userName}</strong><small>حساب الكاشير</small></div><MoreHorizontal size={18} /></div><button className="logout" onClick={onLogout}><LogOut size={17} /> تسجيل الخروج</button></div>
       </aside>
 
       <section className="content-area">
