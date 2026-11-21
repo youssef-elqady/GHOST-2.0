@@ -344,6 +344,11 @@ namespace GHOST.Infrastructure.Persistence.Migrations
                     b.Property<Guid?>("EndShiftId")
                         .HasColumnType("uniqueidentifier");
 
+                    b.Property<bool>("IsVoided")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bit")
+                        .HasDefaultValue(false);
+
                     b.Property<byte[]>("RowVersion")
                         .IsConcurrencyToken()
                         .ValueGeneratedOnAddOrUpdate()

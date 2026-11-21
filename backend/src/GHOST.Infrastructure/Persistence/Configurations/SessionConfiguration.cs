@@ -25,6 +25,12 @@ public sealed class SessionConfiguration : IEntityTypeConfiguration<Session>
 
         builder.Property(s => s.CancelledAt);
 
+        builder.Property(s => s.IsVoided)
+            .IsRequired()
+            .HasDefaultValue(false);
+
+        builder.Ignore(s => s.StartedAt);
+
         builder.Property(s => s.CreatedAt)
             .IsRequired();
 

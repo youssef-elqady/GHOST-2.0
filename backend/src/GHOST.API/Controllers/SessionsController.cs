@@ -1,3 +1,4 @@
+using GHOST.Application.Abstractions.CurrentUser;
 using GHOST.Application.Sessions;
 using GHOST.Application.Sessions.StartSession;
 using GHOST.Domain.Enums;
@@ -16,13 +17,19 @@ public sealed class SessionsController : ControllerBase
     private readonly SessionLifecycleHandler _lifecycleHandler;
     private readonly TransferSessionHandler _transferSessionHandler;
     private readonly ShiftAccess _shiftAccess;
+    private readonly CancelSessionHandler _cancelSessionHandler;
+    private readonly ICurrentUser _currentUser;
 
     public SessionsController(
         StartSessionHandler startSessionHandler,
         SessionLifecycleHandler lifecycleHandler,
         TransferSessionHandler transferSessionHandler,
-        ShiftAccess shiftAccess)
+        ShiftAccess shiftAccess,
+        CancelSessionHandler cancelSessionHandler,
+        ICurrentUser currentUser)
     {
+        _cancelSessionHandler = cancelSessionHandler;
+        _currentUser = currentUser;
         _shiftAccess = shiftAccess;
         _startSessionHandler = startSessionHandler;
         _lifecycleHandler = lifecycleHandler;
@@ -35,6 +42,11 @@ public sealed class SessionsController : ControllerBase
         PlayType PlayType);
 
     public sealed record CompleteSessionRequest(Guid EndShiftId);
+
+    public sealed record CancelSessionRequest(
+        Guid EndShiftId,
+        SessionCancelReason Reason,
+        string? Details);
 
     public sealed record TransferSessionRequest(Guid NewDeviceId, PlayType PlayType);
 
@@ -109,6 +121,38 @@ public sealed class SessionsController : ControllerBase
 
         var result = await _lifecycleHandler.CompleteAsync(
             sessionId, request.EndShiftId, cancellationToken);
+
+        return result.IsSuccess
+            ? Ok(result.Value)
+            : BadRequest(new { error = result.Error });
+    }
+
+    /// <summary>
+    /// Free cancellation inside the configured window (any operator); after it the session can
+    /// only be voided by an Admin with a written reason (SRS BD-03).
+    /// </summary>
+    [HttpPost("{sessionId:guid}/cancel")]
+    public async Task<IActionResult> Cancel(
+        Guid sessionId,
+        [FromBody] CancelSessionRequest request,
+        CancellationToken cancellationToken)
+    {
+        var actorId = _currentUser.UserId;
+        if (actorId is null)
+            return Unauthorized();
+
+        if (!await _shiftAccess.CanOperateOnShiftAsync(request.EndShiftId, cancellationToken))
+            return Forbid();
+
+        var result = await _cancelSessionHandler.HandleAsync(
+            new CancelSessionCommand(
+                sessionId,
+                request.EndShiftId,
+                actorId.Value,
+                _currentUser.IsAdmin,
+                request.Reason,
+                request.Details),
+            cancellationToken);
 
         return result.IsSuccess
             ? Ok(result.Value)

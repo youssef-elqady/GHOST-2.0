@@ -19,6 +19,11 @@ public sealed class Session : BaseEntity
 
     public DateTimeOffset? CancelledAt { get; private set; }
 
+    /// <summary>True when an Admin cancelled the session after the free cancellation window.</summary>
+    public bool IsVoided { get; private set; }
+
+    public DateTimeOffset StartedAt => CreatedAt;
+
     public IReadOnlyCollection<SessionSegment> Segments => _segments.AsReadOnly();
 
     private Session()
@@ -124,6 +129,46 @@ public sealed class Session : BaseEntity
         MarkAsUpdated();
     }
 
+    /// <summary>
+    /// Cancels (inside the window, any operator) or voids (after the window, Admin only)
+    /// a session according to SRS BD-03. The charge becomes zero; time is kept for analytics.
+    /// </summary>
+    public void CancelOrVoid(
+        Guid endShiftId,
+        SessionCancelReason reason,
+        string? details,
+        TimeSpan cancelWindow,
+        bool actorIsAdmin,
+        DateTimeOffset? now = null)
+    {
+        EnsureSessionIsActive();
+
+        if (!Enum.IsDefined(reason))
+            throw new BusinessRuleValidationException("Cancellation reason is invalid.");
+
+        if (cancelWindow < TimeSpan.Zero)
+            throw new BusinessRuleValidationException("Cancel window cannot be negative.");
+
+        var at = now ?? DateTimeOffset.UtcNow;
+        var withinWindow = at - StartedAt <= cancelWindow;
+        var text = details?.Trim();
+
+        if (!withinWindow && !actorIsAdmin)
+            throw new BusinessRuleValidationException(
+                "The cancellation window has passed. End the session and charge the played time, or ask an admin to void it.");
+
+        if ((reason == SessionCancelReason.Other || !withinWindow) && string.IsNullOrWhiteSpace(text))
+            throw new BusinessRuleValidationException(
+                withinWindow
+                    ? "Details are required when the reason is Other."
+                    : "A written reason is required to void a session.");
+
+        CancelSession(
+            endShiftId,
+            string.IsNullOrEmpty(text) ? reason.ToString() : $"{reason}: {text}");
+        IsVoided = !withinWindow;
+    }
+
     public TimeSpan GetTotalBillableDuration(DateTimeOffset? calculateUpTo = null)
     {
         var calculationTime = calculateUpTo ?? DateTimeOffset.UtcNow;
@@ -133,6 +178,10 @@ public sealed class Session : BaseEntity
 
     public decimal GetTotalAmount(DateTimeOffset? calculateUpTo = null)
     {
+        // A cancelled or voided session is never charged (BD-03, ERD 6.3.1).
+        if (Status == SessionStatus.Cancelled)
+            return 0m;
+
         // Use one timestamp for every segment so an active session is priced
         // against a consistent point in time.
         var calculationTime = calculateUpTo ?? DateTimeOffset.UtcNow;

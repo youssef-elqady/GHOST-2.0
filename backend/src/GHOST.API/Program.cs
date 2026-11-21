@@ -2,6 +2,7 @@ using System.Text.Json.Serialization;
 using GHOST.API.Authentication;
 using GHOST.API.Configuration;
 using GHOST.API.Security;
+using GHOST.Application.Abstractions.Auditing;
 using GHOST.Application.Abstractions.CurrentUser;
 using GHOST.Application.Abstractions.Persistence;
 using GHOST.Application.BusinessDays.CloseShift;
@@ -72,6 +73,11 @@ builder.Services.AddScoped<OpenBusinessDayHandler>();
 builder.Services.AddScoped<CreateDeviceHandler>();
 builder.Services.AddScoped<ISessionRepository, SessionRepository>();
 builder.Services.AddScoped<StartSessionHandler>();
+builder.Services.AddSingleton(
+    builder.Configuration.GetSection(SessionPolicy.SectionName).Get<SessionPolicy>()
+    ?? new SessionPolicy());
+builder.Services.AddScoped<IAuditTrail, AuditTrail>();
+builder.Services.AddScoped<CancelSessionHandler>();
 builder.Services.AddScoped<SessionLifecycleHandler>();
 builder.Services.AddScoped<TransferSessionHandler>();
 builder.Services.AddScoped<IShiftRepository, ShiftRepository>();
