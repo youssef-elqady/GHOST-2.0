@@ -1,7 +1,9 @@
 # GHOST STATE
 
-Last updated: 2026-11-18
-Current phase: AUTH-02 — isolated SQL Server integration-test harness
+Last updated: 2026-11-21
+Current phase: offline backend build-out on `feature/auth03-refresh-tokens` (auth, cash, inventory, sales, reports done in code; SQL Server run and frontend wiring pending)
+
+> Read first: [STATUS-2026-11-21.md](./STATUS-2026-11-21.md) (done vs remaining), [NEXT-STEPS-AND-THINKING.md](./NEXT-STEPS-AND-THINKING.md), [CHANGES-INVENTORY.md](./CHANGES-INVENTORY.md), [FRONTEND-WIRING-PLAN.md](./FRONTEND-WIRING-PLAN.md).
 
 > Delivery plan and phase exit criteria: [DELIVERY-ROADMAP.md](./DELIVERY-ROADMAP.md). Keep this file as the live execution log; update it after every meaningful milestone.
 
