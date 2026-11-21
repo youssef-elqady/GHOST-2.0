@@ -1,3 +1,5 @@
+using GHOST.Application.Abstractions.Auditing;
+using GHOST.Application.Abstractions.CurrentUser;
 using GHOST.Application.Abstractions.Persistence;
 using GHOST.Application.Common.Exceptions;
 using GHOST.Application.Common.Result;
@@ -16,13 +18,19 @@ public sealed class TransferSessionHandler
 {
     private readonly ISessionRepository _sessionRepository;
     private readonly IUnitOfWork _unitOfWork;
+    private readonly IAuditTrail? _audit;
+    private readonly ICurrentUser? _currentUser;
 
     public TransferSessionHandler(
         ISessionRepository sessionRepository,
-        IUnitOfWork unitOfWork)
+        IUnitOfWork unitOfWork,
+        IAuditTrail? audit = null,
+        ICurrentUser? currentUser = null)
     {
         _sessionRepository = sessionRepository;
         _unitOfWork = unitOfWork;
+        _audit = audit;
+        _currentUser = currentUser;
     }
 
     public async Task<Result<SessionSnapshot>> HandleAsync(
@@ -76,6 +84,8 @@ public sealed class TransferSessionHandler
             currentDevice.MarkAsAvailable();
             destination.MarkAsRunning(command.PlayType);
 
+            OperationAudit.Record(_audit, _currentUser, "Session.Transferred", "Session", session.Id,
+                new { fromDeviceId = currentDevice.Id, toDeviceId = destination.Id, playType = command.PlayType.ToString(), rate = appliedRate });
             await _unitOfWork.SaveChangesAsync(cancellationToken);
 
             return Result<SessionSnapshot>.Success(new SessionSnapshot(

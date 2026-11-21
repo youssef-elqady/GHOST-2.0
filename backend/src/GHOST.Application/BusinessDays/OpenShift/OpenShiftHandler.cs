@@ -1,3 +1,5 @@
+using GHOST.Application.Abstractions.Auditing;
+using GHOST.Application.Abstractions.CurrentUser;
 using GHOST.Application.Abstractions.Persistence;
 using GHOST.Application.Common.Exceptions;
 using GHOST.Application.Common.Result;
@@ -14,13 +16,19 @@ public sealed class OpenShiftHandler
 {
     private readonly IBusinessDayRepository _businessDayRepository;
     private readonly IUnitOfWork _unitOfWork;
+    private readonly IAuditTrail? _audit;
+    private readonly ICurrentUser? _currentUser;
 
     public OpenShiftHandler(
         IBusinessDayRepository businessDayRepository,
-        IUnitOfWork unitOfWork)
+        IUnitOfWork unitOfWork,
+        IAuditTrail? audit = null,
+        ICurrentUser? currentUser = null)
     {
         _businessDayRepository = businessDayRepository;
         _unitOfWork = unitOfWork;
+        _audit = audit;
+        _currentUser = currentUser;
     }
 
     public async Task<Result<Guid>> HandleAsync(
@@ -39,6 +47,8 @@ public sealed class OpenShiftHandler
         try
         {
             var shift = businessDay.OpenShift(command.StaffUserId, command.OpeningCash);
+            OperationAudit.Record(_audit, _currentUser, "Shift.Opened", "Shift", shift.Id,
+                new { command.BusinessDayId, staffUserId = command.StaffUserId, openingCash = command.OpeningCash });
             await _unitOfWork.SaveChangesAsync(cancellationToken);
             return Result<Guid>.Success(shift.Id);
         }

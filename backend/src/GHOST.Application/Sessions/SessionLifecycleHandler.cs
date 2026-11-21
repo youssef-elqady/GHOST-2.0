@@ -1,3 +1,5 @@
+using GHOST.Application.Abstractions.Auditing;
+using GHOST.Application.Abstractions.CurrentUser;
 using GHOST.Application.Abstractions.Persistence;
 using GHOST.Application.Common.Result;
 using GHOST.Application.Common.Exceptions;
@@ -18,13 +20,19 @@ public sealed class SessionLifecycleHandler
 {
     private readonly ISessionRepository _sessionRepository;
     private readonly IUnitOfWork _unitOfWork;
+    private readonly IAuditTrail? _audit;
+    private readonly ICurrentUser? _currentUser;
 
     public SessionLifecycleHandler(
         ISessionRepository sessionRepository,
-        IUnitOfWork unitOfWork)
+        IUnitOfWork unitOfWork,
+        IAuditTrail? audit = null,
+        ICurrentUser? currentUser = null)
     {
         _sessionRepository = sessionRepository;
         _unitOfWork = unitOfWork;
+        _audit = audit;
+        _currentUser = currentUser;
     }
 
     public Task<Result<SessionSnapshot>> PauseAsync(
@@ -71,6 +79,7 @@ public sealed class SessionLifecycleHandler
                 device.MarkAsResumed();
             }
 
+            OperationAudit.Record(_audit, _currentUser, pause ? "Session.Paused" : "Session.Resumed", "Session", session.Id, new { deviceId = device.Id });
             await _unitOfWork.SaveChangesAsync(cancellationToken);
             return Result<SessionSnapshot>.Success(CreateSnapshot(session));
         }
@@ -118,6 +127,8 @@ public sealed class SessionLifecycleHandler
             session.CompleteSession(endShiftId);
             device.MarkAsAvailable();
 
+            OperationAudit.Record(_audit, _currentUser, "Session.Completed", "Session", session.Id,
+                new { endShiftId, amount = session.GetTotalAmount(), billableSeconds = (long)session.GetTotalBillableDuration().TotalSeconds });
             await _unitOfWork.SaveChangesAsync(cancellationToken);
             return Result<SessionSnapshot>.Success(CreateSnapshot(session));
         }

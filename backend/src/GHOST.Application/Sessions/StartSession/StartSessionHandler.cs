@@ -1,3 +1,5 @@
+using GHOST.Application.Abstractions.Auditing;
+using GHOST.Application.Abstractions.CurrentUser;
 using GHOST.Application.Abstractions.Persistence;
 using GHOST.Application.Common.Result;
 using GHOST.Application.Common.Exceptions;
@@ -11,13 +13,19 @@ public sealed class StartSessionHandler
 {
     private readonly ISessionRepository _sessionRepository;
     private readonly IUnitOfWork _unitOfWork;
+    private readonly IAuditTrail? _audit;
+    private readonly ICurrentUser? _currentUser;
 
     public StartSessionHandler(
         ISessionRepository sessionRepository,
-        IUnitOfWork unitOfWork)
+        IUnitOfWork unitOfWork,
+        IAuditTrail? audit = null,
+        ICurrentUser? currentUser = null)
     {
         _sessionRepository = sessionRepository;
         _unitOfWork = unitOfWork;
+        _audit = audit;
+        _currentUser = currentUser;
     }
 
     public async Task<Result<Guid>> HandleAsync(
@@ -85,6 +93,8 @@ public sealed class StartSessionHandler
                 appliedHourlyRate);
 
             await _sessionRepository.AddAsync(session, cancellationToken);
+            OperationAudit.Record(_audit, _currentUser, "Session.Started", "Session", session.Id,
+                new { command.ShiftId, command.DeviceId, playType = command.PlayType.ToString(), hourlyRate = appliedHourlyRate });
             await _unitOfWork.SaveChangesAsync(cancellationToken);
 
             return Result<Guid>.Success(session.Id);

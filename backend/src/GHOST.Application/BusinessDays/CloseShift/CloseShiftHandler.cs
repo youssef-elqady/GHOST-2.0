@@ -1,3 +1,5 @@
+using GHOST.Application.Abstractions.Auditing;
+using GHOST.Application.Abstractions.CurrentUser;
 using GHOST.Application.Abstractions.Persistence;
 using GHOST.Application.Common.Exceptions;
 using GHOST.Application.Common.Result;
@@ -25,13 +27,19 @@ public sealed class CloseShiftHandler
 {
     private readonly IBusinessDayRepository _businessDayRepository;
     private readonly IUnitOfWork _unitOfWork;
+    private readonly IAuditTrail? _audit;
+    private readonly ICurrentUser? _currentUser;
 
     public CloseShiftHandler(
         IBusinessDayRepository businessDayRepository,
-        IUnitOfWork unitOfWork)
+        IUnitOfWork unitOfWork,
+        IAuditTrail? audit = null,
+        ICurrentUser? currentUser = null)
     {
         _businessDayRepository = businessDayRepository;
         _unitOfWork = unitOfWork;
+        _audit = audit;
+        _currentUser = currentUser;
     }
 
     public async Task<Result<ClosedShiftSnapshot>> HandleAsync(
@@ -54,6 +62,8 @@ public sealed class CloseShiftHandler
         try
         {
             shift.Close(command.ActualCash, command.ClosingReason);
+            OperationAudit.Record(_audit, _currentUser, "Shift.Closed", "Shift", shift.Id,
+                new { command.BusinessDayId, expectedCash = shift.ExpectedCash, actualCash = shift.ActualCash, difference = shift.CashDifference, reason = shift.ClosingReason });
             await _unitOfWork.SaveChangesAsync(cancellationToken);
 
             return Result<ClosedShiftSnapshot>.Success(new ClosedShiftSnapshot(
