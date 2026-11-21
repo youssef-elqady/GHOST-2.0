@@ -65,6 +65,9 @@ namespace GHOST.Infrastructure.Persistence.Migrations
 
                     b.HasKey("Id");
 
+                    b.HasIndex("At")
+                        .HasDatabaseName("IX_AuditLogs_At");
+
                     b.HasIndex("UserId", "At")
                         .HasDatabaseName("IX_AuditLogs_UserId_At");
 

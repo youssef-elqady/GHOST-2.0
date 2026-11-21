@@ -65,5 +65,8 @@ public sealed class AuditLogConfiguration : IEntityTypeConfiguration<AuditLog>
 
         builder.HasIndex(x => new { x.UserId, x.At })
             .HasDatabaseName("IX_AuditLogs_UserId_At");
+
+        builder.HasIndex(x => x.At)
+            .HasDatabaseName("IX_AuditLogs_At");
     }
 }

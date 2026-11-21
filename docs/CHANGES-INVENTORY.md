@@ -62,3 +62,12 @@ Endpoints added:
 - API: `GET/PUT api/settings` (Admin), `GET api/alerts` (Admin), `GET/POST api/backups` (Admin), hosted `ScheduledBackupService`, `Backup:*` configuration (disabled by default).
 - Fixes: checkout idempotency race (R1), double-refund and approve/reject races (R2, R3), split queries (R4).
 - Tests: 191 unit tests (was 169).
+
+
+## Read APIs (Nov 21)
+- Application/Reads: ReadModels (DTOs, IOperationsReadQueries), OperationsReadHandler (authorization + paging clamp, max 100).
+- Infrastructure/Persistence/OperationsReadQueries.cs: projections only, one count + one page query per list, user names joined in-query (no N+1). Session detail uses AsSplitQuery.
+- API/Controllers/ReadApisControllers.cs: ShiftsController, SessionReadsController (same api/sessions route), AuditLogsController, UsersController.
+- Visibility: Admin all. Staff: own shifts only (others look like 404); sessions that are Active or started/ended in own shifts. Lists of shifts, audit logs and users are Admin only. User DTO excludes hashes and stamps.
+- Migration 11: AddAuditLogAtIndex (IX_AuditLogs_At).
+- Tests: Security/ReadApiAuthorizationTests.cs (15 tests).

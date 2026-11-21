@@ -44,3 +44,8 @@ Rule used: build what other things depend on first, and keep money and stock cor
 - Which backup folder should the API use, and is SQL Server on the same machine as the API?
 - Is Staff discount approval needed at the counter, or is Admin-only fine?
 - Should the staff app be a separate route group (`/staff`) in the same Next.js app? The plan assumes yes.
+
+
+## Update (Nov 21): new order
+Done in code: settings, alerts, backup, Sales/Inventory/Cash review fixes, Read APIs (shifts, sessions, audit logs, users).
+Next: (1) refresh-on-401 in the frontend, then wire Staff screens to real APIs; (2) scratch-DB verification S1..S10 (docs/CODE-REVIEW-SALES-INVENTORY-CASH.md); (3) per-endpoint role tests for the older controllers; (4) local-deployment code changes ONLY after the owner answers the decisions in docs/LOCAL-DEPLOYMENT-REVIEW.md; (5) P2/P3.

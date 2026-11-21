@@ -99,6 +99,8 @@ builder.Services.AddScoped<ISettingsRepository, GHOST.Infrastructure.Persistence
 builder.Services.AddScoped<GHOST.Application.Settings.SettingsHandler>();
 builder.Services.AddScoped<GHOST.Application.Alerts.IAlertQueries, GHOST.Infrastructure.Persistence.AlertQueries>();
 builder.Services.AddScoped<GHOST.Application.Alerts.AlertsHandler>();
+builder.Services.AddScoped<GHOST.Application.Reads.IOperationsReadQueries, GHOST.Infrastructure.Persistence.OperationsReadQueries>();
+builder.Services.AddScoped<GHOST.Application.Reads.OperationsReadHandler>();
 builder.Services.Configure<GHOST.API.Backup.ScheduledBackupOptions>(
     builder.Configuration.GetSection(GHOST.API.Backup.ScheduledBackupOptions.SectionName));
 builder.Services.AddScoped<IBackupRepository, GHOST.Infrastructure.Persistence.Repositories.BackupRepository>();
