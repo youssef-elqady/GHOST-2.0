@@ -133,7 +133,7 @@ namespace GHOST.Infrastructure.Persistence.Migrations
                         {
                             t.HasCheckConstraint("CK_BackupRecords_Status", "[Status] IN (1, 2)");
 
-                            t.HasCheckConstraint("CK_BackupRecords_Type", "[Type] IN (1, 2)");
+                            t.HasCheckConstraint("CK_BackupRecords_Type", "[Type] IN (1, 2, 3)");
                         });
                 });
 

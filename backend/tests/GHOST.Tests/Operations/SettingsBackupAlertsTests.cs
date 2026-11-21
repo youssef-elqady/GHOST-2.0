@@ -175,6 +175,15 @@ public sealed class SettingsBackupAlertsTests
         public Task VerifyAsync(string filePath, CancellationToken cancellationToken = default)
             => FailVerify ? throw new InvalidOperationException("checksum mismatch") : Task.CompletedTask;
 
+        public string? ExternalFailure;
+        public List<string> Copied = new();
+
+        public Task<string?> CopyToExternalAsync(string filePath, string externalDirectory, int keep, CancellationToken cancellationToken = default)
+        {
+            Copied.Add(filePath + " -> " + externalDirectory + " keep " + keep);
+            return Task.FromResult(ExternalFailure);
+        }
+
         public bool TryDelete(string filePath)
         {
             Deleted.Add(filePath);
@@ -184,6 +193,39 @@ public sealed class SettingsBackupAlertsTests
 
     private static BackupHandler Backup(FakeBackups repo, FakeGateway gateway, int retention = 7, string dir = "/bk")
         => new(repo, gateway, new FakeUow(), new FakeAudit(), TimeProvider.System, new BackupOptions(dir, retention));
+
+    private static BackupHandler BackupWithExternal(FakeBackups repo, FakeGateway gateway)
+        => new(repo, gateway, new FakeUow(), new FakeAudit(), TimeProvider.System, new BackupOptions("/bk", 7, "/usb"));
+
+    [Fact]
+    public async Task Backup_CopiesVerifiedFileToExternalDrive_AndReportsIt()
+    {
+        var gateway = new FakeGateway();
+        var result = await BackupWithExternal(new FakeBackups(), gateway).RunAsync(BackupType.ShiftClose, Admin);
+
+        Assert.True(result.IsSuccess);
+        Assert.Equal("Copied", result.Value!.ExternalCopy);
+        Assert.Contains("/usb keep 7", Assert.Single(gateway.Copied));
+    }
+
+    [Fact]
+    public async Task ExternalCopyFailure_KeepsTheLocalBackup_AndIsReported()
+    {
+        var repo = new FakeBackups();
+        var result = await BackupWithExternal(repo, new FakeGateway { ExternalFailure = "drive not found" }).RunAsync(BackupType.Scheduled, null);
+
+        Assert.True(result.IsSuccess);
+        Assert.StartsWith("Failed: drive not found", result.Value!.ExternalCopy);
+        Assert.Equal(BackupStatus.Succeeded, repo.Rows.Single().Status);
+    }
+
+    [Fact]
+    public async Task FailedBackup_IsNeverCopiedExternally()
+    {
+        var gateway = new FakeGateway { FailVerify = true };
+        await BackupWithExternal(new FakeBackups(), gateway).RunAsync(BackupType.Manual, Admin);
+        Assert.Empty(gateway.Copied);
+    }
 
     [Fact]
     public async Task Backup_Succeeds_OnlyAfterVerification()

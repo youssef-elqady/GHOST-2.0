@@ -19,14 +19,17 @@ public sealed class BusinessDaysController : ControllerBase
     private readonly CloseShiftHandler _closeShiftHandler;
     private readonly ICurrentUser _currentUser;
     private readonly ShiftAccess _shiftAccess;
+    private readonly GHOST.API.Backup.ShiftCloseBackupTrigger _backupTrigger;
 
     public BusinessDaysController(
         OpenBusinessDayHandler openBusinessDayHandler,
         OpenShiftHandler openShiftHandler,
         CloseShiftHandler closeShiftHandler,
         ICurrentUser currentUser,
-        ShiftAccess shiftAccess)
+        ShiftAccess shiftAccess,
+        GHOST.API.Backup.ShiftCloseBackupTrigger backupTrigger)
     {
+        _backupTrigger = backupTrigger;
         _currentUser = currentUser;
         _shiftAccess = shiftAccess;
         _openBusinessDayHandler = openBusinessDayHandler;
@@ -83,6 +86,9 @@ public sealed class BusinessDaysController : ControllerBase
         {
             return BadRequest(new { error = result.Error });
         }
+
+        if (_currentUser.UserId is { } closer)
+            _backupTrigger.Fire(closer);
 
         return Ok(result.Value);
     }

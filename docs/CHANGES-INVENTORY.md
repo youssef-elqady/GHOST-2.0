@@ -113,3 +113,11 @@ Endpoints added:
 - components/staff-pos.tsx: product catalog (GET api/products?status=Active), search by name/barcode, cart with stock caps, cash checkout with an idempotency key that is created once per cart content and reused on retry (a retry after a timeout cannot double-charge); new key when the cart changes or after success. Total shown is a preview; the server recomputes. Needs an open shift.
 - lib/ghost-api.ts: getProducts, ApiProduct, ApiSale typed result for checkout.
 - Not wired: discounts, linking a sale to a session, invoice list/print, refunds UI. tsc clean, eslint 0 errors, next build ok, no browser test.
+
+## Backup: shift close + external drive (Nov 21, owner decision)
+- BackupType.ShiftClose (=3). Migration 12 `AllowShiftCloseBackupType` widens CK_BackupRecords_Type to (1,2,3). Not applied to any SQL Server yet.
+- Config (appsettings Backup:*): Enabled, Directory (SQL Server writes here), RetentionCount (keep newest N, default 7, applies locally and on the external drive), ExternalDirectory (for example E:\GHOST-Backups), BackupOnShiftClose (default true), DailyAt.
+- After a successful verified backup the file is copied to ExternalDirectory (written as .partial, size-checked, renamed, older GHOST_*.bak beyond N removed). A failed or unverified backup is never copied. A failed copy keeps the local backup, is returned in the API result (ExternalCopy) and logged; manual runs by an Admin also write an audit row Backup.ExternalCopyFailed.
+- Shift close triggers a background backup AFTER the close is saved; a backup problem never fails the close (ShiftCloseBackupTrigger, logged).
+- Requirement: the API must be able to read Backup:Directory (same PC as SQL Server, folder readable by the API account) or the external copy reports an error.
+- Tests: 3 handler tests + 3 real file-system tests (copy, keep newest 2, partial cleanup, missing source, unusable destination). Backend 228 unit tests pass. Real BACKUP/RESTORE VERIFYONLY on SQL Server: NOT tested yet.

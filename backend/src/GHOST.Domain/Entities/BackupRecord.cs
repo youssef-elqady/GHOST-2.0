@@ -3,7 +3,8 @@ namespace GHOST.Domain.Entities;
 public enum BackupType
 {
     Manual = 1,
-    Scheduled = 2
+    Scheduled = 2,
+    ShiftClose = 3
 }
 
 public enum BackupStatus

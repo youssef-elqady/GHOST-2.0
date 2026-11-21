@@ -14,6 +14,12 @@ public sealed class ScheduledBackupOptions
 
     public int RetentionCount { get; set; } = 7;
 
+    /// <summary>Second location (for example an external drive). Every verified backup is copied here and the newest RetentionCount are kept.</summary>
+    public string? ExternalDirectory { get; set; }
+
+    /// <summary>Also back up after each shift close.</summary>
+    public bool BackupOnShiftClose { get; set; } = true;
+
     /// <summary>Daily run time, local server time, HH:mm.</summary>
     public string DailyAt { get; set; } = "03:00";
 }
@@ -68,6 +74,8 @@ public sealed class ScheduledBackupService : BackgroundService
                 var result = await handler.RunAsync(BackupType.Scheduled, null, stoppingToken);
                 if (!result.IsSuccess)
                     _logger.LogError("Scheduled backup failed: {Error}", result.Error);
+                else if (result.Value!.ExternalCopy is { } copy && copy != "Copied")
+                    _logger.LogError("Scheduled backup external copy problem: {Copy}", copy);
             }
             catch (OperationCanceledException)
             {

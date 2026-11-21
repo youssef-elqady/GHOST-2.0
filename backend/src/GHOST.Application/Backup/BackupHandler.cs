@@ -6,7 +6,7 @@ using GHOST.Domain.Entities;
 
 namespace GHOST.Application.Backup;
 
-public sealed record BackupOptions(string Directory, int RetentionCount);
+public sealed record BackupOptions(string Directory, int RetentionCount, string? ExternalDirectory = null);
 
 public sealed record BackupFileResult(long? SizeBytes);
 
@@ -18,6 +18,12 @@ public interface IDatabaseBackupGateway
 
     /// <summary>RESTORE VERIFYONLY with CHECKSUM. Throws when the file is unreadable or corrupt.</summary>
     Task VerifyAsync(string filePath, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Copies a verified backup to a second location (for example an external drive) and keeps the newest
+    /// <paramref name="keep"/> GHOST_*.bak files there. Returns null on success or the error text.
+    /// </summary>
+    Task<string?> CopyToExternalAsync(string filePath, string externalDirectory, int keep, CancellationToken cancellationToken = default);
 
     /// <summary>Best effort. Returns false when the file could not be removed.</summary>
     bool TryDelete(string filePath);
@@ -32,7 +38,8 @@ public sealed record BackupDto(
     string? Error,
     DateTimeOffset CreatedAt,
     DateTimeOffset? VerifiedAt,
-    DateTimeOffset? PrunedAt);
+    DateTimeOffset? PrunedAt,
+    string? ExternalCopy = null);
 
 /// <summary>
 /// Backup with verification and retention (SRS FR-81). A backup only counts as succeeded after
@@ -107,13 +114,25 @@ public sealed class BackupHandler
                     "BackupRecord", record.Id.ToString(),
                     JsonSerializer.Serialize(new { type = type.ToString(), record.FilePath }));
 
+            string? externalCopy = null;
             if (record.Status == BackupStatus.Succeeded)
+            {
                 await PruneAsync(record, cancellationToken);
+                if (!string.IsNullOrWhiteSpace(_options.ExternalDirectory) && record.FilePath is not null)
+                {
+                    var failure = await _gateway.CopyToExternalAsync(
+                        record.FilePath, _options.ExternalDirectory, Math.Max(_options.RetentionCount, 1), cancellationToken);
+                    externalCopy = failure is null ? "Copied" : "Failed: " + failure;
+                    if (failure is not null && actorUserId is { } who)
+                        _audit.Record(who, "Backup.ExternalCopyFailed", "BackupRecord", record.Id.ToString(),
+                            JsonSerializer.Serialize(new { _options.ExternalDirectory, failure }));
+                }
+            }
 
             await _unitOfWork.SaveChangesAsync(cancellationToken);
 
             return record.Status == BackupStatus.Succeeded
-                ? Result<BackupDto>.Success(ToDto(record))
+                ? Result<BackupDto>.Success(ToDto(record) with { ExternalCopy = externalCopy })
                 : Result<BackupDto>.Failure("Backup failed: " + record.Error);
         }
         finally

@@ -24,7 +24,7 @@ public sealed class BackupRecordConfiguration : IEntityTypeConfiguration<BackupR
     {
         builder.ToTable("BackupRecords", table =>
         {
-            table.HasCheckConstraint("CK_BackupRecords_Type", "[Type] IN (1, 2)");
+            table.HasCheckConstraint("CK_BackupRecords_Type", "[Type] IN (1, 2, 3)");
             table.HasCheckConstraint("CK_BackupRecords_Status", "[Status] IN (1, 2)");
         });
         builder.HasKey(x => x.Id);

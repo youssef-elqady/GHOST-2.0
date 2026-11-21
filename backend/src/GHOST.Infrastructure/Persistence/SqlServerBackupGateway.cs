@@ -49,6 +49,40 @@ public sealed partial class SqlServerBackupGateway : IDatabaseBackupGateway
             [new SqlParameter("@path", filePath)], cancellationToken);
     }
 
+    public Task<string?> CopyToExternalAsync(
+        string filePath, string externalDirectory, int keep, CancellationToken cancellationToken = default)
+    {
+        try
+        {
+            if (!File.Exists(filePath))
+                return Task.FromResult<string?>("The backup file is not visible to the API, so it cannot be copied. Run the API on the SQL Server machine or share the backup folder.");
+
+            Directory.CreateDirectory(externalDirectory);
+            var target = Path.Combine(externalDirectory, Path.GetFileName(filePath));
+            var temp = target + ".partial";
+            File.Copy(filePath, temp, overwrite: true);
+            // A copy only counts when its size matches the source; the file is renamed into place last.
+            if (new FileInfo(temp).Length != new FileInfo(filePath).Length)
+            {
+                File.Delete(temp);
+                return Task.FromResult<string?>("The copy size did not match the source.");
+            }
+
+            File.Move(temp, target, overwrite: true);
+
+            // Names start with GHOST_yyyyMMdd_HHmmss so ordering by name is ordering by time.
+            foreach (var old in Directory.EnumerateFiles(externalDirectory, "GHOST_*.bak")
+                         .OrderByDescending(Path.GetFileName, StringComparer.Ordinal).Skip(Math.Max(keep, 1)))
+                File.Delete(old);
+
+            return Task.FromResult<string?>(null);
+        }
+        catch (Exception exception) when (exception is IOException or UnauthorizedAccessException or ArgumentException or NotSupportedException)
+        {
+            return Task.FromResult<string?>(exception.Message);
+        }
+    }
+
     public bool TryDelete(string filePath)
     {
         try
