@@ -79,3 +79,8 @@ Endpoints added:
 - components/admin-shell.tsx, admin-login.tsx: wait for restore before redirecting; logged-in visitors skip the login page.
 - tests/ghost-api-refresh.test.mts (4 tests, `pnpm test`): result 4 pass, 0 fail. `tsc --noEmit` clean, eslint 0 errors (9 old warnings), `next build` succeeds.
 - Not verified: real browser against a running API (needs SQL Server), cookie behaviour on a LAN HTTP origin (see LOCAL-DEPLOYMENT-REVIEW).
+
+## Authorization matrix fix (Nov 21)
+- BUG: ASP.NET requires ALL [Authorize] attributes (class + action). DevicesController and BusinessDaysController had class-level AdminOnly plus action-level StaffOrAdmin, so Staff got 403 on GET api/devices, open shift and close shift. Fixed: class StaffOrAdmin, AdminOnly on the admin actions (create/seed/rates device, open business day).
+- Test: Security/EndpointRoleMatrixTests.cs runs every controller action through the real policies for Admin, Staff and no role against a reviewed table. With the old attributes it fails (3 actions listed); with the fix it passes.
+- Reviewed table flags for owner decision: Staff can Create product, AdjustStock, GenerateBarcode and create stock receipts/stocktakes (approvals are Admin only).

@@ -10,7 +10,7 @@ using Microsoft.AspNetCore.Mvc;
 namespace GHOST.API.Controllers;
 
 [ApiController]
-[Authorize(Policy = AuthorizationPolicies.AdminOnly)]
+[Authorize(Policy = AuthorizationPolicies.StaffOrAdmin)]
 [Route("api/devices")]
 public sealed class DevicesController : ControllerBase
 {
@@ -38,7 +38,6 @@ public sealed class DevicesController : ControllerBase
     public sealed record UpdateDeviceRatesRequest(
         IReadOnlyCollection<DeviceRateRequest> Rates);
 
-    [Authorize(Policy = AuthorizationPolicies.StaffOrAdmin)]
     [HttpGet]
     public async Task<IActionResult> GetAll(
         CancellationToken cancellationToken)
@@ -47,6 +46,7 @@ public sealed class DevicesController : ControllerBase
         return Ok(devices.Select(ToResponse));
     }
 
+    [Authorize(Policy = AuthorizationPolicies.AdminOnly)]
     [HttpPost]
     public async Task<IActionResult> Create(
         [FromBody] CreateDeviceRequest request,
@@ -66,6 +66,7 @@ public sealed class DevicesController : ControllerBase
         return StatusCode(StatusCodes.Status201Created, new { deviceId = result.Value });
     }
 
+    [Authorize(Policy = AuthorizationPolicies.AdminOnly)]
     [HttpPost("seed-defaults")]
     public async Task<IActionResult> SeedDefaultDevices(
         CancellationToken cancellationToken)
@@ -111,6 +112,7 @@ public sealed class DevicesController : ControllerBase
         });
     }
 
+    [Authorize(Policy = AuthorizationPolicies.AdminOnly)]
     [HttpPut("{id:guid}/rates")]
     public async Task<IActionResult> UpdateRates(
         Guid id,

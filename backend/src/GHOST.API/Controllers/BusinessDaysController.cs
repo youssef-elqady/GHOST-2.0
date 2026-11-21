@@ -10,7 +10,7 @@ using Microsoft.AspNetCore.Mvc;
 namespace GHOST.API.Controllers;
 
 [ApiController]
-[Authorize(Policy = AuthorizationPolicies.AdminOnly)]
+[Authorize(Policy = AuthorizationPolicies.StaffOrAdmin)]
 [Route("api/business-days")]
 public sealed class BusinessDaysController : ControllerBase
 {
@@ -37,6 +37,7 @@ public sealed class BusinessDaysController : ControllerBase
     public sealed record OpenShiftRequest(Guid StaffUserId, decimal OpeningCash);
     public sealed record CloseShiftRequest(decimal ActualCash, string? ClosingReason);
 
+    [Authorize(Policy = AuthorizationPolicies.AdminOnly)]
     [HttpPost]
     public async Task<IActionResult> OpenBusinessDay(
         [FromBody] OpenBusinessDayRequest request,
@@ -60,7 +61,6 @@ public sealed class BusinessDaysController : ControllerBase
             });
     }
 
-    [Authorize(Policy = AuthorizationPolicies.StaffOrAdmin)]
     [HttpPost("{businessDayId:guid}/shifts/{shiftId:guid}/close")]
     public async Task<IActionResult> CloseShift(
         Guid businessDayId,
@@ -87,7 +87,6 @@ public sealed class BusinessDaysController : ControllerBase
         return Ok(result.Value);
     }
 
-    [Authorize(Policy = AuthorizationPolicies.StaffOrAdmin)]
     [HttpPost("{businessDayId:guid}/shifts")]
     public async Task<IActionResult> OpenShift(
         Guid businessDayId,
