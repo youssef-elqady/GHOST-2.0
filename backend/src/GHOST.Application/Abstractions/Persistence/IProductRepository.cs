@@ -21,5 +21,7 @@ public interface IProductRepository
         int take,
         CancellationToken cancellationToken = default);
 
+    Task<IReadOnlyList<Product>> GetManyAsync(IReadOnlyCollection<Guid> ids, CancellationToken cancellationToken = default);
+
     Task AddAsync(Product product, CancellationToken cancellationToken = default);
 }

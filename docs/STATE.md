@@ -1932,3 +1932,8 @@ Branch `feature/auth03-refresh-tokens`, based on `origin/feature/admin-frontend-
 - Stock changes only through `Product.ApplyMovement` (reason required, never below zero, weighted average cost on purchases). Staff may record Waste, Expired and ManualAdjustment; other types need Admin.
 - Migration `AddProductsAndStockMovements` is NOT applied to any database and the trigger SQL is unverified on SQL Server.
 - Not done: stock receipts (and the cash link), stocktake, barcode generation, sales/POS.
+
+### Stock receipts (offline session)
+- `StockReceipt`/`StockReceiptItem` + `api/stock-receipts`. Staff create on their own open shift: stock rises at once, the total leaves the drawer (StockPurchase), status Pending.
+- Admin approves, or rejects with a reason: stock is reversed and the cash either returns to a chosen open shift (ReverseCash) or is charged to the staff member (ChargeToStaff, audited). Rejection fails whole if the goods were already sold.
+- Migration `AddStockReceipts` not applied anywhere.

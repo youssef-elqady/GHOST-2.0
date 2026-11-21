@@ -21,6 +21,7 @@ public sealed class GHOSTDbContext
     public DbSet<ShiftHandover> ShiftHandovers => Set<ShiftHandover>();
     public DbSet<RefreshToken> RefreshTokens => Set<RefreshToken>();
     public DbSet<Product> Products => Set<Product>();
+    public DbSet<StockReceipt> StockReceipts => Set<StockReceipt>();
     public DbSet<StockMovement> StockMovements => Set<StockMovement>();
     public DbSet<ProductPriceHistory> ProductPriceHistory => Set<ProductPriceHistory>();
 
