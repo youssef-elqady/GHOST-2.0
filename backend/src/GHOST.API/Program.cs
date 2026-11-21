@@ -1,6 +1,8 @@
 using System.Text.Json.Serialization;
 using GHOST.API.Authentication;
 using GHOST.API.Configuration;
+using GHOST.API.Security;
+using GHOST.Application.Abstractions.CurrentUser;
 using GHOST.Application.Abstractions.Persistence;
 using GHOST.Application.BusinessDays.CloseShift;
 using GHOST.Application.BusinessDays.OpenBusinessDay;
@@ -51,6 +53,9 @@ builder.Services.AddDbContext<GHOSTDbContext>((serviceProvider, options) =>
 
 builder.Services.AddGhostIdentity();
 builder.Services.AddGhostJwtAuthentication(builder.Configuration);
+builder.Services.AddHttpContextAccessor();
+builder.Services.AddScoped<ICurrentUser, HttpContextCurrentUser>();
+builder.Services.AddScoped<ShiftAccess>();
 builder.Services.AddSingleton<JwtTokenService>();
 builder.Services.AddSingleton(TimeProvider.System);
 builder.Services

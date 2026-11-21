@@ -1,23 +1,29 @@
 using GHOST.Application.Sessions;
 using GHOST.Application.Sessions.StartSession;
 using GHOST.Domain.Enums;
+using GHOST.API.Security;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
 namespace GHOST.API.Controllers;
 
 [ApiController]
+[Authorize(Policy = AuthorizationPolicies.StaffOrAdmin)]
 [Route("api/sessions")]
 public sealed class SessionsController : ControllerBase
 {
     private readonly StartSessionHandler _startSessionHandler;
     private readonly SessionLifecycleHandler _lifecycleHandler;
     private readonly TransferSessionHandler _transferSessionHandler;
+    private readonly ShiftAccess _shiftAccess;
 
     public SessionsController(
         StartSessionHandler startSessionHandler,
         SessionLifecycleHandler lifecycleHandler,
-        TransferSessionHandler transferSessionHandler)
+        TransferSessionHandler transferSessionHandler,
+        ShiftAccess shiftAccess)
     {
+        _shiftAccess = shiftAccess;
         _startSessionHandler = startSessionHandler;
         _lifecycleHandler = lifecycleHandler;
         _transferSessionHandler = transferSessionHandler;
@@ -37,6 +43,9 @@ public sealed class SessionsController : ControllerBase
         [FromBody] StartSessionRequest request,
         CancellationToken cancellationToken)
     {
+        if (!await _shiftAccess.CanOperateOnShiftAsync(request.ShiftId, cancellationToken))
+            return Forbid();
+
         var result = await _startSessionHandler.HandleAsync(
             new StartSessionCommand(
                 request.ShiftId,
@@ -95,6 +104,9 @@ public sealed class SessionsController : ControllerBase
         [FromBody] CompleteSessionRequest request,
         CancellationToken cancellationToken)
     {
+        if (!await _shiftAccess.CanOperateOnShiftAsync(request.EndShiftId, cancellationToken))
+            return Forbid();
+
         var result = await _lifecycleHandler.CompleteAsync(
             sessionId, request.EndShiftId, cancellationToken);
 

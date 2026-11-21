@@ -1,4 +1,6 @@
+using GHOST.API.Security;
 using GHOST.Application.Abstractions.Persistence;
+using Microsoft.AspNetCore.Authorization;
 using GHOST.Application.Devices.CreateDevice;
 using GHOST.Domain.Entities;
 using GHOST.Domain.Enums;
@@ -8,6 +10,7 @@ using Microsoft.AspNetCore.Mvc;
 namespace GHOST.API.Controllers;
 
 [ApiController]
+[Authorize(Policy = AuthorizationPolicies.AdminOnly)]
 [Route("api/devices")]
 public sealed class DevicesController : ControllerBase
 {
@@ -35,6 +38,7 @@ public sealed class DevicesController : ControllerBase
     public sealed record UpdateDeviceRatesRequest(
         IReadOnlyCollection<DeviceRateRequest> Rates);
 
+    [Authorize(Policy = AuthorizationPolicies.StaffOrAdmin)]
     [HttpGet]
     public async Task<IActionResult> GetAll(
         CancellationToken cancellationToken)

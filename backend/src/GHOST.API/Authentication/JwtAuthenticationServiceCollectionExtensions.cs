@@ -1,4 +1,5 @@
 using System.Text;
+using GHOST.API.Security;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.Extensions.Configuration;
@@ -68,8 +69,20 @@ public static class JwtAuthenticationServiceCollectionExtensions
             options.FallbackPolicy = new AuthorizationPolicyBuilder()
                 .RequireAuthenticatedUser()
                 .RequireClaim("token_use", JwtTokenService.AccessTokenPurpose)
-                .RequireRole("Admin")
+                .RequireRole(AuthorizationPolicies.AdminRole)
                 .Build();
+
+            options.AddPolicy(AuthorizationPolicies.AdminOnly, policy =>
+                policy.RequireAuthenticatedUser()
+                    .RequireClaim("token_use", JwtTokenService.AccessTokenPurpose)
+                    .RequireRole(AuthorizationPolicies.AdminRole));
+
+            options.AddPolicy(AuthorizationPolicies.StaffOrAdmin, policy =>
+                policy.RequireAuthenticatedUser()
+                    .RequireClaim("token_use", JwtTokenService.AccessTokenPurpose)
+                    .RequireRole(
+                        AuthorizationPolicies.AdminRole,
+                        AuthorizationPolicies.StaffRole));
 
             // Bootstrap accounts can only use their restricted token to change a password.
             options.AddPolicy("PasswordChangeOnly", policy =>
