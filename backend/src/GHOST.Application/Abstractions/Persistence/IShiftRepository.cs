@@ -19,8 +19,7 @@ public interface IShiftRepository
     /// </summary>
     Task<IReadOnlyList<Shift>> GetOpenShiftsForUserWithCashAsync(
         Guid userId,
-        CancellationToken cancellationToken = default)
-        => Task.FromResult<IReadOnlyList<Shift>>([]);
+        CancellationToken cancellationToken = default);
 
     /// <summary>True when either shift already takes part in a recorded handover.</summary>
     Task<bool> HandoverExistsAsync(

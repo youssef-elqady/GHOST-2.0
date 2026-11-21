@@ -209,6 +209,10 @@ public sealed class ShiftCashTests
         public Task<Shift?> GetAsync(Guid shiftId, CancellationToken cancellationToken = default) =>
             GetWithCashAsync(shiftId, cancellationToken);
 
+        public Task<IReadOnlyList<Shift>> GetOpenShiftsForUserWithCashAsync(Guid userId, CancellationToken cancellationToken = default) =>
+            Task.FromResult<IReadOnlyList<Shift>>(
+                shift is not null && shift.StaffUserId == userId && shift.Status == ShiftStatus.Open ? [shift] : []);
+
         public Task<bool> HandoverExistsAsync(Guid fromShiftId, Guid toShiftId, CancellationToken cancellationToken = default) =>
             Task.FromResult(false);
 
