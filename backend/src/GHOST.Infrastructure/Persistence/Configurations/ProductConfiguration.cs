@@ -31,6 +31,9 @@ public sealed class ProductConfiguration : IEntityTypeConfiguration<Product>
         builder.Property(x => x.MinStock).HasColumnType("decimal(18,3)");
         builder.Property(x => x.WarningStock).HasColumnType("decimal(18,3)");
 
+        // Concurrency token: two simultaneous sales cannot both take the last unit (FR-37).
+        builder.Property<byte[]>("RowVersion").IsRowVersion();
+
         builder.Ignore(x => x.IsSellable);
         builder.Ignore(x => x.StockLevel);
 

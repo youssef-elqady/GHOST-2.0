@@ -21,6 +21,7 @@ public sealed class GHOSTDbContext
     public DbSet<ShiftHandover> ShiftHandovers => Set<ShiftHandover>();
     public DbSet<RefreshToken> RefreshTokens => Set<RefreshToken>();
     public DbSet<Product> Products => Set<Product>();
+    public DbSet<Sale> Sales => Set<Sale>();
     public DbSet<StockReceipt> StockReceipts => Set<StockReceipt>();
     public DbSet<StockMovement> StockMovements => Set<StockMovement>();
     public DbSet<ProductPriceHistory> ProductPriceHistory => Set<ProductPriceHistory>();
@@ -32,6 +33,8 @@ public sealed class GHOSTDbContext
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         base.OnModelCreating(modelBuilder);
+
+        modelBuilder.HasSequence<long>("InvoiceNumbers").StartsAt(1).IncrementsBy(1);
 
         // Keep Identity's standard schema and indexes, but use the business
         // table names documented in the GHOST SRS.

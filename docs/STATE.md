@@ -1937,3 +1937,11 @@ Branch `feature/auth03-refresh-tokens`, based on `origin/feature/admin-frontend-
 - `StockReceipt`/`StockReceiptItem` + `api/stock-receipts`. Staff create on their own open shift: stock rises at once, the total leaves the drawer (StockPurchase), status Pending.
 - Admin approves, or rejects with a reason: stock is reversed and the cash either returns to a chosen open shift (ReverseCash) or is charged to the staff member (ChargeToStaff, audited). Rejection fails whole if the goods were already sold.
 - Migration `AddStockReceipts` not applied anywhere.
+
+### Sales / POS (offline session)
+- `Sale`, `SaleItem`, `Payment`, `Refund` + `api/sales`: one-step cash checkout (products and/or one completed session), stock decrement + drawer cash + invoice in one transaction (FR-57), price and average cost frozen per line (FR-53), idempotency key (FR-54), invoice number `GS-YYYY-NNNNN` from SQL sequence `InvoiceNumbers` (FR-52; the counter does not reset per year).
+- Discount is Admin-only (fixed or percent, reason required, rounded down so totals stay whole EGP). Full refund is Admin-only, with an open shift receiving the cash-out and an optional return to stock. Invoices are never deleted.
+- Print endpoint counts prints: first is the original, later ones are labelled copy (FR-56). Prints are audited; there is no separate PrintJobLog table yet.
+- Product has a RowVersion so two sales cannot take the last unit (FR-37).
+- Not done: partial refunds, non-cash payments, draft invoices, the actual 80mm print layout, customers.
+- Migration `AddSalesAndInvoices` not applied anywhere (includes the sequence and filtered unique indexes).
