@@ -46,7 +46,7 @@ Rule: an invariant marked only "-" or "S/C not run" is UNKNOWN, and UNKNOWN coun
 | PI-4 | Cart content is never the checkout identity | frontend creates a random key per checkout, regenerated after success or any cart change | code review; no browser test |
 | PI-5 | An invoice can be refunded once | `Sale.RefundAll` needs Paid, RowVersion | U; S: SC-08 |
 | PI-6 | Discount: Admin only, with a reason | `SaleHandler` | U |
-| PI-7 | A session is invoiced once | `SessionIsInvoicedAsync` | U (logic); no unique constraint yet, see GAPS |
+| PI-7 | A session is invoiced once | `SessionIsInvoicedAsync` | U (logic); unique filtered index UX_Sales_SessionId_Live (live invoices Paid/Pending only, owner-approved 12:33; Rebill link ReplacesSaleId pending) |
 | PI-8 | A receipt is approved or rejected once | `StockReceipt` status checks, RowVersion | U; S: not covered by a concurrent test yet |
 | PI-9 | Stock movements are append-only | domain (no setter) + trigger TR_StockMovements_AppendOnly (migration 16) | C+S: SC-02 (not run) |
 
