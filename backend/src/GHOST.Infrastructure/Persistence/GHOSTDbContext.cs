@@ -28,6 +28,7 @@ public sealed class GHOSTDbContext
     public DbSet<ProductPriceHistory> ProductPriceHistory => Set<ProductPriceHistory>();
     public DbSet<SystemSetting> SystemSettings => Set<SystemSetting>();
     public DbSet<BackupRecord> BackupRecords => Set<BackupRecord>();
+    public DbSet<SystemHeartbeat> SystemHeartbeats => Set<SystemHeartbeat>();
 
     public GHOSTDbContext(DbContextOptions<GHOSTDbContext> options) : base(options)
     {

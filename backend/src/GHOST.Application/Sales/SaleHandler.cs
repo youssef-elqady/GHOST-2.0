@@ -105,6 +105,9 @@ public sealed class SaleHandler
             if (session is null)
                 return Result<SaleDto>.Failure("Session was not found.");
 
+            if (session.NeedsReview)
+                return Result<SaleDto>.Failure("This session is waiting for an Admin review after a power outage.");
+
             if (await _sales.SessionIsInvoicedAsync(sessionId, cancellationToken))
                 return Result<SaleDto>.Failure("This session already has an invoice.");
 

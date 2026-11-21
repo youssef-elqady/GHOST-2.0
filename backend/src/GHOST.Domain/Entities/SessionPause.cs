@@ -1,4 +1,4 @@
-﻿using GHOST.Domain.Common;
+using GHOST.Domain.Common;
 using GHOST.Domain.Exceptions;
 
 namespace GHOST.Domain.Entities;
@@ -17,6 +17,25 @@ public sealed class SessionPause : BaseEntity
 
     private SessionPause()
     {
+    }
+
+    internal SessionPause(Guid segmentId, string? reason, DateTimeOffset startedAt, DateTimeOffset endedAt)
+        : this(segmentId, reason)
+    {
+        if (endedAt < startedAt)
+            throw new BusinessRuleValidationException("A pause cannot end before it starts.");
+
+        StartedAt = startedAt;
+        EndedAt = endedAt;
+    }
+
+    internal void EndAt(DateTimeOffset at)
+    {
+        if (!IsActive)
+            return;
+
+        EndedAt = at < StartedAt ? StartedAt : at;
+        MarkAsUpdated();
     }
 
     internal SessionPause(Guid segmentId, string? reason)

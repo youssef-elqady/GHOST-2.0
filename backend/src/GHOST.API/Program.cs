@@ -114,6 +114,12 @@ builder.Services.AddScoped(sp =>
 });
 builder.Services.AddScoped<GHOST.Application.Backup.BackupHandler>();
 builder.Services.AddHostedService<GHOST.API.Backup.ScheduledBackupService>();
+builder.Services.Configure<GHOST.API.Outage.OutageOptions>(
+    builder.Configuration.GetSection(GHOST.API.Outage.OutageOptions.SectionName));
+builder.Services.AddScoped<GHOST.Application.Abstractions.Persistence.IOutageRepository, GHOST.Infrastructure.Persistence.Repositories.OutageRepository>();
+builder.Services.AddScoped<GHOST.Application.Abstractions.Auditing.ISystemAuditTrail, GHOST.Infrastructure.Persistence.SystemAuditTrail>();
+builder.Services.AddScoped<GHOST.Application.Sessions.PowerOutageHandler>();
+builder.Services.AddHostedService<GHOST.API.Outage.OutageRecoveryService>();
 builder.Services.AddSingleton<GHOST.API.Backup.ShiftCloseBackupTrigger>();
 
 var app = builder.Build();

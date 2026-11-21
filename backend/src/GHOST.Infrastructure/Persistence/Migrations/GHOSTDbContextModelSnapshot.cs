@@ -771,6 +771,23 @@ namespace GHOST.Infrastructure.Persistence.Migrations
                         .HasColumnType("bit")
                         .HasDefaultValue(false);
 
+                    b.Property<bool>("NeedsReview")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bit")
+                        .HasDefaultValue(false);
+
+                    b.Property<DateTimeOffset?>("OutageEndedAt")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<DateTimeOffset?>("OutageStartedAt")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<DateTimeOffset?>("ReviewedAt")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<Guid?>("ReviewedById")
+                        .HasColumnType("uniqueidentifier");
+
                     b.Property<byte[]>("RowVersion")
                         .IsConcurrencyToken()
                         .ValueGeneratedOnAddOrUpdate()
@@ -792,6 +809,10 @@ namespace GHOST.Infrastructure.Persistence.Migrations
                         .HasFilter("[CancelledAt] IS NOT NULL");
 
                     b.HasIndex("EndShiftId");
+
+                    b.HasIndex("NeedsReview")
+                        .HasDatabaseName("IX_Sessions_NeedsReview")
+                        .HasFilter("[NeedsReview] = 1");
 
                     b.HasIndex("StartShiftId");
 
@@ -1240,6 +1261,22 @@ namespace GHOST.Infrastructure.Persistence.Migrations
                         .HasDatabaseName("UX_StocktakeItems_Stocktake_Product");
 
                     b.ToTable("StocktakeItems", (string)null);
+                });
+
+            modelBuilder.Entity("GHOST.Domain.Entities.SystemHeartbeat", b =>
+                {
+                    b.Property<int>("Id")
+                        .HasColumnType("int");
+
+                    b.Property<DateTimeOffset>("BeatAt")
+                        .HasColumnType("datetimeoffset");
+
+                    b.HasKey("Id");
+
+                    b.ToTable("SystemHeartbeats", null, t =>
+                        {
+                            t.HasCheckConstraint("CK_SystemHeartbeats_Singleton", "[Id] = 1");
+                        });
                 });
 
             modelBuilder.Entity("GHOST.Domain.Entities.SystemSetting", b =>

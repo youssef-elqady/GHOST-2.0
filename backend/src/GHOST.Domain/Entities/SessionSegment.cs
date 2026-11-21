@@ -1,4 +1,4 @@
-﻿using GHOST.Domain.Common;
+using GHOST.Domain.Common;
 using GHOST.Domain.Enums;
 using GHOST.Domain.Exceptions;
 
@@ -57,6 +57,37 @@ public sealed class SessionSegment : BaseEntity
             throw new BusinessRuleValidationException("Segment is already paused.");
 
         _pauses.Add(new SessionPause(Id, reason));
+        MarkAsUpdated();
+    }
+
+    internal bool IsPaused => _pauses.Any(p => p.IsActive);
+
+    /// <summary>Records time the device was not running (power outage) as an already-closed pause, so it is not billed.</summary>
+    internal void AddClosedPause(string reason, DateTimeOffset startedAt, DateTimeOffset endedAt)
+    {
+        var start = startedAt < StartedAt ? StartedAt : startedAt;
+        if (endedAt <= start)
+            return;
+
+        _pauses.Add(new SessionPause(Id, reason, start, endedAt));
+        MarkAsUpdated();
+    }
+
+    /// <summary>Ends the segment at an explicit time (admin-approved end after an outage).</summary>
+    internal void EndAt(DateTimeOffset at, string outageReason, bool dropOutagePauseCoveringEnd)
+    {
+        if (!IsActive)
+            throw new BusinessRuleValidationException("Segment is already ended.");
+        if (at < StartedAt)
+            throw new BusinessRuleValidationException("The end time cannot be before the session segment started.");
+
+        _pauses.FirstOrDefault(p => p.IsActive)?.EndAt(at);
+
+        // Admin says play really lasted until `at`: an outage pause that covers that moment must not subtract it.
+        if (dropOutagePauseCoveringEnd)
+            _pauses.RemoveAll(p => p.Reason == outageReason && p.StartedAt < at);
+
+        EndedAt = at;
         MarkAsUpdated();
     }
 

@@ -1,4 +1,4 @@
-﻿using GHOST.Domain.Common;
+using GHOST.Domain.Common;
 using GHOST.Domain.Enums;
 using GHOST.Domain.Exceptions;
 using GHOST.Domain.Services;
@@ -21,6 +21,19 @@ public sealed class Session : BaseEntity
 
     /// <summary>True when an Admin cancelled the session after the free cancellation window.</summary>
     public bool IsVoided { get; private set; }
+
+    public const string PowerOutageReason = "Power outage";
+
+    /// <summary>Set when the system was down while this session ran. Billing is frozen until an Admin approves an end time.</summary>
+    public bool NeedsReview { get; private set; }
+
+    public DateTimeOffset? OutageStartedAt { get; private set; }
+
+    public DateTimeOffset? OutageEndedAt { get; private set; }
+
+    public Guid? ReviewedById { get; private set; }
+
+    public DateTimeOffset? ReviewedAt { get; private set; }
 
     public DateTimeOffset StartedAt => CreatedAt;
 
@@ -200,8 +213,61 @@ public sealed class Session : BaseEntity
         return (DateTimeOffset.UtcNow - CreatedAt) <= gracePeriod;
     }
 
+    /// <summary>
+    /// The system was down from <paramref name="lastSavedAt"/> to <paramref name="recoveredAt"/>. The outage is stored as
+    /// a closed pause (not billed) and the session waits for an Admin to set the real end time. Idempotent per outage.
+    /// </summary>
+    public void MarkPowerOutage(DateTimeOffset lastSavedAt, DateTimeOffset recoveredAt)
+    {
+        if (Status != SessionStatus.Active)
+            return;
+        if (recoveredAt <= lastSavedAt)
+            throw new BusinessRuleValidationException("Recovery time must be after the last saved time.");
+
+        var segment = GetActiveSegment();
+        if (segment is null)
+            return;
+
+        if (!segment.IsPaused)
+            segment.AddClosedPause(PowerOutageReason, lastSavedAt, recoveredAt);
+
+        NeedsReview = true;
+        // Keep the earliest outage start if several outages happen before the Admin reviews.
+        OutageStartedAt = OutageStartedAt is { } existing && existing < lastSavedAt ? existing : lastSavedAt;
+        OutageEndedAt = recoveredAt;
+        MarkAsUpdated();
+    }
+
+    /// <summary>Admin decision: the session really ended at <paramref name="actualEnd"/>. Closes it and clears the review flag.</summary>
+    public void ApproveAfterOutage(Guid adminUserId, Guid endShiftId, DateTimeOffset actualEnd, DateTimeOffset now)
+    {
+        if (Status != SessionStatus.Active || !NeedsReview)
+            throw new BusinessRuleValidationException("This session is not waiting for an outage review.");
+        if (adminUserId == Guid.Empty || endShiftId == Guid.Empty)
+            throw new BusinessRuleValidationException("Reviewer and end shift are required.");
+        if (actualEnd > now)
+            throw new BusinessRuleValidationException("The end time cannot be in the future.");
+
+        var segment = GetActiveSegment()
+            ?? throw new BusinessRuleValidationException("No active segment to end.");
+
+        var insideOutage = OutageStartedAt is { } s && OutageEndedAt is { } e && actualEnd > s && actualEnd <= e;
+        segment.EndAt(actualEnd, PowerOutageReason, dropOutagePauseCoveringEnd: insideOutage);
+
+        Status = SessionStatus.Completed;
+        EndShiftId = endShiftId;
+        NeedsReview = false;
+        ReviewedById = adminUserId;
+        ReviewedAt = now;
+        MarkAsUpdated();
+    }
+
     private void EnsureSessionIsActive()
     {
+        if (NeedsReview)
+            throw new BusinessRuleValidationException(
+                "This session is waiting for an Admin review after a power outage.");
+
         if (Status != SessionStatus.Active)
         {
             throw new BusinessRuleValidationException($"Cannot perform this action because session is {Status}.");

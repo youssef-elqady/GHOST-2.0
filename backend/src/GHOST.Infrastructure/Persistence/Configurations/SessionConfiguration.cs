@@ -1,4 +1,4 @@
-﻿using GHOST.Domain.Entities;
+using GHOST.Domain.Entities;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
 
@@ -28,6 +28,19 @@ public sealed class SessionConfiguration : IEntityTypeConfiguration<Session>
         builder.Property(s => s.IsVoided)
             .IsRequired()
             .HasDefaultValue(false);
+
+        builder.Property(s => s.NeedsReview)
+            .IsRequired()
+            .HasDefaultValue(false);
+
+        builder.Property(s => s.OutageStartedAt);
+        builder.Property(s => s.OutageEndedAt);
+        builder.Property(s => s.ReviewedById);
+        builder.Property(s => s.ReviewedAt);
+
+        builder.HasIndex(s => s.NeedsReview)
+            .HasFilter("[NeedsReview] = 1")
+            .HasDatabaseName("IX_Sessions_NeedsReview");
 
         builder.Ignore(s => s.StartedAt);
 
