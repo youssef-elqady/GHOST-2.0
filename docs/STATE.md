@@ -1910,3 +1910,18 @@ Reported by user after fast-forward pull to commit `761f98ce4ead4dead43af76f262e
 - The SQL Server audit persistence test is present and guarded, but skipped without `GHOST_AUTH02_TEST_CONNECTION_STRING`; no database was connected or modified.
 - PR #26 was closed as superseded by PR #29 after detecting the concurrent, newer login/password-change implementation. No duplicate token/login code was merged.
 - Current next backend slice: A3 refresh-token/session lifecycle design, followed by implementation only after the storage, cookie, CSRF, concurrency and migration strategy are documented.
+
+
+## Offline work session — AUTH-03 A3-A5, cash ledger, session cancel/void, handover (2026-11-21)
+
+Branch `feature/auth03-refresh-tokens`, based on `origin/feature/admin-frontend-complete` (8a5508e). Built and tested locally with .NET SDK 10.0.404 (Release): 132 unit tests pass; SQL Server tests unchanged (10 pass, 4 skipped without the guarded DB). No database was touched and no migration was applied. Three new EF migrations were generated and inspected but are NOT verified against SQL Server.
+
+### Implemented
+- **A3 refresh tokens** (`RefreshToken`, `RefreshTokenService`, `AuthController` refresh/logout, migration `AddRefreshTokens`): SHA-256 hashed tokens, rotation, replay detection with family revocation, 7-day sliding / 30-day absolute lifetime, HttpOnly SameSite=Strict cookie `ghost_refresh` on `/api/auth`, Origin allowlist + `X-GHOST-Request: 1`, access JWT carries `sid` and is rejected when its family is revoked or the user is disabled (`SessionTokenValidator`). Password change revokes all older sessions.
+- **A4/A5** `HttpContextCurrentUser` (claims only), policies `AdminOnly` / `StaffOrAdmin`, `ShiftAccess` ownership checks; explicit authorization on every controller; reflection test inventories endpoints. Staff can read devices, open/close their own shift, run sessions on their own open shift.
+- **Cash ledger** `CashTransaction` (append-only trigger in migration), `Shift.RecordCash` (ExpectedCash moves only through the ledger, no overdraw, idempotency keys), expense and withdrawal endpoints, shift cash summary. `UpdateExpectedCash` removed. Migration backfills an OpeningBalance row for existing shifts.
+- **Session cancel/void** (BD-03, FR-25): configurable window (`Sessions:CancelWindowSeconds`, default 300), reason list, Admin-only void after the window with written reason, cancelled sessions bill 0, audit staged in the same save (`IAuditTrail`). Migration `AddSessionVoidFlag`.
+- **Shift handover** (FR-12): `ShiftHandover`, acknowledge endpoint, mandatory note on difference, discrepancy audit. Migration `AddShiftHandovers`.
+
+### Not verified
+- Migrations against a real SQL Server (backfill SQL, triggers, filtered indexes), concurrency behavior of the Serializable refresh rotation, and the new endpoints end to end. Frontend not changed.
