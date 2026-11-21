@@ -1925,3 +1925,10 @@ Branch `feature/auth03-refresh-tokens`, based on `origin/feature/admin-frontend-
 
 ### Not verified
 - Migrations against a real SQL Server (backfill SQL, triggers, filtered indexes), concurrency behavior of the Serializable refresh rotation, and the new endpoints end to end. Frontend not changed.
+
+### Inventory foundation (offline session, branch feature/auth03-refresh-tokens)
+- Added Product, StockMovement (append-only, trigger in migration), ProductPriceHistory, InventoryHandler and ProductsController (`api/products`).
+- Staff quick-add creates a PendingPricing product that cannot be sold; Admin sets the price (whole EGP) to activate it.
+- Stock changes only through `Product.ApplyMovement` (reason required, never below zero, weighted average cost on purchases). Staff may record Waste, Expired and ManualAdjustment; other types need Admin.
+- Migration `AddProductsAndStockMovements` is NOT applied to any database and the trigger SQL is unverified on SQL Server.
+- Not done: stock receipts (and the cash link), stocktake, barcode generation, sales/POS.

@@ -260,6 +260,128 @@ namespace GHOST.Infrastructure.Persistence.Migrations
                     b.ToTable("DeviceRates", (string)null);
                 });
 
+            modelBuilder.Entity("GHOST.Domain.Entities.Product", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<decimal>("AvgCost")
+                        .HasColumnType("decimal(18,4)");
+
+                    b.Property<string>("Barcode")
+                        .HasMaxLength(64)
+                        .HasColumnType("nvarchar(64)");
+
+                    b.Property<string>("Category")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<Guid?>("CreatedById")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<decimal>("MinStock")
+                        .HasColumnType("decimal(18,3)");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(150)
+                        .HasColumnType("nvarchar(150)");
+
+                    b.Property<decimal>("SalePrice")
+                        .HasColumnType("decimal(18,2)");
+
+                    b.Property<string>("Sku")
+                        .HasMaxLength(64)
+                        .HasColumnType("nvarchar(64)");
+
+                    b.Property<int>("Status")
+                        .HasColumnType("int");
+
+                    b.Property<decimal>("StockQuantity")
+                        .HasColumnType("decimal(18,3)");
+
+                    b.Property<bool>("TrackStock")
+                        .HasColumnType("bit");
+
+                    b.Property<string>("Unit")
+                        .IsRequired()
+                        .HasMaxLength(30)
+                        .HasColumnType("nvarchar(30)");
+
+                    b.Property<DateTimeOffset?>("UpdatedAt")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<decimal>("WarningStock")
+                        .HasColumnType("decimal(18,3)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("Barcode")
+                        .IsUnique()
+                        .HasDatabaseName("UX_Products_Barcode")
+                        .HasFilter("[Barcode] IS NOT NULL");
+
+                    b.HasIndex("CreatedById");
+
+                    b.HasIndex("Name")
+                        .HasDatabaseName("IX_Products_Name");
+
+                    b.HasIndex("Sku")
+                        .IsUnique()
+                        .HasDatabaseName("UX_Products_Sku")
+                        .HasFilter("[Sku] IS NOT NULL");
+
+                    b.ToTable("Products", null, t =>
+                        {
+                            t.HasCheckConstraint("CK_Products_SalePrice", "[SalePrice] >= 0");
+
+                            t.HasCheckConstraint("CK_Products_Status", "[Status] IN (1, 2, 3)");
+
+                            t.HasCheckConstraint("CK_Products_StockQuantity", "[StockQuantity] >= 0");
+                        });
+                });
+
+            modelBuilder.Entity("GHOST.Domain.Entities.ProductPriceHistory", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateTimeOffset>("ChangedAt")
+                        .HasColumnType("datetimeoffset(7)");
+
+                    b.Property<Guid>("ChangedById")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<decimal>("NewValue")
+                        .HasColumnType("decimal(18,4)");
+
+                    b.Property<decimal>("OldValue")
+                        .HasColumnType("decimal(18,4)");
+
+                    b.Property<int>("PriceType")
+                        .HasColumnType("int");
+
+                    b.Property<Guid>("ProductId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("Reason")
+                        .HasMaxLength(500)
+                        .HasColumnType("nvarchar(500)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ChangedById");
+
+                    b.HasIndex("ProductId", "ChangedAt")
+                        .HasDatabaseName("IX_ProductPriceHistory_ProductId_ChangedAt");
+
+                    b.ToTable("ProductPriceHistory", (string)null);
+                });
+
             modelBuilder.Entity("GHOST.Domain.Entities.RefreshToken", b =>
                 {
                     b.Property<Guid>("Id")
@@ -570,6 +692,64 @@ namespace GHOST.Infrastructure.Persistence.Migrations
                         });
                 });
 
+            modelBuilder.Entity("GHOST.Domain.Entities.StockMovement", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<decimal>("BalanceAfter")
+                        .HasColumnType("decimal(18,3)");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("datetimeoffset(7)");
+
+                    b.Property<Guid>("ProductId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<decimal>("QtyDelta")
+                        .HasColumnType("decimal(18,3)");
+
+                    b.Property<string>("Reason")
+                        .IsRequired()
+                        .HasMaxLength(500)
+                        .HasColumnType("nvarchar(500)");
+
+                    b.Property<Guid?>("ShiftId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<Guid?>("SourceId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("SourceType")
+                        .HasMaxLength(50)
+                        .HasColumnType("nvarchar(50)");
+
+                    b.Property<int>("Type")
+                        .HasColumnType("int");
+
+                    b.Property<decimal>("UnitCost")
+                        .HasColumnType("decimal(18,4)");
+
+                    b.Property<Guid>("UserId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ShiftId");
+
+                    b.HasIndex("UserId");
+
+                    b.HasIndex("ProductId", "CreatedAt")
+                        .HasDatabaseName("IX_StockMovements_ProductId_CreatedAt");
+
+                    b.ToTable("StockMovements", null, t =>
+                        {
+                            t.HasCheckConstraint("CK_StockMovements_BalanceAfter", "[BalanceAfter] >= 0");
+
+                            t.HasCheckConstraint("CK_StockMovements_QtyDelta", "[QtyDelta] <> 0");
+                        });
+                });
+
             modelBuilder.Entity("GHOST.Infrastructure.Identity.ApplicationUser", b =>
                 {
                     b.Property<Guid>("Id")
@@ -828,6 +1008,29 @@ namespace GHOST.Infrastructure.Persistence.Migrations
                         .IsRequired();
                 });
 
+            modelBuilder.Entity("GHOST.Domain.Entities.Product", b =>
+                {
+                    b.HasOne("GHOST.Infrastructure.Identity.ApplicationUser", null)
+                        .WithMany()
+                        .HasForeignKey("CreatedById")
+                        .OnDelete(DeleteBehavior.Restrict);
+                });
+
+            modelBuilder.Entity("GHOST.Domain.Entities.ProductPriceHistory", b =>
+                {
+                    b.HasOne("GHOST.Infrastructure.Identity.ApplicationUser", null)
+                        .WithMany()
+                        .HasForeignKey("ChangedById")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("GHOST.Domain.Entities.Product", null)
+                        .WithMany("PriceHistory")
+                        .HasForeignKey("ProductId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+                });
+
             modelBuilder.Entity("GHOST.Domain.Entities.RefreshToken", b =>
                 {
                     b.HasOne("GHOST.Infrastructure.Identity.ApplicationUser", null)
@@ -911,6 +1114,26 @@ namespace GHOST.Infrastructure.Persistence.Migrations
                         .IsRequired();
                 });
 
+            modelBuilder.Entity("GHOST.Domain.Entities.StockMovement", b =>
+                {
+                    b.HasOne("GHOST.Domain.Entities.Product", null)
+                        .WithMany("Movements")
+                        .HasForeignKey("ProductId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("GHOST.Domain.Entities.Shift", null)
+                        .WithMany()
+                        .HasForeignKey("ShiftId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.HasOne("GHOST.Infrastructure.Identity.ApplicationUser", null)
+                        .WithMany()
+                        .HasForeignKey("UserId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+                });
+
             modelBuilder.Entity("Microsoft.AspNetCore.Identity.IdentityRoleClaim<System.Guid>", b =>
                 {
                     b.HasOne("Microsoft.AspNetCore.Identity.IdentityRole<System.Guid>", null)
@@ -970,6 +1193,13 @@ namespace GHOST.Infrastructure.Persistence.Migrations
             modelBuilder.Entity("GHOST.Domain.Entities.Device", b =>
                 {
                     b.Navigation("Rates");
+                });
+
+            modelBuilder.Entity("GHOST.Domain.Entities.Product", b =>
+                {
+                    b.Navigation("Movements");
+
+                    b.Navigation("PriceHistory");
                 });
 
             modelBuilder.Entity("GHOST.Domain.Entities.Session", b =>

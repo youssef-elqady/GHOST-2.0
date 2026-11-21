@@ -20,6 +20,9 @@ public sealed class GHOSTDbContext
     public DbSet<CashTransaction> CashTransactions => Set<CashTransaction>();
     public DbSet<ShiftHandover> ShiftHandovers => Set<ShiftHandover>();
     public DbSet<RefreshToken> RefreshTokens => Set<RefreshToken>();
+    public DbSet<Product> Products => Set<Product>();
+    public DbSet<StockMovement> StockMovements => Set<StockMovement>();
+    public DbSet<ProductPriceHistory> ProductPriceHistory => Set<ProductPriceHistory>();
 
     public GHOSTDbContext(DbContextOptions<GHOSTDbContext> options) : base(options)
     {
