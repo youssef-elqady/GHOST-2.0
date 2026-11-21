@@ -103,3 +103,13 @@ Endpoints added:
 - components/staff-session-controls.tsx: pause/resume, complete (end shift = current shift), transfer to an available device with play type. Playing devices are now clickable. All rules stay on the server; its Arabic error is shown.
 - Opening/closing a shift refreshes the dashboard.
 - tsc clean, eslint 0 errors, next build ok. Not browser-tested against a live API; no component test framework.
+
+## CORS from configuration (Nov 21, owner decision: single PC, localhost only)
+- Program.cs: CORS origins now come from Authentication:RefreshToken:AllowedOrigins (the same list the refresh/logout guard uses), validated at startup by Authentication/LocalOriginPolicy.cs. Wildcards, LAN, public hosts and malformed origins stop the API from starting. Tests: Security/LocalOriginPolicyTests (13 cases). Backend 222 unit tests pass.
+- Note: .NET config binding of arrays can keep the built-in localhost:3000 defaults next to configured values. Both are loopback, so the policy still holds.
+- Secure refresh cookie stays on. Chrome/Edge treat http://localhost as a secure context and keep Secure cookies there; Safari does not. Venue PC should use Chrome or Edge. Not tested in a real browser yet.
+
+## Staff POS wired (Nov 21)
+- components/staff-pos.tsx: product catalog (GET api/products?status=Active), search by name/barcode, cart with stock caps, cash checkout with an idempotency key that is created once per cart content and reused on retry (a retry after a timeout cannot double-charge); new key when the cart changes or after success. Total shown is a preview; the server recomputes. Needs an open shift.
+- lib/ghost-api.ts: getProducts, ApiProduct, ApiSale typed result for checkout.
+- Not wired: discounts, linking a sale to a session, invoice list/print, refunds UI. tsc clean, eslint 0 errors, next build ok, no browser test.

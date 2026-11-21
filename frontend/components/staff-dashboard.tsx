@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from 'react'
 import { getCurrentShift, getDevices, listSessions, startSession, type ApiDevice, type ApiSessionSummary, type ApiShift } from '@/lib/ghost-api'
+import { StaffPos } from '@/components/staff-pos'
 import { SessionControls } from '@/components/staff-session-controls'
 import { StaffShiftView } from '@/components/staff-shift'
 import { ThemeToggle } from '@/components/theme-toggle'
@@ -164,7 +165,7 @@ export function StaffDashboard({ token, userId, userName, onLogout }: { token: s
         </>}
 
         {activeNav === 'devices' && <DevicesView devices={devices} onBack={() => setActiveNav('overview')} onSelect={(device) => setSelectedDevice(device)} />}
-        {activeNav === 'products' && <ProductsView />}
+        {activeNav === 'products' && <StaffPos token={token} shiftId={shift?.id ?? null} />}
         {activeNav === 'payments' && <PaymentsView />}
         {activeNav === 'shift' && <StaffShiftView token={token} userId={userId} onChanged={refresh} onBack={() => setActiveNav('overview')} />}
         {activeNav === 'messages' && <MessagesView />}
@@ -179,16 +180,6 @@ export function StaffDashboard({ token, userId, userName, onLogout }: { token: s
 
 function DevicesView({ devices, onBack, onSelect }: { devices: Device[]; onBack: () => void; onSelect: (device: Device) => void }) {
   return <div className="inner-page"><button className="back-link" onClick={onBack}><ChevronLeft size={16} /> العودة للرئيسية</button><div className="page-heading compact"><div><p className="eyebrow">التشغيل اليومي · الأجهزة المصرّح بها</p><h1>الأجهزة والجلسات</h1><p className="subheading">اختر جهازاً متاحاً لبدء جلسة وفق التسعيرة المعتمدة.</p></div><span className="secure-label"><ShieldCheck size={15} /> صلاحيات الموظف</span></div><div className="device-groups">{Object.entries(devices.reduce<Record<string, Device[]>>((a, d) => { a[d.room] = [...(a[d.room] || []), d]; return a }, {})).map(([room, items]) => <section className="room-section" key={room}><div className="room-title"><div><h3>{room}</h3><span>{items.length} أجهزة · <b>{items.filter((d) => d.status === 'available').length} متاحة</b></span></div></div><div className="device-grid">{items.map((device) => <button className={`device-card ${device.status}`} key={device.id} disabled={device.status === 'maintenance'} onClick={() => onSelect(device)}><div className="device-card-top"><span className="device-id">{device.id}</span><span className={`status-label ${device.status}`}><i />{statusLabel(device.status)}</span></div><div className="device-icon"><Gamepad2 size={23} /></div><h4>{device.name}</h4><p>{device.type}</p>{device.status === 'available' ? <span className="start-hint">بدء جلسة فردية أو متعددة <Zap size={14} /></span> : <span className="maintenance-note">{device.status === 'playing' ? 'إدارة الجلسة الجارية' : 'غير متاح مؤقتاً'}</span>}</button>)}</div></section>)}</div></div>
-}
-
-function ProductsView() {
-  return <div className="inner-page">
-    <div className="page-heading compact">
-      <div><p className="eyebrow">الطلبات والمنتجات</p><h1>الطلبات والمنتجات</h1><p className="subheading">إضافة المنتجات إلى فاتورة الجلسة ومتابعة المخزون.</p></div>
-      <span className="secure-label"><ShieldCheck size={15} /> بيانات النظام فقط</span>
-    </div>
-    <div className="notice-bar"><div className="notice-icon"><CupSoda size={17} /></div><div><strong>كتالوج المنتجات غير متصل بعد</strong><p>لن نعرض منتجات أو أسعارًا تجريبية. يلزم إضافة API للمنتجات والمخزون قبل تفعيل البيع.</p></div></div>
-  </div>
 }
 
 function PaymentsView() {

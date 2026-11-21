@@ -85,6 +85,8 @@ export type ApiShift = { id: string; businessDayId: string; staffUserId: string;
 export type ApiSessionSummary = { id: string; startShiftId: string; endShiftId: string | null; status: 'Active' | 'Completed' | 'Cancelled' | string; startedAt: string; cancelledAt: string | null; isVoided: boolean; currentDeviceId: string | null; segmentCount: number }
 export type ApiPaged<T> = { items: T[]; page: number; pageSize: number; totalCount: number }
 export type CheckoutInput = { shiftId: string; items?: { productId: string; quantity: number }[]; sessionId?: string; discount?: { type: string; value: number; reason?: string }; idempotencyKey: string }
+export type ApiProduct = { id: string; name: string; barcode: string | null; sku: string | null; category: string; unit: string; salePrice: number; stockQuantity: number; status: string; stockLevel: string; trackStock: boolean }
+export type ApiSale = { id: string; invoiceNumber: string; shiftId: string; status: string; subtotal: number; discountAmount: number; total: number; paidTotal: number; createdAt: string; items: { itemType: string; description: string; quantity: number; unitPrice: number; lineTotal: number }[] }
 const enc = encodeURIComponent
 /** 404 means "none open"; callers treat it as null instead of an error. */
 async function orNull<T>(call: Promise<T>): Promise<T | null> { try { return await call } catch (e) { if (e instanceof Error && e.message.includes('HTTP 404')) return null; throw e } }
@@ -102,5 +104,6 @@ export function resumeSession(token: string, id: string) { return request<unknow
 export function transferSession(token: string, id: string, newDeviceId: string, playType: PlayTypeName) { return request<unknown>(`/api/sessions/${enc(id)}/transfer`, { method: 'POST', body: JSON.stringify({ newDeviceId, playType }) }, token) }
 export function completeSession(token: string, id: string, endShiftId: string) { return request<unknown>(`/api/sessions/${enc(id)}/complete`, { method: 'POST', body: JSON.stringify({ endShiftId }) }, token) }
 /** idempotencyKey must be created once per checkout attempt and reused on retry so a double tap never double-charges. */
-export function checkout(token: string, input: CheckoutInput) { return request<unknown>('/api/sales/checkout', { method: 'POST', body: JSON.stringify(input) }, token) }
+export function checkout(token: string, input: CheckoutInput) { return request<ApiSale>('/api/sales/checkout', { method: 'POST', body: JSON.stringify(input) }, token) }
 export function newIdempotencyKey() { return globalThis.crypto.randomUUID() }
+export function getProducts(token: string, search?: string) { return request<ApiProduct[]>(`/api/products?status=Active${search ? `&search=${enc(search)}` : ''}`, undefined, token) }
