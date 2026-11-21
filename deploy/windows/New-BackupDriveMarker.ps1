@@ -4,7 +4,6 @@ $root = $DriveRoot.TrimEnd('\') + '\'
 if (-not (Test-Path $root)) { throw "$root is not connected." }
 $marker = Join-Path $root '.ghost-backup-drive'
 $letter = $root.Substring(0,1)
-$serial = ('{0:X8}' -f [uint32](Get-CimInstance Win32_LogicalDisk -Filter "DeviceID='${letter}:'").VolumeSerialNumber -as [uint32])
 $serial = (Get-CimInstance Win32_LogicalDisk -Filter "DeviceID='${letter}:'").VolumeSerialNumber
 if (-not $serial) { throw 'Could not read the volume serial of this drive.' }
 if (Test-Path $marker) { $old = (Get-Content $marker -Raw).Trim(); Write-Host "Marker already exists."; Write-Host "Marker file: $marker"; Write-Host "ExternalDriveId: $old@$serial"; return }
