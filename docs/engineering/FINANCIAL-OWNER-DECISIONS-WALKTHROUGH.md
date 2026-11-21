@@ -2,7 +2,7 @@
 Status: DESIGN ONLY, for owner approval. Nothing is implemented. No code, table or migration until final approval. Extends FINANCIAL-ARCHITECTURE-GAP-ANALYSIS.md.
 
 ## 0. Changes from the owner's last message (adopted in this design)
-- **Paid-now defaults to ZERO.** Credit purchase is the default intake. The drawer is charged only the amount actually entered as paid. An omitted field means 0, never "full". This replaces the "keep today's behavior" line in the gap analysis (section 4 and 9). Existing receipts are not changed (they already took cash, see migration).
+- **Paid-now defaults to ZERO (superseded by section 0 of v3).** Credit purchase is the default intake. The drawer is charged only the amount actually entered as paid. An omitted field means 0, never "full". This replaces the "keep today's behavior" line in the gap analysis (section 4 and 9). Existing receipts are not changed (they already took cash, see migration).
   - Consequence to flag: any existing screen or API client that relied on automatic full deduction will now create unpaid invoices. The staff intake screen must show the paid-now field and a clear "unpaid, owed to supplier" label, and the shift close report must list intakes with unpaid amounts so nobody believes the drawer paid.
 - **Session invoice rule (decision 1 final):** unique index stays on live invoices (Paid/Pending). A new invoice after a refund is a **Rebill**: it stores `ReplacesSaleId` (the old invoice, kept as is), reason (mandatory), employee and time. At most one live invoice per session (the existing index already guarantees it). Needs a small additive column; scheduled as non-financial approved work, separate from the financial module.
 
