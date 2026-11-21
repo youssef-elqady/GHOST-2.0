@@ -62,6 +62,10 @@ public sealed class CashTransactionConfiguration : IEntityTypeConfiguration<Cash
         builder.HasIndex(x => new { x.ShiftId, x.CreatedAt })
             .HasDatabaseName("IX_CashTransactions_ShiftId_CreatedAt");
 
+        // Report and alert queries filter by type and time range across all shifts.
+        builder.HasIndex(x => new { x.Type, x.CreatedAt })
+            .HasDatabaseName("IX_CashTransactions_Type_CreatedAt");
+
         // One entry per idempotency key within a shift; null keys are unconstrained.
         builder.HasIndex(x => new { x.ShiftId, x.IdempotencyKey })
             .IsUnique()

@@ -95,6 +95,22 @@ builder.Services.AddScoped<AcknowledgeHandoverHandler>();
 builder.Services.AddScoped<OpenShiftHandler>();
 builder.Services.AddScoped<CloseShiftHandler>();
 
+builder.Services.AddScoped<ISettingsRepository, GHOST.Infrastructure.Persistence.Repositories.SettingsRepository>();
+builder.Services.AddScoped<GHOST.Application.Settings.SettingsHandler>();
+builder.Services.AddScoped<GHOST.Application.Alerts.IAlertQueries, GHOST.Infrastructure.Persistence.AlertQueries>();
+builder.Services.AddScoped<GHOST.Application.Alerts.AlertsHandler>();
+builder.Services.Configure<GHOST.API.Backup.ScheduledBackupOptions>(
+    builder.Configuration.GetSection(GHOST.API.Backup.ScheduledBackupOptions.SectionName));
+builder.Services.AddScoped<IBackupRepository, GHOST.Infrastructure.Persistence.Repositories.BackupRepository>();
+builder.Services.AddScoped<GHOST.Application.Backup.IDatabaseBackupGateway, GHOST.Infrastructure.Persistence.SqlServerBackupGateway>();
+builder.Services.AddScoped(sp =>
+{
+    var o = sp.GetRequiredService<Microsoft.Extensions.Options.IOptions<GHOST.API.Backup.ScheduledBackupOptions>>().Value;
+    return new GHOST.Application.Backup.BackupOptions(o.Directory ?? string.Empty, Math.Clamp(o.RetentionCount, 1, 60));
+});
+builder.Services.AddScoped<GHOST.Application.Backup.BackupHandler>();
+builder.Services.AddHostedService<GHOST.API.Backup.ScheduledBackupService>();
+
 var app = builder.Build();
 
 app.UseCors("GhostFrontend");

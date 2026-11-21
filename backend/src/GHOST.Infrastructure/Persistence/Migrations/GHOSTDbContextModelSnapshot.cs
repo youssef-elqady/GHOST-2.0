@@ -83,6 +83,57 @@ namespace GHOST.Infrastructure.Persistence.Migrations
                         });
                 });
 
+            modelBuilder.Entity("GHOST.Domain.Entities.BackupRecord", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<string>("Error")
+                        .HasMaxLength(1000)
+                        .HasColumnType("nvarchar(1000)");
+
+                    b.Property<string>("FilePath")
+                        .HasMaxLength(500)
+                        .HasColumnType("nvarchar(500)");
+
+                    b.Property<DateTimeOffset?>("PrunedAt")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<Guid?>("RequestedById")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<long?>("SizeBytes")
+                        .HasColumnType("bigint");
+
+                    b.Property<int>("Status")
+                        .HasColumnType("int");
+
+                    b.Property<int>("Type")
+                        .HasColumnType("int");
+
+                    b.Property<DateTimeOffset?>("VerifiedAt")
+                        .HasColumnType("datetimeoffset");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("CreatedAt")
+                        .IsDescending()
+                        .HasDatabaseName("IX_BackupRecords_Live")
+                        .HasFilter("[Status] = 1 AND [PrunedAt] IS NULL");
+
+                    b.HasIndex("RequestedById");
+
+                    b.ToTable("BackupRecords", null, t =>
+                        {
+                            t.HasCheckConstraint("CK_BackupRecords_Status", "[Status] IN (1, 2)");
+
+                            t.HasCheckConstraint("CK_BackupRecords_Type", "[Type] IN (1, 2)");
+                        });
+                });
+
             modelBuilder.Entity("GHOST.Domain.Entities.BusinessDay", b =>
                 {
                     b.Property<Guid>("Id")
@@ -182,6 +233,9 @@ namespace GHOST.Infrastructure.Persistence.Migrations
                         .IsUnique()
                         .HasDatabaseName("UX_CashTransactions_ShiftId_IdempotencyKey")
                         .HasFilter("[IdempotencyKey] IS NOT NULL");
+
+                    b.HasIndex("Type", "CreatedAt")
+                        .HasDatabaseName("IX_CashTransactions_Type_CreatedAt");
 
                     b.ToTable("CashTransactions", null, t =>
                         {
@@ -612,6 +666,10 @@ namespace GHOST.Infrastructure.Persistence.Migrations
                         .IsUnique()
                         .HasDatabaseName("UX_Sales_InvoiceNumber");
 
+                    b.HasIndex("PaidAt")
+                        .HasDatabaseName("IX_Sales_PaidAt")
+                        .HasFilter("[PaidAt] IS NOT NULL");
+
                     b.HasIndex("SessionId")
                         .IsUnique()
                         .HasDatabaseName("UX_Sales_SessionId_Live")
@@ -720,6 +778,10 @@ namespace GHOST.Infrastructure.Persistence.Migrations
                         .HasColumnType("datetimeoffset");
 
                     b.HasKey("Id");
+
+                    b.HasIndex("CancelledAt")
+                        .HasDatabaseName("IX_Sessions_CancelledAt")
+                        .HasFilter("[CancelledAt] IS NOT NULL");
 
                     b.HasIndex("EndShiftId");
 
@@ -860,6 +922,10 @@ namespace GHOST.Infrastructure.Persistence.Migrations
                     b.HasKey("Id");
 
                     b.HasIndex("BusinessDayId");
+
+                    b.HasIndex("ClosedAt")
+                        .HasDatabaseName("IX_Shifts_ClosedAt")
+                        .HasFilter("[ClosedAt] IS NOT NULL");
 
                     b.HasIndex("StaffUserId");
 
@@ -1163,6 +1229,30 @@ namespace GHOST.Infrastructure.Persistence.Migrations
                     b.ToTable("StocktakeItems", (string)null);
                 });
 
+            modelBuilder.Entity("GHOST.Domain.Entities.SystemSetting", b =>
+                {
+                    b.Property<string>("Key")
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
+
+                    b.Property<DateTimeOffset>("UpdatedAt")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<Guid>("UpdatedById")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("Value")
+                        .IsRequired()
+                        .HasMaxLength(500)
+                        .HasColumnType("nvarchar(500)");
+
+                    b.HasKey("Key");
+
+                    b.HasIndex("UpdatedById");
+
+                    b.ToTable("SystemSettings", (string)null);
+                });
+
             modelBuilder.Entity("GHOST.Infrastructure.Identity.ApplicationUser", b =>
                 {
                     b.Property<Guid>("Id")
@@ -1389,6 +1479,14 @@ namespace GHOST.Infrastructure.Persistence.Migrations
                     b.HasOne("GHOST.Infrastructure.Identity.ApplicationUser", null)
                         .WithMany()
                         .HasForeignKey("UserId")
+                        .OnDelete(DeleteBehavior.Restrict);
+                });
+
+            modelBuilder.Entity("GHOST.Domain.Entities.BackupRecord", b =>
+                {
+                    b.HasOne("GHOST.Infrastructure.Identity.ApplicationUser", null)
+                        .WithMany()
+                        .HasForeignKey("RequestedById")
                         .OnDelete(DeleteBehavior.Restrict);
                 });
 
@@ -1694,6 +1792,15 @@ namespace GHOST.Infrastructure.Persistence.Migrations
                         .WithMany("Items")
                         .HasForeignKey("StocktakeId")
                         .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("GHOST.Domain.Entities.SystemSetting", b =>
+                {
+                    b.HasOne("GHOST.Infrastructure.Identity.ApplicationUser", null)
+                        .WithMany()
+                        .HasForeignKey("UpdatedById")
+                        .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
                 });
 

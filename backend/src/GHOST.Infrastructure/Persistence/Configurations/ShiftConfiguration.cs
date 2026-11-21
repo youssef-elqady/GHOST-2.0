@@ -70,6 +70,7 @@ public sealed class ShiftConfiguration : IEntityTypeConfiguration<Shift>
 
         builder.HasIndex(s => s.BusinessDayId);
         builder.HasIndex(s => s.StaffUserId);
+        builder.HasIndex(s => s.ClosedAt).HasFilter("[ClosedAt] IS NOT NULL").HasDatabaseName("IX_Shifts_ClosedAt");
         builder.HasIndex(s => s.Status);
 
         // Single physical cash register: at most one open shift globally.

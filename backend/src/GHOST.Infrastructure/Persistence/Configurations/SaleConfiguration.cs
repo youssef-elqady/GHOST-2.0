@@ -34,6 +34,7 @@ public sealed class SaleConfiguration : IEntityTypeConfiguration<Sale>
         builder.HasIndex(x => x.SessionId).IsUnique()
             .HasFilter("[SessionId] IS NOT NULL AND [Status] IN (1, 2)").HasDatabaseName("UX_Sales_SessionId_Live");
         builder.HasIndex(x => new { x.ShiftId, x.CreatedAt }).HasDatabaseName("IX_Sales_ShiftId_CreatedAt");
+        builder.HasIndex(x => x.PaidAt).HasFilter("[PaidAt] IS NOT NULL").HasDatabaseName("IX_Sales_PaidAt");
 
         builder.HasOne<Shift>().WithMany().HasForeignKey(x => x.ShiftId).OnDelete(DeleteBehavior.Restrict);
         builder.HasOne<Session>().WithMany().HasForeignKey(x => x.SessionId).IsRequired(false).OnDelete(DeleteBehavior.Restrict);

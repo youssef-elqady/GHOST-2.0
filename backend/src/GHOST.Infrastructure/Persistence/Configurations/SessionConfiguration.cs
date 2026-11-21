@@ -64,5 +64,6 @@ public sealed class SessionConfiguration : IEntityTypeConfiguration<Session>
         builder.HasIndex(s => s.StartShiftId);
         builder.HasIndex(s => s.EndShiftId);
         builder.HasIndex(s => s.Status);
+        builder.HasIndex(s => s.CancelledAt).HasFilter("[CancelledAt] IS NOT NULL").HasDatabaseName("IX_Sessions_CancelledAt");
     }
 }
