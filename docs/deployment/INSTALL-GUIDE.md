@@ -10,7 +10,7 @@ STATUS: NOT TESTED on a real Windows PC. The package builds (see release notes) 
 - Optional: the external backup drive.
 
 ## Install
-1. (Optional, once) Plug in the external drive. Double click `installer\Prepare-BackupDrive.cmd`, type the drive letter. Write down the printed ExternalDriveId. The drive is recognised by this marker, not by its letter.
+1. (Optional, once) Plug in the external drive. Double click `installer\Prepare-BackupDrive.cmd`, type the drive letter. Write down the printed ExternalDriveId (it looks like `<marker>@<volume serial>`). The drive is recognised by the marker plus the volume serial, not by its letter; a copied marker file on another drive is refused.
 2. Right click `installer\Install-GHOST.cmd`, choose Run as administrator.
    - With a backup drive: open PowerShell as administrator in the `installer` folder and run `.\Install-GHOST.ps1 -ExternalBackupDir E:\GhostBackups -ExternalDriveId <id>`.
 3. The installer checks the PC, verifies the files, installs SQL Server Express if needed (10 to 20 minutes), then asks you to type `CREATE GHOST` to make a NEW empty database. If a database named GHOST already exists it stops and changes nothing.

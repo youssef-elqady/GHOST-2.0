@@ -2,6 +2,8 @@
 
 Fill in Result and Evidence (screenshot or log line). Any FAIL means NOT READY. Use a fresh Windows 10/11 PC or VM with NO internet, NO Node, NO .NET, NO dev tools.
 
+Run sheet: copy the release folder to the clean PC (USB). After EACH row below run `installer\Collect-TestEvidence.ps1` (right click, Run with PowerShell, as administrator) and keep the evidence folders. Zip them and send back with the filled table. The script collects no passwords, connection strings or database content. Rows 15 and 21 must use a scratch database name, never the live GHOST database. Stages are separate: a passing row never counts as proof for a later stage (build, package, installer run, clean install, SQL migrations).
+
 | # | Test | Expected | Result | Evidence |
 |---|------|----------|--------|----------|
 | 1 | Run installer without admin rights | Stops with a clear message | | |
