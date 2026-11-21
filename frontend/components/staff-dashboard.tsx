@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { getCurrentShift, getDevices, listSessions, startSession, type ApiDevice, type ApiSessionSummary, type ApiShift } from '@/lib/ghost-api'
 import { StaffPos } from '@/components/staff-pos'
 import { SessionControls } from '@/components/staff-session-controls'
+import { StaffIntake } from '@/components/staff-intake'
 import { StaffShiftView } from '@/components/staff-shift'
 import { ThemeToggle } from '@/components/theme-toggle'
 import {
@@ -126,6 +127,7 @@ export function StaffDashboard({ token, userId, userName, isAdmin = false, onLog
     { id: 'overview', label: 'الرئيسية', en: 'Operations', icon: LayoutGrid },
     { id: 'devices', label: 'الأجهزة والجلسات', en: 'Devices & sessions', icon: Gamepad2 },
     { id: 'products', label: 'الطلبات والمنتجات', en: 'Orders & products', icon: Zap },
+    { id: 'intake', label: 'توريد المخزون', en: 'Stock intake', icon: Plus },
     { id: 'payments', label: 'الفواتير والمدفوعات', en: 'Invoices & payments', icon: WalletCards },
     { id: 'shift', label: 'شيفتي', en: 'My shift', icon: ClipboardCheck },
     { id: 'messages', label: 'الرسائل', en: 'Messages & handover', icon: MessageSquareText },
@@ -166,6 +168,7 @@ export function StaffDashboard({ token, userId, userName, isAdmin = false, onLog
 
         {activeNav === 'devices' && <DevicesView devices={devices} onBack={() => setActiveNav('overview')} onSelect={(device) => setSelectedDevice(device)} />}
         {activeNav === 'products' && <StaffPos token={token} shiftId={shift?.id ?? null} isAdmin={isAdmin} />}
+        {activeNav === 'intake' && <StaffIntake token={token} shiftId={shift?.id ?? null} />}
         {activeNav === 'payments' && <PaymentsView />}
         {activeNav === 'shift' && <StaffShiftView token={token} userId={userId} onChanged={refresh} onBack={() => setActiveNav('overview')} />}
         {activeNav === 'messages' && <MessagesView />}
