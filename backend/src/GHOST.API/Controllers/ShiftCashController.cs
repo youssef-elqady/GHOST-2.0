@@ -18,12 +18,15 @@ public sealed class ShiftCashController : ControllerBase
     private readonly ShiftCashHandler _handler;
     private readonly ShiftAccess _shiftAccess;
     private readonly ICurrentUser _currentUser;
+    private readonly AcknowledgeHandoverHandler _handoverHandler;
 
     public ShiftCashController(
+        AcknowledgeHandoverHandler handoverHandler,
         ShiftCashHandler handler,
         ShiftAccess shiftAccess,
         ICurrentUser currentUser)
     {
+        _handoverHandler = handoverHandler;
         _handler = handler;
         _shiftAccess = shiftAccess;
         _currentUser = currentUser;
@@ -41,6 +44,42 @@ public sealed class ShiftCashController : ControllerBase
         string? Reason,
         Guid? BeneficiaryUserId,
         string? IdempotencyKey);
+
+    public sealed record AcknowledgeHandoverRequest(
+        Guid FromShiftId,
+        decimal ReceivedCash,
+        string? Note);
+
+    /// <summary>
+    /// The incoming staff (route shift = their own open shift) confirms the cash received from
+    /// the previous, closed shift. A difference needs a note and is audited.
+    /// </summary>
+    [HttpPost("handover/acknowledge")]
+    public async Task<IActionResult> AcknowledgeHandover(
+        Guid shiftId,
+        [FromBody] AcknowledgeHandoverRequest request,
+        CancellationToken cancellationToken)
+    {
+        var actorId = _currentUser.UserId;
+        if (actorId is null)
+            return Unauthorized();
+
+        if (!await _shiftAccess.CanOperateOnShiftAsync(shiftId, cancellationToken))
+            return Forbid();
+
+        var result = await _handoverHandler.HandleAsync(
+            new AcknowledgeHandoverCommand(
+                request.FromShiftId,
+                shiftId,
+                actorId.Value,
+                request.ReceivedCash,
+                request.Note),
+            cancellationToken);
+
+        return result.IsSuccess
+            ? StatusCode(StatusCodes.Status201Created, result.Value)
+            : BadRequest(new { error = result.Error });
+    }
 
     [HttpGet]
     public async Task<IActionResult> GetSummary(Guid shiftId, CancellationToken cancellationToken)

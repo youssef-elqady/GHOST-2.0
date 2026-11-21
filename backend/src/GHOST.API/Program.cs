@@ -82,6 +82,7 @@ builder.Services.AddScoped<SessionLifecycleHandler>();
 builder.Services.AddScoped<TransferSessionHandler>();
 builder.Services.AddScoped<IShiftRepository, ShiftRepository>();
 builder.Services.AddScoped<ShiftCashHandler>();
+builder.Services.AddScoped<AcknowledgeHandoverHandler>();
 builder.Services.AddScoped<OpenShiftHandler>();
 builder.Services.AddScoped<CloseShiftHandler>();
 

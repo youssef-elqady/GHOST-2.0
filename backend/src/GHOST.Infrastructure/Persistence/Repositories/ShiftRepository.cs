@@ -21,4 +21,28 @@ public sealed class ShiftRepository : IShiftRepository
             .Include(shift => shift.CashTransactions)
             .FirstOrDefaultAsync(shift => shift.Id == shiftId, cancellationToken);
     }
+
+    public Task<Shift?> GetAsync(
+        Guid shiftId,
+        CancellationToken cancellationToken = default)
+    {
+        return _dbContext.Shifts.FirstOrDefaultAsync(shift => shift.Id == shiftId, cancellationToken);
+    }
+
+    public Task<bool> HandoverExistsAsync(
+        Guid fromShiftId,
+        Guid toShiftId,
+        CancellationToken cancellationToken = default)
+    {
+        return _dbContext.ShiftHandovers.AnyAsync(
+            handover => handover.FromShiftId == fromShiftId || handover.ToShiftId == toShiftId,
+            cancellationToken);
+    }
+
+    public async Task AddHandoverAsync(
+        ShiftHandover handover,
+        CancellationToken cancellationToken = default)
+    {
+        await _dbContext.ShiftHandovers.AddAsync(handover, cancellationToken);
+    }
 }

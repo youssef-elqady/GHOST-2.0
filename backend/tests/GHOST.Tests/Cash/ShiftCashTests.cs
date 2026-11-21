@@ -205,6 +205,15 @@ public sealed class ShiftCashTests
     {
         public Task<Shift?> GetWithCashAsync(Guid shiftId, CancellationToken cancellationToken = default) =>
             Task.FromResult(shift is not null && shift.Id == shiftId ? shift : null);
+
+        public Task<Shift?> GetAsync(Guid shiftId, CancellationToken cancellationToken = default) =>
+            GetWithCashAsync(shiftId, cancellationToken);
+
+        public Task<bool> HandoverExistsAsync(Guid fromShiftId, Guid toShiftId, CancellationToken cancellationToken = default) =>
+            Task.FromResult(false);
+
+        public Task AddHandoverAsync(ShiftHandover handover, CancellationToken cancellationToken = default) =>
+            Task.CompletedTask;
     }
 
     private sealed class CountingUnitOfWork : IUnitOfWork

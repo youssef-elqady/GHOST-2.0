@@ -514,6 +514,62 @@ namespace GHOST.Infrastructure.Persistence.Migrations
                     b.ToTable("Shifts", (string)null);
                 });
 
+            modelBuilder.Entity("GHOST.Domain.Entities.ShiftHandover", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateTimeOffset>("AcknowledgedAt")
+                        .HasColumnType("datetimeoffset(7)");
+
+                    b.Property<Guid>("AcknowledgedById")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<decimal>("Difference")
+                        .HasColumnType("decimal(18,2)");
+
+                    b.Property<Guid>("FromShiftId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<decimal>("HandedCash")
+                        .HasColumnType("decimal(18,2)");
+
+                    b.Property<string>("Note")
+                        .HasMaxLength(500)
+                        .HasColumnType("nvarchar(500)");
+
+                    b.Property<decimal>("ReceivedCash")
+                        .HasColumnType("decimal(18,2)");
+
+                    b.Property<Guid>("ToShiftId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateTimeOffset?>("UpdatedAt")
+                        .HasColumnType("datetimeoffset");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("AcknowledgedById");
+
+                    b.HasIndex("FromShiftId")
+                        .IsUnique()
+                        .HasDatabaseName("UX_ShiftHandovers_FromShiftId");
+
+                    b.HasIndex("ToShiftId")
+                        .IsUnique()
+                        .HasDatabaseName("UX_ShiftHandovers_ToShiftId");
+
+                    b.ToTable("ShiftHandovers", null, t =>
+                        {
+                            t.HasCheckConstraint("CK_ShiftHandovers_Amounts", "[HandedCash] >= 0 AND [ReceivedCash] >= 0");
+
+                            t.HasCheckConstraint("CK_ShiftHandovers_DifferentShifts", "[FromShiftId] <> [ToShiftId]");
+                        });
+                });
+
             modelBuilder.Entity("GHOST.Infrastructure.Identity.ApplicationUser", b =>
                 {
                     b.Property<Guid>("Id")
@@ -830,6 +886,27 @@ namespace GHOST.Infrastructure.Persistence.Migrations
                     b.HasOne("GHOST.Infrastructure.Identity.ApplicationUser", null)
                         .WithMany()
                         .HasForeignKey("StaffUserId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("GHOST.Domain.Entities.ShiftHandover", b =>
+                {
+                    b.HasOne("GHOST.Infrastructure.Identity.ApplicationUser", null)
+                        .WithMany()
+                        .HasForeignKey("AcknowledgedById")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("GHOST.Domain.Entities.Shift", null)
+                        .WithMany()
+                        .HasForeignKey("FromShiftId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("GHOST.Domain.Entities.Shift", null)
+                        .WithMany()
+                        .HasForeignKey("ToShiftId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
                 });
