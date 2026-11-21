@@ -21,6 +21,8 @@ public sealed class StockReceiptConfiguration : IEntityTypeConfiguration<StockRe
         builder.HasKey(x => x.Id);
         builder.Property(x => x.Id).ValueGeneratedNever();
         builder.Property(x => x.SupplierName).HasMaxLength(150);
+        builder.Property(x => x.InvoiceReference).HasMaxLength(StockReceipt.MaxReferenceLength);
+        builder.Property(x => x.Notes).HasMaxLength(StockReceipt.MaxNotesLength);
         builder.Property(x => x.TotalCost).HasColumnType("decimal(18,2)");
         builder.Property(x => x.RejectionReason).HasMaxLength(500);
 

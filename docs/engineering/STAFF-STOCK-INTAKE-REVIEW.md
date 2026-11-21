@@ -17,3 +17,11 @@ The receipt flow already covers points 1, 2, 3 (partly), 5, 10. Gaps and planned
 5. Frontend: Staff intake screen (existing or new product, quantity, cost, reference, notes) and correction action; Admin report view.
 6. Concurrency: Product RowVersion already guards stock; add test on scratch DB for two simultaneous intakes and an intake racing a sale.
 Open decision for owner: does a Staff intake need Admin approval before it counts (today stock is added immediately and Admin can reject afterwards, which reverses it)? Plan keeps the current "counts immediately, Admin can reject" behavior unless told otherwise. Purchase cost with cash from the drawer stays as is.
+
+## Implemented so far (commit after 236442e)
+- Receipts carry InvoiceReference and Notes (migration 16).
+- Correction: POST /api/stock-intake/movements/{id}/correct (Staff own intakes, Admin any), new movement type IntakeCorrection, reason mandatory, linked to the original, capped by the original quantity, never below zero. It reduces stock only and does not move cash; fixing a too-small quantity is a new intake. Cash effect of correcting a receipt that took money from the drawer is an OWNER DECISION (not changed).
+- Trigger TR_StockMovements_AppendOnly (migration 16, SC-02 extended, not yet run on SQL Server).
+- Admin report: GET /api/stock-intake/report?rangeFrom&rangeTo (per employee and product: operations, net quantity, net cost). Per-operation detail is the existing receipt list and product movements.
+- Tests: 6 unit tests (all pass). Total backend unit now 267 passed.
+- Still to do: Staff intake and correction screens, Admin report screen, SC concurrency tests for intakes.

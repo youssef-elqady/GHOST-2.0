@@ -1,11 +1,11 @@
 # GHOST Test Strategy and Evidence
 
-Actual results (this branch): backend unit 261 passed, 0 failed. SQL Server project 18 passed, 13 skipped (need a real SQL Server). Frontend: tsc clean, eslint 0 errors, next build OK, 5 node tests pass.
+Actual results (this branch): backend unit 267 passed, 0 failed. SQL Server project 18 passed, 13 skipped (need a real SQL Server). Frontend: tsc clean, eslint 0 errors, next build OK, 5 node tests pass.
 
 | ID | Scenario | Expected | Evidence |
 |---|---|---|---|
 | SC-01 | Apply all migrations on scratch DB | succeeds, no pending | NOT YET RUN |
-| SC-02 | UPDATE/DELETE on AuditLogs, CashTransactions | blocked by trigger | NOT YET RUN |
+| SC-02 | UPDATE/DELETE on AuditLogs, CashTransactions, StockMovements | blocked by trigger | NOT YET RUN |
 | SC-03 | Two sales of last unit | one succeeds, stock 0 | NOT YET RUN |
 | SC-04 | 20 sales, stock 5 | 5 succeed | NOT YET RUN |
 | SC-05 | Same key x8 | one invoice | NOT YET RUN |

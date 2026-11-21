@@ -1107,6 +1107,14 @@ namespace GHOST.Infrastructure.Persistence.Migrations
                     b.Property<Guid?>("DecidedById")
                         .HasColumnType("uniqueidentifier");
 
+                    b.Property<string>("InvoiceReference")
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
+
+                    b.Property<string>("Notes")
+                        .HasMaxLength(500)
+                        .HasColumnType("nvarchar(500)");
+
                     b.Property<int?>("RejectionOutcome")
                         .HasColumnType("int");
 

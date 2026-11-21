@@ -41,6 +41,14 @@ public sealed class StockReceipt : BaseEntity
     public Guid ShiftId { get; private set; }
     public Guid CreatedById { get; private set; }
     public string? SupplierName { get; private set; }
+
+    public const int MaxReferenceLength = 100;
+    public const int MaxNotesLength = 500;
+
+    /// <summary>Purchase invoice number or other reference, optional.</summary>
+    public string? InvoiceReference { get; private set; }
+
+    public string? Notes { get; private set; }
     public StockReceiptStatus Status { get; private set; }
     public decimal TotalCost { get; private set; }
     public Guid? DecidedById { get; private set; }
@@ -60,8 +68,16 @@ public sealed class StockReceipt : BaseEntity
     /// Records the receipt, raises stock for every line and takes the total out of the shift's drawer.
     /// Pure domain logic; the caller persists the shift, products and receipt in one unit of work.
     /// </summary>
-    public static StockReceipt Receive(Shift shift, Guid staffId, string? supplierName, IReadOnlyList<Line> lines)
+    public static StockReceipt Receive(Shift shift, Guid staffId, string? supplierName, IReadOnlyList<Line> lines,
+        string? invoiceReference = null, string? notes = null)
     {
+        var reference = string.IsNullOrWhiteSpace(invoiceReference) ? null : invoiceReference.Trim();
+        var note = string.IsNullOrWhiteSpace(notes) ? null : notes.Trim();
+        if (reference is { Length: > MaxReferenceLength })
+            throw new BusinessRuleValidationException($"Invoice reference cannot exceed {MaxReferenceLength} characters.");
+        if (note is { Length: > MaxNotesLength })
+            throw new BusinessRuleValidationException($"Notes cannot exceed {MaxNotesLength} characters.");
+
         if (lines.Count == 0)
             throw new BusinessRuleValidationException("A receipt needs at least one item.");
 
@@ -73,6 +89,8 @@ public sealed class StockReceipt : BaseEntity
             ShiftId = shift.Id,
             CreatedById = staffId,
             SupplierName = string.IsNullOrWhiteSpace(supplierName) ? null : supplierName.Trim(),
+            InvoiceReference = reference,
+            Notes = note,
             Status = StockReceiptStatus.Pending
         };
 

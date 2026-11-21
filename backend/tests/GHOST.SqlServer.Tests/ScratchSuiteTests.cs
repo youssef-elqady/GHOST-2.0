@@ -24,7 +24,7 @@ public sealed class ScratchSuiteTests
         Assert.NotEmpty(await db.Database.GetAppliedMigrationsAsync());
     }
 
-    // SC-02 Append-only triggers on the cash ledger and the audit log reject UPDATE and DELETE (statement triggers fire
+    // SC-02 Append-only triggers on the cash ledger, stock movements and the audit log reject UPDATE and DELETE (statement triggers fire
     // even when no row matches, so no data is needed; everything runs in a transaction that is rolled back).
     [ScratchFact]
     public async Task SC02_append_only_triggers_reject_update_and_delete()
@@ -35,6 +35,8 @@ public sealed class ScratchSuiteTests
             "DELETE FROM dbo.CashTransactions WHERE 1 = 0",
             "UPDATE dbo.AuditLogs SET Action = Action WHERE 1 = 0",
             "DELETE FROM dbo.AuditLogs WHERE 1 = 0",
+            "UPDATE dbo.StockMovements SET QtyDelta = QtyDelta WHERE 1 = 0",
+            "DELETE FROM dbo.StockMovements WHERE 1 = 0",
         })
         {
             await using var connection = new SqlConnection(ScratchDb.ConnectionString);

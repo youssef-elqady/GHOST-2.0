@@ -26,7 +26,7 @@ public sealed class StockReceiptsController : ControllerBase
 
     public sealed record ReceiptLineRequest(Guid ProductId, decimal Quantity, decimal UnitCost, DateOnly? ExpiryDate);
 
-    public sealed record CreateReceiptRequest(Guid ShiftId, string? SupplierName, List<ReceiptLineRequest>? Items);
+    public sealed record CreateReceiptRequest(Guid ShiftId, string? SupplierName, List<ReceiptLineRequest>? Items, string? InvoiceReference = null, string? Notes = null);
 
     public sealed record RejectReceiptRequest(string? Reason, ReceiptRejectionOutcome Outcome, Guid? CashReturnShiftId);
 
@@ -44,7 +44,9 @@ public sealed class StockReceiptsController : ControllerBase
                 request.ShiftId,
                 actorId,
                 request.SupplierName,
-                (request.Items ?? new()).Select(i => new ReceiptLineInput(i.ProductId, i.Quantity, i.UnitCost, i.ExpiryDate)).ToList()),
+                (request.Items ?? new()).Select(i => new ReceiptLineInput(i.ProductId, i.Quantity, i.UnitCost, i.ExpiryDate)).ToList(),
+                request.InvoiceReference,
+                request.Notes),
             cancellationToken);
 
         return result.IsSuccess

@@ -15,7 +15,9 @@ public sealed record CreateReceiptCommand(
     Guid ShiftId,
     Guid ActorUserId,
     string? SupplierName,
-    IReadOnlyList<ReceiptLineInput> Lines);
+    IReadOnlyList<ReceiptLineInput> Lines,
+    string? InvoiceReference = null,
+    string? Notes = null);
 
 public sealed record RejectReceiptCommand(
     Guid ReceiptId,
@@ -31,6 +33,8 @@ public sealed record ReceiptDto(
     Guid ShiftId,
     Guid CreatedById,
     string? SupplierName,
+    string? InvoiceReference,
+    string? Notes,
     string Status,
     decimal TotalCost,
     string? RejectionReason,
@@ -80,7 +84,8 @@ public sealed class StockReceiptHandler
                 .Select(l => new StockReceipt.Line(products[l.ProductId], l.Quantity, l.UnitCost, l.ExpiryDate))
                 .ToList();
 
-            var receipt = StockReceipt.Receive(shift, command.ActorUserId, command.SupplierName, lines);
+            var receipt = StockReceipt.Receive(shift, command.ActorUserId, command.SupplierName, lines,
+                command.InvoiceReference, command.Notes);
             await _receipts.AddAsync(receipt, cancellationToken);
 
             _audit.Record(
@@ -190,7 +195,7 @@ public sealed class StockReceiptHandler
         => (await _receipts.ListAsync(status, createdById, cancellationToken)).Select(ToDto).ToList();
 
     private static ReceiptDto ToDto(StockReceipt r) => new(
-        r.Id, r.ShiftId, r.CreatedById, r.SupplierName, r.Status.ToString(), r.TotalCost,
+        r.Id, r.ShiftId, r.CreatedById, r.SupplierName, r.InvoiceReference, r.Notes, r.Status.ToString(), r.TotalCost,
         r.RejectionReason, r.RejectionOutcome?.ToString(), r.CreatedAt,
         r.Items.Select(i => new ReceiptItemDto(i.ProductId, i.Quantity, i.UnitCost, i.LineTotal, i.ExpiryDate)).ToList());
 }

@@ -48,7 +48,7 @@ Rule: an invariant marked only "-" or "S/C not run" is UNKNOWN, and UNKNOWN coun
 | PI-6 | Discount: Admin only, with a reason | `SaleHandler` | U |
 | PI-7 | A session is invoiced once | `SessionIsInvoicedAsync` | U (logic); no unique constraint yet, see GAPS |
 | PI-8 | A receipt is approved or rejected once | `StockReceipt` status checks, RowVersion | U; S: not covered by a concurrent test yet |
-| PI-9 | Stock movements are append-only | domain only (no setter), no trigger | GAP |
+| PI-9 | Stock movements are append-only | domain (no setter) + trigger TR_StockMovements_AppendOnly (migration 16) | C+S: SC-02 (not run) |
 
 ## Audit
 | ID | Invariant | Enforced in | Proof |
