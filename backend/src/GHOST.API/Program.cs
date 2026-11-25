@@ -119,6 +119,7 @@ builder.Services.AddScoped<CloseShiftHandler>();
 
 builder.Services.AddScoped<ISettingsRepository, GHOST.Infrastructure.Persistence.Repositories.SettingsRepository>();
 builder.Services.AddScoped<GHOST.Application.Settings.SettingsHandler>();
+builder.Services.AddScoped<GHOST.Application.Sales.IInvoiceNumberGapQuery, GHOST.Infrastructure.Persistence.InvoiceNumberGapQuery>();
 builder.Services.AddScoped<GHOST.Application.Alerts.IAlertQueries, GHOST.Infrastructure.Persistence.AlertQueries>();
 builder.Services.AddScoped<GHOST.Application.Alerts.AlertsHandler>();
 builder.Services.AddScoped<GHOST.Application.Reads.IOperationsReadQueries, GHOST.Infrastructure.Persistence.OperationsReadQueries>();

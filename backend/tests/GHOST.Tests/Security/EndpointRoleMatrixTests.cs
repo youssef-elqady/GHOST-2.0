@@ -31,7 +31,7 @@ public sealed class EndpointRoleMatrixTests
         ["ProductsController.SetPrice"] = A, ["ProductsController.Enable"] = A, ["ProductsController.Disable"] = A,
         ["ProductsController.Movements"] = S, ["ProductsController.AdjustStock"] = S, ["ProductsController.GenerateBarcode"] = S,
         ["ReportsController.Dashboard"] = A, ["ReportsController.Daily"] = A, ["ReportsController.Shifts"] = A,
-        ["ReportsController.Employees"] = A, ["ReportsController.Devices"] = A,
+        ["ReportsController.Employees"] = A, ["ReportsController.Devices"] = A, ["ReportsController.InvoiceNumberGaps"] = A,
         ["SalesController.Checkout"] = S, ["SalesController.List"] = S, ["SalesController.Get"] = S, ["SalesController.Print"] = S, ["SalesController.Refund"] = A,
         ["SessionsController.Start"] = S, ["SessionsController.Pause"] = S, ["SessionsController.Resume"] = S,
         ["SessionsController.Transfer"] = S, ["SessionsController.Complete"] = S, ["SessionsController.Cancel"] = S,

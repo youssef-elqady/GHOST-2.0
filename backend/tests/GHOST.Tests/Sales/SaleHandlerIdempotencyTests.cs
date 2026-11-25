@@ -103,8 +103,9 @@ public sealed class SaleHandlerIdempotencyTests
     private sealed class Rejections : IRejectionAudit
     {
         public List<string> Actions = new();
+        public List<(string Action, string? EntityId, string Reason)> Records = new();
         public Task RecordAsync(Guid? actorUserId, string action, string entityType, string? entityId, string reason, CancellationToken ct = default)
-        { Actions.Add(action); return Task.CompletedTask; }
+        { Actions.Add(action); Records.Add((action, entityId, reason)); return Task.CompletedTask; }
     }
 
     private sealed class Uow : IUnitOfWork
@@ -417,5 +418,104 @@ public sealed class SaleHandlerIdempotencyTests
         var allowed = await handler.CheckoutCashAsync(w.Command("k-zero2", new DiscountRequest(DiscountType.Percent, 100m, "gift"), admin: true));
         Assert.True(allowed.IsSuccess, allowed.Error);
         Assert.Equal(0m, allowed.Value!.Total);
+    }
+
+    // ---- invoice number: gaps are allowed, duplicates and silent gaps are not ----
+
+    [Fact]
+    public async Task FailedCheckout_AfterTakingANumber_RecordsThatNumberAsUnused_WithTheReason()
+    {
+        var w = new World();
+        var tooMany = new CheckoutCommand(w.Shifts.Shift.Id, Staff, false,
+            new[] { new SaleLineInput(w.Cola.Id, 50) }, null, null, "fail-1");
+
+        var result = await w.Handler.CheckoutCashAsync(tooMany);
+
+        Assert.False(result.IsSuccess);
+        Assert.Empty(w.Sales.Rows);
+        Assert.Equal(1, w.Sales.Counter); // one number was taken and is not given back
+        var note = Assert.Single(w.Rejections.Records, r => r.Action == InvoiceNumberGaps.UnusedNumberAction);
+        Assert.Equal("GS-2026-00001", note.EntityId);
+        Assert.False(string.IsNullOrWhiteSpace(note.Reason));
+    }
+
+    [Fact]
+    public async Task NextSale_AfterAFailedOne_GetsANewNumber_NeverTheFailedOne()
+    {
+        var w = new World();
+        var tooMany = new CheckoutCommand(w.Shifts.Shift.Id, Staff, false,
+            new[] { new SaleLineInput(w.Cola.Id, 50) }, null, null, "fail-2");
+        await w.Handler.CheckoutCashAsync(tooMany);
+
+        var ok = await w.Handler.CheckoutCashAsync(w.Command("ok-2"));
+
+        Assert.True(ok.IsSuccess);
+        Assert.Equal("GS-2026-00002", ok.Value!.InvoiceNumber);
+    }
+
+    [Fact]
+    public async Task RetryWithSameKey_AfterSuccess_TakesNoNewNumber_AndRecordsNoUnusedNote()
+    {
+        var w = new World();
+
+        await w.Handler.CheckoutCashAsync(w.Command("retry-1"));
+        await w.Handler.CheckoutCashAsync(w.Command("retry-1"));
+        await w.Handler.CheckoutCashAsync(w.Command("retry-1"));
+
+        Assert.Equal(1, w.Sales.Counter);
+        Assert.Single(w.Sales.Rows);
+        Assert.DoesNotContain(w.Rejections.Records, r => r.Action == InvoiceNumberGaps.UnusedNumberAction);
+    }
+
+    [Fact]
+    public async Task ConcurrentDuplicate_Loser_RecordsItsNumberAsUnused_AndTheWinnerKeepsItsOwn()
+    {
+        var w = new World();
+        var winner = Sale.CheckoutCash(w.Shifts.Shift, Staff, "GS-2026-00099",
+            new[] { new Sale.ProductLine(w.Cola, 3) }, null, null, "dup-1");
+        w.Uow.OnSave = () =>
+        {
+            w.Sales.Rows.Remove(w.Sales.Rows.Last());
+            w.Sales.Rows.Add(winner);
+            throw new PersistenceConflictException("unique");
+        };
+
+        var result = await w.Handler.CheckoutCashAsync(w.Command("dup-1"));
+
+        Assert.True(result.IsSuccess);
+        Assert.Equal("GS-2026-00099", result.Value!.InvoiceNumber);
+        var note = Assert.Single(w.Rejections.Records, r => r.Action == InvoiceNumberGaps.UnusedNumberAction);
+        Assert.Equal("GS-2026-00001", note.EntityId); // the loser's own number, not the winner's
+        Assert.Contains("same idempotency key", note.Reason);
+    }
+
+    [Fact]
+    public async Task ConflictWithoutWinner_RecordsTheUnusedNumber()
+    {
+        var w = new World();
+        w.Uow.OnSave = () =>
+        {
+            w.Sales.Rows.Remove(w.Sales.Rows.Last());
+            throw new PersistenceConflictException("stock changed");
+        };
+
+        var result = await w.Handler.CheckoutCashAsync(w.Command("conf-1"));
+
+        Assert.False(result.IsSuccess);
+        Assert.Single(w.Rejections.Records, r => r.Action == InvoiceNumberGaps.UnusedNumberAction && r.EntityId == "GS-2026-00001");
+    }
+
+    [Fact]
+    public async Task RejectionBeforeANumberIsTaken_ConsumesNoNumber()
+    {
+        var w = new World();
+        var unknownProduct = new CheckoutCommand(w.Shifts.Shift.Id, Staff, false,
+            new[] { new SaleLineInput(Guid.NewGuid(), 1) }, null, null, "none-1");
+
+        var result = await w.Handler.CheckoutCashAsync(unknownProduct);
+
+        Assert.False(result.IsSuccess);
+        Assert.Equal(0, w.Sales.Counter);
+        Assert.DoesNotContain(w.Rejections.Records, r => r.Action == InvoiceNumberGaps.UnusedNumberAction);
     }
 }

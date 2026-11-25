@@ -32,9 +32,7 @@ public sealed class SaleRepository : ISaleRepository
 
     public async Task<string> NextInvoiceNumberAsync(DateTimeOffset now, CancellationToken cancellationToken = default)
     {
-        var next = await _db.Database
-            .SqlQuery<long>($"SELECT NEXT VALUE FOR [dbo].[InvoiceNumbers] AS [Value]")
-            .SingleAsync(cancellationToken);
+        var next = await SqlSequence.NextValueAsync(_db.Database, SqlSequence.InvoiceNumbers, cancellationToken);
 
         return $"GS-{now.Year}-{next:D5}";
     }

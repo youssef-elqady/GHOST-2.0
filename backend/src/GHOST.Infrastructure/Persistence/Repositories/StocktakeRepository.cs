@@ -30,7 +30,5 @@ public sealed class StocktakeRepository : IStocktakeRepository
         => await _db.Stocktakes.AddAsync(stocktake, cancellationToken);
 
     public Task<long> NextInternalBarcodeNumberAsync(CancellationToken cancellationToken = default)
-        => _db.Database
-            .SqlQuery<long>($"SELECT NEXT VALUE FOR [dbo].[InternalBarcodes] AS [Value]")
-            .SingleAsync(cancellationToken);
+        => SqlSequence.NextValueAsync(_db.Database, SqlSequence.InternalBarcodes, cancellationToken);
 }

@@ -57,6 +57,16 @@ public sealed class ReportsController : ControllerBase
             : Ok(rows);
     }
 
+    /// <summary>
+    /// Numbers below the highest invoice number that no invoice uses. They are not invoices and not sales.
+    /// Gaps with a recorded reason are separated from gaps with no record.
+    /// </summary>
+    [HttpGet("invoice-number-gaps")]
+    public async Task<IActionResult> InvoiceNumberGaps(
+        [FromServices] GHOST.Application.Sales.IInvoiceNumberGapQuery query,
+        CancellationToken cancellationToken)
+        => Ok(await query.GetAsync(cancellationToken));
+
     [HttpGet("shifts")]
     public async Task<IActionResult> Shifts(
         [FromQuery] DateTimeOffset? from,

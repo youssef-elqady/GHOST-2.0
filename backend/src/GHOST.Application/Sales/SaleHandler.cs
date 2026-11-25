@@ -173,9 +173,10 @@ public sealed class SaleHandler
             gaming = new Sale.GamingLine(session, "Gaming session");
         }
 
+        string? invoiceNumber = null;
         try
         {
-            var invoiceNumber = await _sales.NextInvoiceNumberAsync(DateTimeOffset.UtcNow, cancellationToken);
+            invoiceNumber = await _sales.NextInvoiceNumberAsync(DateTimeOffset.UtcNow, cancellationToken);
 
             var discount = command.Discount is { Type: not DiscountType.None } d
                 ? new Sale.DiscountInput(d.Type, d.Value, d.Reason, command.ActorUserId,
@@ -215,6 +216,7 @@ public sealed class SaleHandler
         }
         catch (BusinessRuleValidationException exception)
         {
+            await RecordUnusedNumberAsync(command, invoiceNumber, exception.Message, cancellationToken);
             return Result<SaleDto>.Failure(exception.Message);
         }
         catch (PersistenceConflictException)
@@ -225,12 +227,33 @@ public sealed class SaleHandler
             {
                 var winner = await _sales.GetByIdempotencyKeyAsync(command.IdempotencyKey.Trim(), cancellationToken);
                 if (winner is not null && SameCheckout(winner, command))
+                {
+                    await RecordUnusedNumberAsync(command, invoiceNumber,
+                        "Another request with the same idempotency key created the invoice first.", cancellationToken);
                     return Result<SaleDto>.Success(ToDto(winner));
+                }
             }
 
+            await RecordUnusedNumberAsync(command, invoiceNumber,
+                "The save conflicted (stock or drawer changed).", cancellationToken);
             return Result<SaleDto>.Failure(
                 "The stock or the drawer changed while you were selling. Please try again.");
         }
+    }
+
+    /// <summary>
+    /// A number was taken from the sequence but no invoice used it. Record why, in its own save, so the gap report can
+    /// tell a gap with a known reason from one with no record. This is a note about a number, not an invoice or a sale.
+    /// </summary>
+    private async Task RecordUnusedNumberAsync(
+        CheckoutCommand command, string? invoiceNumber, string reason, CancellationToken cancellationToken)
+    {
+        if (invoiceNumber is null || _rejections is null)
+            return;
+
+        await _rejections.RecordAsync(
+            command.ActorUserId, InvoiceNumberGaps.UnusedNumberAction, InvoiceNumberGaps.UnusedNumberEntityType,
+            invoiceNumber, reason, cancellationToken);
     }
 
     public async Task<Result<SaleDto>> RefundAsync(
