@@ -54,7 +54,7 @@ public sealed class PowerOutageTests
     }
 
     [Fact]
-    public void Admin_end_inside_the_outage_bills_play_up_to_that_time()
+    public void Admin_end_inside_the_outage_deducts_that_outage_up_to_the_end()
     {
         var s = NewSession();
         var t0 = s.StartedAt;
@@ -62,7 +62,8 @@ public sealed class PowerOutageTests
 
         s.ApproveAfterOutage(Guid.NewGuid(), Guid.NewGuid(), t0.AddMinutes(30), t0.AddHours(2));
 
-        Assert.Equal(30m, s.GetTotalAmount(s.StartedAt.AddDays(1)));
+        // 30 minutes on the clock, outage 10-30 minutes is deducted: 10 minutes paid.
+        Assert.Equal(10m, s.GetTotalAmount(s.StartedAt.AddDays(1)));
     }
 
     // C2 rule: the Admin-approved end is the session end even inside an outage. No pause row is deleted.
@@ -79,24 +80,24 @@ public sealed class PowerOutageTests
     private static int PauseRows(Session s) => s.Segments.Sum(x => x.Pauses.Count);
 
     [Fact]
-    public void Admin_end_inside_later_outage_keeps_earlier_outage_deducted_and_that_part_of_the_later_one_billed()
+    public void Admin_end_inside_later_outage_deducts_the_earlier_outage_and_the_later_one_up_to_the_end()
     {
         var s = TwoOutages();
         var t0 = s.StartedAt;
         s.ApproveAfterOutage(Guid.NewGuid(), Guid.NewGuid(), t0.AddMinutes(180), t0.AddHours(5));
-        // 180 minutes on the clock - 50 (outage 1) = 130. Outage 2 covers the approved end, so its first 60 minutes are session time.
-        Assert.Equal(130m, s.GetTotalAmount(t0.AddDays(1)));
+        // 180 on the clock - 50 (outage 1) - 60 (outage 2 from 120 to the end at 180) = 70.
+        Assert.Equal(70m, s.GetTotalAmount(t0.AddDays(1)));
         Assert.Equal(2, PauseRows(s));
         Assert.Equal(SessionStatus.Completed, s.Status);
     }
 
     [Fact]
-    public void Admin_end_inside_first_outage_ignores_the_later_outage()
+    public void Admin_end_inside_first_outage_deducts_it_up_to_the_end_and_ignores_the_later_outage()
     {
         var s = TwoOutages();
         var t0 = s.StartedAt;
         s.ApproveAfterOutage(Guid.NewGuid(), Guid.NewGuid(), t0.AddMinutes(30), t0.AddHours(5));
-        Assert.Equal(30m, s.GetTotalAmount(t0.AddDays(1)));
+        Assert.Equal(10m, s.GetTotalAmount(t0.AddDays(1))); // 30 - 20 (outage 1 from 10 to the end)
         Assert.Equal(2, PauseRows(s));
     }
 

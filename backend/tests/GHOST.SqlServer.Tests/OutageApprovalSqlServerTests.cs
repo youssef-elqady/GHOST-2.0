@@ -1,9 +1,8 @@
 namespace GHOST.SqlServer.Tests;
 
 /// <summary>
-/// C2 rule (user decision): the Admin-approved end time is the session end, even inside an outage. Earlier outages stay deducted,
-/// the outage covering the approved end does not subtract time before it, a later outage has no effect, no pause row is deleted
-/// or changed. Session rate is 60 per hour. Outages: 1h-2h and 3h-3h30 after the start.
+/// C2 rule (user decision): the Admin-approved end time is the session end, even inside an outage. Every pause is deducted only
+/// for its overlap with [start, approved end]; nothing after the end is deducted; no pause row is deleted or changed. Session rate is 60 per hour. Outages: 1h-2h and 3h-3h30 after the start.
 /// </summary>
 public sealed class OutageApprovalSqlServerTests : IAsyncLifetime
 {
@@ -31,22 +30,22 @@ public sealed class OutageApprovalSqlServerTests : IAsyncLifetime
     }
 
     [ScratchFact]
-    public async Task Approval_inside_first_outage_ends_the_session_there_and_the_later_outage_does_not_count()
+    public async Task Approval_inside_first_outage_deducts_it_up_to_the_end_and_the_later_outage_does_not_count()
     {
         var (id, shiftId, s, before) = await SeedAsync((1, 2), (3, 3.5));
         var r = await CiSupport.ApproveAsync(id, shiftId, s.AddMinutes(90));
-        Assert.Equal(TimeSpan.FromMinutes(90), r.Billable);
-        Assert.Equal(90m, r.Amount);
+        Assert.Equal(TimeSpan.FromMinutes(60), r.Billable); // 90 - 30 (outage 1h-1h30)
+        Assert.Equal(60m, r.Amount);
         AssertKept(before, r, 2);
     }
 
     [ScratchFact]
-    public async Task Approval_inside_a_later_outage_keeps_the_earlier_outage_deducted()
+    public async Task Approval_inside_a_later_outage_deducts_the_earlier_outage_and_the_later_one_up_to_the_end()
     {
         var (id, shiftId, s, before) = await SeedAsync((1, 2), (3, 3.5));
         var r = await CiSupport.ApproveAsync(id, shiftId, s.AddMinutes(192));
-        Assert.Equal(TimeSpan.FromMinutes(132), r.Billable);
-        Assert.Equal(132m, r.Amount);
+        Assert.Equal(TimeSpan.FromMinutes(120), r.Billable); // 192 - 60 - 12
+        Assert.Equal(120m, r.Amount);
         AssertKept(before, r, 2);
     }
 
@@ -76,8 +75,8 @@ public sealed class OutageApprovalSqlServerTests : IAsyncLifetime
     {
         var (id, shiftId, s, before) = await SeedAsync((1, 2), (3, 5));
         var r = await CiSupport.ApproveAsync(id, shiftId, s.AddHours(4));
-        Assert.Equal(TimeSpan.FromHours(3), r.Billable); // 4h - outage 1 (1h); 3h-4h of outage 2 is session time; nothing after 4h
-        Assert.Equal(180m, r.Amount);
+        Assert.Equal(TimeSpan.FromHours(2), r.Billable); // 4h - outage 1 (1h) - outage 2 up to the end (3h-4h = 1h); 4h-5h is outside the session
+        Assert.Equal(120m, r.Amount);
         AssertKept(before, r, 2);
     }
 }
