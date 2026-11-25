@@ -126,6 +126,40 @@ public sealed class AlertQueries : IAlertQueries
         alerts.AddRange(pending.Select(s => new AlertDto(
             AlertTypes.OutageReviewPending, "Critical", s.OutageEndedAt ?? rangeTo, "Session", s.Id, null, null, 0, 0, null)));
 
+        // 8. Completed sessions with no invoice. Always shown, whatever the range, so it survives logout, page refresh and
+        // shift change. It is derived from the data, so it disappears by itself once an invoice (Paid or Refunded) exists.
+        // Actor: the Admin who approved it after an outage, else the user who completed it (audit log), else the
+        // owner of the shift it ended in.
+        var uninvoiced = await _db.Sessions.AsNoTracking()
+            .Where(s => s.Status == SessionStatus.Completed && !s.IsVoided
+                        && !_db.Sales.Any(x => x.SessionId == s.Id
+                                               && (x.Status == SaleStatus.Paid || x.Status == SaleStatus.Refunded)))
+            .OrderBy(s => s.UpdatedAt ?? s.CreatedAt).Take(MaxPerRule)
+            .Select(s => new { s.Id, At = s.UpdatedAt ?? s.CreatedAt, s.EndShiftId, s.ReviewedById })
+            .ToListAsync(cancellationToken);
+        if (uninvoiced.Count > 0)
+        {
+            var sessionKeys = uninvoiced.Select(u => u.Id.ToString()).ToList();
+            var completedBy = await _db.AuditLogs.AsNoTracking()
+                .Where(a => a.Action == "Session.Completed" && a.EntityType == "Session"
+                            && a.EntityId != null && sessionKeys.Contains(a.EntityId) && a.UserId != null)
+                .Select(a => new { a.EntityId, a.UserId })
+                .ToListAsync(cancellationToken);
+            var actorBySession = completedBy
+                .GroupBy(a => a.EntityId!)
+                .ToDictionary(g => g.Key, g => g.First().UserId!.Value);
+            var endShiftIds = uninvoiced.Where(u => u.EndShiftId != null).Select(u => u.EndShiftId!.Value).Distinct().ToList();
+            var ownerByShift = await _db.Shifts.AsNoTracking()
+                .Where(s => endShiftIds.Contains(s.Id))
+                .ToDictionaryAsync(s => s.Id, s => s.StaffUserId, cancellationToken);
+            alerts.AddRange(uninvoiced.Select(u => new AlertDto(
+                AlertTypes.CompletedSessionNotInvoiced, "Warning", u.At, "Session", u.Id,
+                u.ReviewedById
+                    ?? (actorBySession.TryGetValue(u.Id.ToString(), out var actor) ? actor : (Guid?)null)
+                    ?? (u.EndShiftId is { } sid && ownerByShift.TryGetValue(sid, out var owner) ? owner : (Guid?)null),
+                null, 0, 0, null)));
+        }
+
         return await AttachNamesAsync(alerts, cancellationToken);
     }
 

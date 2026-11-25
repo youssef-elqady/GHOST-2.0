@@ -10,6 +10,9 @@ public static class AlertTypes
     public const string BackupFailed = "BackupFailed";
     public const string ExternalBackupFailed = "ExternalBackupFailed";
     public const string OutageReviewPending = "OutageReviewPending";
+
+    /// <summary>A session was completed and no invoice (Paid or Refunded) exists for it. Shown until an invoice is issued.</summary>
+    public const string CompletedSessionNotInvoiced = "CompletedSessionNotInvoiced";
 }
 
 /// <summary>

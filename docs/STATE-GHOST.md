@@ -24,7 +24,8 @@ No SQL Server or API/Frontend run has been done by this work. Nothing is TESTED 
 - [x] B7 discount policy. New Admin settings Sales:MaxDiscountPercent (1-100, default 100 = no extra cap, so no behaviour change until he sets it) and Sales:AllowZeroTotalInvoice (0/1, default 0).
       A discount is checked as effective percent of subtotal (fixed amounts too). Zero-total invoice is refused unless the setting is 1 (this DOES change today's behaviour: 100% discount is now refused by default).
       No schema change (settings are rows). CODE + BUILT + 4 unit tests (mutation-checked). Cap VALUE is his decision; default left permissive on purpose.
-- [ ] B5 persistent alert for completed sessions with no invoice
+- [~] B5 alert for completed sessions with no invoice: BACKEND PART DONE. New alert type CompletedSessionNotInvoiced in AlertQueries (rule 8): Completed, not voided, no Paid/Refunded sale. Shown whatever the range, derived from data so it survives logout/refresh/shift change and disappears when an invoice exists. Names the Admin who approved after an outage, else the user in the audit row Session.Completed, else the end-shift owner. CODE + BUILT + 4 unit tests on EF in-memory (mutation-checked); real SQL NOT RUN.
+      NOT DONE: no frontend alert UI exists yet (the /api/alerts endpoint is not consumed by the frontend), the 'documented administrative resolution' record (needs a table + his decision), no alert 'seen/acknowledged' state.
 
 ## Waiting on decisions (do not guess)
 Admin refund shift/source (B2), pause/resume/transfer across handover, re-invoice after refund (B8),
