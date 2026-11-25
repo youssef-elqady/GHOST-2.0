@@ -1,5 +1,5 @@
 name: SQL Server integration tests
-# (rerun marker 2)
+# (rerun marker 3)
 
 # Runs the SQL Server integration tests against a throwaway SQL Server container on a GitHub-hosted runner.
 # The container, its random password and its databases exist only for this run. No repository secret is used and
