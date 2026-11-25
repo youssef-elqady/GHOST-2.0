@@ -1,11 +1,7 @@
 namespace GHOST.SqlServer.Tests;
 
-/// <summary>
-/// KNOWN DEFECTS (review findings C1 and C2). These assert the CORRECT behaviour and are expected to FAIL on the current code.
-/// They run in a separate workflow step that does not gate the build, and they are reported as "known defect" in the summary.
-/// When the domain decision is made and the code is fixed they should pass; do not delete or weaken them to make them green.
-/// </summary>
-public sealed class PauseBillingKnownDefectSqlServerTests : IAsyncLifetime
+/// <summary>C1 (approved and implemented): overlapping pauses are deducted once. Moved from the known-defect step to the gate; assertions unchanged.</summary>
+public sealed class PauseUnionBillingSqlServerTests : IAsyncLifetime
 {
     public Task InitializeAsync() => ScratchDb.EnterAsync();
     public Task DisposeAsync() => ScratchDb.LeaveAsync();

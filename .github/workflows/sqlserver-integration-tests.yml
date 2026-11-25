@@ -153,7 +153,7 @@ jobs:
           set -o pipefail
           python3 scripts/ci/check_sql_results.py --trx-glob 'ci-out/trx/*.trx' --min-sql 34 --summary ci-out/summary.md | tee -a "$GITHUB_STEP_SUMMARY"
 
-      - name: Run KNOWN DEFECT tests (C1, C2; expected to fail until decided; does not gate)
+      - name: Run KNOWN DEFECT tests (none left after C1 and C2; kept for future findings; does not gate)
         if: always()
         continue-on-error: true
         run: |
