@@ -75,4 +75,44 @@ public sealed class PauseBillingKnownDefectSqlServerTests : IAsyncLifetime
         Console.WriteLine($"C2_APPROVE: pausesLeft={pauses} billable={billable} expected(4h minus 1h30m)={TimeSpan.FromMinutes(150)}");
         Assert.Equal(TimeSpan.FromMinutes(150), billable);
     }
+
+    // C2 scenarios. Outages: 1h-2h and 3h-3h30 after the start. Play really lasted until the approved end.
+    private static async Task<(Guid Id, Guid ShiftId, DateTimeOffset S)> TwoOutagesAsync()
+    {
+        var (_, _, shiftId) = await ScratchDb.SeedOpenShiftAsync();
+        var (id, s) = await CiSupport.NewSessionStartedAsync(shiftId, Five);
+        await CiSupport.MarkOutageAsync(id, s.AddHours(1), s.AddHours(2));
+        await CiSupport.MarkOutageAsync(id, s.AddHours(3), s.AddMinutes(210));
+        return (id, shiftId, s);
+    }
+
+    // Approved end inside the FIRST outage: that outage must not subtract the time up to the end. Expected billable 1h30.
+    [ScratchFact]
+    public async Task C2_approval_inside_first_outage_bills_up_to_the_approved_end()
+    {
+        var (id, shiftId, s) = await TwoOutagesAsync();
+        var r = await CiSupport.ApproveAsync(id, shiftId, s.AddMinutes(90));
+        Console.WriteLine($"C2_INSIDE_FIRST: pausesLeft={r.Pauses} billable={r.Billable} expected={TimeSpan.FromMinutes(90)}");
+        Assert.Equal(TimeSpan.FromMinutes(90), r.Billable);
+    }
+
+    // Approved end inside the LATER outage (3h12m): the earlier outage (1h) stays deducted. Expected billable 2h12m.
+    [ScratchFact]
+    public async Task C2_approval_inside_later_outage_keeps_the_earlier_outage_deducted()
+    {
+        var (id, shiftId, s) = await TwoOutagesAsync();
+        var r = await CiSupport.ApproveAsync(id, shiftId, s.AddMinutes(192));
+        Console.WriteLine($"C2_INSIDE_LATER: pausesLeft={r.Pauses} billable={r.Billable} expected={TimeSpan.FromMinutes(132)}");
+        Assert.Equal(TimeSpan.FromMinutes(132), r.Billable);
+    }
+
+    // Approved end in NORMAL time between the outages (2h30m): the first outage (1h) stays deducted. Expected billable 1h30.
+    [ScratchFact]
+    public async Task C2_approval_between_outages_keeps_the_earlier_outage_deducted()
+    {
+        var (id, shiftId, s) = await TwoOutagesAsync();
+        var r = await CiSupport.ApproveAsync(id, shiftId, s.AddMinutes(150));
+        Console.WriteLine($"C2_BETWEEN: pausesLeft={r.Pauses} billable={r.Billable} expected={TimeSpan.FromMinutes(90)}");
+        Assert.Equal(TimeSpan.FromMinutes(90), r.Billable);
+    }
 }

@@ -50,4 +50,17 @@ internal static class CiSupport
         var s = await LoadSessionAsync(db, sessionId);
         return (s.Segments.Sum(x => x.Pauses.Count), s.GetTotalBillableDuration(upTo));
     }
+
+    /// <summary>Admin approval in its own request: load, ApproveAfterOutage, save. Returns what a fresh read shows afterwards.</summary>
+    internal static async Task<(int Pauses, TimeSpan Billable)> ApproveAsync(Guid sessionId, Guid shiftId, DateTimeOffset actualEnd)
+    {
+        await using (var db = ScratchDb.NewContext())
+        {
+            var admin = await ScratchDb.SeedUserAsync("adm");
+            var s = await LoadSessionAsync(db, sessionId);
+            s.ApproveAfterOutage(admin, shiftId, actualEnd, actualEnd.AddMinutes(1));
+            await db.SaveChangesAsync();
+        }
+        return await ReadAsync(sessionId, actualEnd);
+    }
 }
