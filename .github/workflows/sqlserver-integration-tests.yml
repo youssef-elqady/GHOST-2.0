@@ -109,7 +109,7 @@ jobs:
             | sed "s/$SQL_PW/***/g" | tee -a ci-out/migrations.log
           docker cp ci-out/migrations.sql ghost-sql:/tmp/migrations.sql
           echo "== applying the script to GHOST_AUTH02_IT"
-          docker exec -e SQLCMDPASSWORD="$SQL_PW" ghost-sql /opt/mssql-tools18/bin/sqlcmd -C -S localhost -U sa -b -d GHOST_AUTH02_IT -i /tmp/migrations.sql 2>&1 \
+          docker exec -e SQLCMDPASSWORD="$SQL_PW" ghost-sql /opt/mssql-tools18/bin/sqlcmd -C -I -S localhost -U sa -b -d GHOST_AUTH02_IT -i /tmp/migrations.sql 2>&1 \
             | sed "s/$SQL_PW/***/g" | tail -5 | tee -a ci-out/migrations.log
 
       - name: Verify the schema the tests rely on
