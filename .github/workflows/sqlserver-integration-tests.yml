@@ -103,9 +103,9 @@ jobs:
           dotnet ef database update -p backend/src/GHOST.Infrastructure -s backend/src/GHOST.API --configuration Release --no-build --connection "$CS" 2>&1 \
             | sed "s/$SQL_PW/***/g" | tee -a ci-out/migrations.log
           # The API host refuses the protected catalog name GHOST_AUTH02_IT (its own guard), so dotnet ef cannot target it.
-          # The same migrations are applied to it as an idempotent SQL script generated from this same migration set.
-          echo "== generating the idempotent migration script"
-          dotnet ef migrations script --idempotent -p backend/src/GHOST.Infrastructure -s backend/src/GHOST.API --configuration Release --no-build -o ci-out/migrations.sql 2>&1 \
+          # The same migrations are applied to it as a SQL script generated from this same migration set.
+          echo "== generating the migration script (fresh database, from the first migration)"
+          dotnet ef migrations script -p backend/src/GHOST.Infrastructure -s backend/src/GHOST.API --configuration Release --no-build -o ci-out/migrations.sql 2>&1 \
             | sed "s/$SQL_PW/***/g" | tee -a ci-out/migrations.log
           docker cp ci-out/migrations.sql ghost-sql:/tmp/migrations.sql
           echo "== applying the script to GHOST_AUTH02_IT"
