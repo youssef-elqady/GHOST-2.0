@@ -13,6 +13,9 @@ public static class AlertTypes
 
     /// <summary>A session was completed and no invoice (Paid or Refunded) exists for it. Shown until an invoice is issued.</summary>
     public const string CompletedSessionNotInvoiced = "CompletedSessionNotInvoiced";
+
+    /// <summary>A gaming-session invoice was refunded. The session is not invoiced again; the Admin sees it here. Always shown.</summary>
+    public const string RefundedSessionInvoice = "RefundedSessionInvoice";
 }
 
 /// <summary>

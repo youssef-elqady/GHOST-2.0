@@ -168,7 +168,7 @@ public sealed class SaleHandler
                 return Result<SaleDto>.Failure("This session is waiting for an Admin review after a power outage.");
 
             if (await _sales.SessionIsInvoicedAsync(sessionId, cancellationToken))
-                return Result<SaleDto>.Failure("This session already has an invoice.");
+                return Result<SaleDto>.Failure("This session already has an invoice (a refunded invoice also counts, the session is not invoiced again).");
 
             gaming = new Sale.GamingLine(session, "Gaming session");
         }
@@ -179,7 +179,8 @@ public sealed class SaleHandler
 
             var discount = command.Discount is { Type: not DiscountType.None } d
                 ? new Sale.DiscountInput(d.Type, d.Value, d.Reason, command.ActorUserId,
-                    await ReadSettingAsync(SettingsCatalog.MaxDiscountPercent, cancellationToken),
+                    await ReadSettingAsync(SettingsCatalog.MaxProductDiscountPercent, cancellationToken),
+                    await ReadSettingAsync(SettingsCatalog.MaxGamingDiscountPercent, cancellationToken),
                     await ReadSettingAsync(SettingsCatalog.AllowZeroTotalInvoice, cancellationToken) == 1m)
                 : null;
 

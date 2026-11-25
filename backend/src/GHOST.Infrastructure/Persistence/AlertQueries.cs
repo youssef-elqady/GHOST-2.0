@@ -160,6 +160,17 @@ public sealed class AlertQueries : IAlertQueries
                 null, 0, 0, null)));
         }
 
+        // 9. Refunded invoices of gaming sessions. A refunded session is never invoiced again, so the Admin is told here.
+        // Always shown, whatever the range. The actor is the Admin who approved the refund; Amount is what went back.
+        var refundedSessions = await _db.Sales.AsNoTracking()
+            .Where(s => s.SessionId != null && s.Status == SaleStatus.Refunded)
+            .SelectMany(s => s.Refunds.Select(r => new { SessionId = s.SessionId!.Value, r.Amount, r.ApprovedById, r.CreatedAt }))
+            .OrderByDescending(r => r.CreatedAt).Take(MaxPerRule)
+            .ToListAsync(cancellationToken);
+        alerts.AddRange(refundedSessions.Select(r => new AlertDto(
+            AlertTypes.RefundedSessionInvoice, "Warning", r.CreatedAt, "Session", r.SessionId, r.ApprovedById,
+            null, r.Amount, 0, null)));
+
         return await AttachNamesAsync(alerts, cancellationToken);
     }
 

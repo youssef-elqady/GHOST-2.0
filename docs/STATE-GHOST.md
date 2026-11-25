@@ -40,3 +40,10 @@ Decision: any running session may be paused/resumed/transferred by any signed-in
 
 ## Fourth review (Nov 25 2:27 PM) of aec96f6, 5b7fc10, 7a50b6f, 4473c0f
 No defect found. My first reading (stock receipt key over 100 chars would hit the DB) was wrong: StockReceipt.Create already rejects it (domain rule, MaxIdempotencyKeyLength 100) and the handler returns a clean failure. Added 2 boundary tests (101 chars rejected; exactly 100 with spaces accepted). Notes: B5 alert list is oldest first, capped 200; Refunded counts as invoiced (B8 open).
+
+## Decisions of Nov 25 2:29 PM and what was built (local until pushed)
+- Discount cap: 10% of products, 50% of gaming time (Admin settings Sales:MaxProductDiscountPercent=10, Sales:MaxGamingDiscountPercent=50; replaces the single Sales:MaxDiscountPercent). Cap is on the invoice: allowed = 10% of product lines + 50% of gaming lines. Behaviour change: Admin discounts above that are refused.
+- No re-invoice after refund: a refunded invoice still counts as invoiced (SessionIsInvoicedAsync). New Admin alert RefundedSessionInvoice (always shown, names the refunding Admin and the amount). Alerts UI still not built.
+- Pause/Resume/Transfer: any running session; Staff need their own open shift (ShiftAccess.CanControlRunningSessionsAsync). Admin not restricted (assumption, to confirm).
+- B2 (refund shift, "most suitable way"): NOT built yet. Proposal: refund cash leaves the one shift open now (any owner), Admin recorded as approver. Needs a new repository method and care with ExpectedCash.
+- Tabs: he wants a second desktop exe instance for Admin on the same PC next to the staff one, no Staff logout. Design must also cover separate app instances (own cookie store or own slot). Repo has no desktop/Electron project, so how the exe is packaged is unknown.

@@ -160,7 +160,7 @@ public sealed class Sale : BaseEntity
 /// </summary>
 public sealed record DiscountInput(
     DiscountType Type, decimal Value, string? Reason, Guid ApprovedById,
-    decimal MaxPercent = 100m, bool AllowZeroTotal = false);
+    decimal MaxProductPercent = 100m, decimal MaxGamingPercent = 100m, bool AllowZeroTotal = false);
 
     /// <summary>Total a completed gaming session adds to an invoice.</summary>
     public sealed record GamingLine(Session Session, string Description);
@@ -340,6 +340,10 @@ public sealed record DiscountInput(
         return isCopy;
     }
 
+    /// <summary>The most discount an invoice may carry: each kind of line has its own maximum percent.</summary>
+    public static decimal MaxAllowedDiscount(decimal productSubtotal, decimal gamingSubtotal, decimal maxProductPercent, decimal maxGamingPercent)
+        => productSubtotal * maxProductPercent / 100m + gamingSubtotal * maxGamingPercent / 100m;
+
     private void ApplyDiscount(DiscountInput? discount)
     {
         if (discount is null || discount.Type == DiscountType.None)
@@ -373,12 +377,16 @@ public sealed record DiscountInput(
         if (amount > Subtotal)
             throw new BusinessRuleValidationException("Discount cannot exceed the subtotal.");
 
-        if (discount.MaxPercent is < 0 or > 100)
+        if (discount.MaxProductPercent is < 0 or > 100 || discount.MaxGamingPercent is < 0 or > 100)
             throw new BusinessRuleValidationException("The maximum discount setting is invalid.");
 
-        if (amount * 100m > Subtotal * discount.MaxPercent)
+        // The cap is per kind of line: products and gaming time each have their own maximum percent.
+        var productSubtotal = _items.Where(i => i.ItemType != SaleItemType.Gaming).Sum(i => i.LineTotal);
+        var gamingSubtotal = _items.Where(i => i.ItemType == SaleItemType.Gaming).Sum(i => i.LineTotal);
+        var allowed = MaxAllowedDiscount(productSubtotal, gamingSubtotal, discount.MaxProductPercent, discount.MaxGamingPercent);
+        if (amount > allowed)
             throw new BusinessRuleValidationException(
-                $"This discount is above the maximum allowed discount ({discount.MaxPercent:0}% of the invoice).");
+                $"This discount is above the maximum allowed ({discount.MaxProductPercent:0}% of products, {discount.MaxGamingPercent:0}% of gaming time; at most {allowed:0.##} on this invoice).");
 
         if (amount == Subtotal && !discount.AllowZeroTotal)
             throw new BusinessRuleValidationException(

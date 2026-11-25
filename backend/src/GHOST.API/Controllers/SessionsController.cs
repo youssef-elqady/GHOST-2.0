@@ -78,6 +78,9 @@ public sealed class SessionsController : ControllerBase
         Guid sessionId,
         CancellationToken cancellationToken)
     {
+        if (!await _shiftAccess.CanControlRunningSessionsAsync(cancellationToken))
+            return Forbid();
+
         var result = await _lifecycleHandler.PauseAsync(sessionId, cancellationToken);
         return result.IsSuccess
             ? Ok(result.Value)
@@ -89,6 +92,9 @@ public sealed class SessionsController : ControllerBase
         Guid sessionId,
         CancellationToken cancellationToken)
     {
+        if (!await _shiftAccess.CanControlRunningSessionsAsync(cancellationToken))
+            return Forbid();
+
         var result = await _lifecycleHandler.ResumeAsync(sessionId, cancellationToken);
         return result.IsSuccess
             ? Ok(result.Value)
@@ -101,6 +107,9 @@ public sealed class SessionsController : ControllerBase
         [FromBody] TransferSessionRequest request,
         CancellationToken cancellationToken)
     {
+        if (!await _shiftAccess.CanControlRunningSessionsAsync(cancellationToken))
+            return Forbid();
+
         var result = await _transferSessionHandler.HandleAsync(
             new TransferSessionCommand(sessionId, request.NewDeviceId, request.PlayType),
             cancellationToken);

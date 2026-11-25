@@ -27,7 +27,7 @@ public sealed class SaleRepository : ISaleRepository
 
     public Task<bool> SessionIsInvoicedAsync(Guid sessionId, CancellationToken cancellationToken = default)
         => _db.Sales.AnyAsync(
-            s => s.SessionId == sessionId && s.Status != SaleStatus.Refunded && s.Status != SaleStatus.Voided,
+            s => s.SessionId == sessionId && s.Status != SaleStatus.Voided, // a refunded invoice still counts: the session is not invoiced again (decision Nov 25)
             cancellationToken);
 
     public async Task<string> NextInvoiceNumberAsync(DateTimeOffset now, CancellationToken cancellationToken = default)

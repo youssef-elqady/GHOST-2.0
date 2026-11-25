@@ -198,7 +198,7 @@ public sealed class SaleTests
                 new Sale.DiscountInput(DiscountType.Fixed, 50m, "free", Admin), null));
 
         var allowed = Sale.CheckoutCash(OpenShift(), Staff, "GS-3", new[] { Line(cola, 2) }, null,
-            new Sale.DiscountInput(DiscountType.Percent, 100m, "owner approved", Admin, 100m, true), null);
+            new Sale.DiscountInput(DiscountType.Percent, 100m, "owner approved", Admin, 100m, 100m, true), null);
         Assert.Equal(0m, allowed.Total);
     }
 
@@ -216,5 +216,23 @@ public sealed class SaleTests
         Assert.Throws<BusinessRuleValidationException>(() =>
             Sale.CheckoutCash(OpenShift(), Staff, "GS-3", new[] { Line(cola, 4) }, null,
                 new Sale.DiscountInput(DiscountType.Percent, 20m, "promo", Admin, 10m), null));
+    }
+
+    [Fact]
+    public void MaxAllowedDiscount_IsTenPercentOfProducts_PlusFiftyPercentOfGamingTime()
+    {
+        Assert.Equal(10m, Sale.MaxAllowedDiscount(100m, 0m, 10m, 50m));
+        Assert.Equal(50m, Sale.MaxAllowedDiscount(0m, 100m, 10m, 50m));
+        Assert.Equal(60m, Sale.MaxAllowedDiscount(100m, 100m, 10m, 50m));
+    }
+
+    [Fact]
+    public void Discount_OnProducts_UsesTheProductCap_NotTheGamingCap()
+    {
+        var cola = Stocked("Cola", 25m, 20, 10m);
+        // Products only, subtotal 100: product cap 10, gaming cap 50 must not apply.
+        Assert.Throws<BusinessRuleValidationException>(() =>
+            Sale.CheckoutCash(OpenShift(), Staff, "GS-1", new[] { Line(cola, 4) }, null,
+                new Sale.DiscountInput(DiscountType.Fixed, 11m, "promo", Admin, 10m, 50m), null));
     }
 }
