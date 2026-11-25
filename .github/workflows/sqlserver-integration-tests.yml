@@ -167,7 +167,7 @@ jobs:
       - name: Collect SQL Server deadlock reports (diagnostics only)
         if: always()
         run: |
-          docker exec -e SQLCMDPASSWORD="$SQL_PW" ghost-sql /opt/mssql-tools18/bin/sqlcmd -C -S localhost -U sa -h -1 -y 0 -Q "SET NOCOUNT ON; SELECT CAST(event_data AS nvarchar(max)) FROM sys.fn_xe_file_target_read_file(N'/var/opt/mssql/log/system_health*.xel', NULL, NULL, NULL) WHERE object_name = N'xml_deadlock_report'" 2>&1 | sed "s/$SQL_PW/***/g" > ci-out/deadlock-reports.xml || true
+          docker exec -e SQLCMDPASSWORD="$SQL_PW" ghost-sql /opt/mssql-tools18/bin/sqlcmd -C -S localhost -U sa -y 0 -Q "SET NOCOUNT ON; SELECT CAST(event_data AS nvarchar(max)) FROM sys.fn_xe_file_target_read_file(N'/var/opt/mssql/log/system_health*.xel', NULL, NULL, NULL) WHERE object_name = N'xml_deadlock_report'" 2>&1 | sed "s/$SQL_PW/***/g" > ci-out/deadlock-reports.xml || true
           echo "deadlock reports captured: $(grep -c '<deadlock>' ci-out/deadlock-reports.xml || true)"
 
       - name: Note about the SQL Server edition
