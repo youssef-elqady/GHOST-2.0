@@ -107,6 +107,8 @@ public sealed class ShiftHandoverTests
             Task.FromResult<Shift?>(shiftId == from.Id ? from : shiftId == to.Id ? to : null);
         public Task<Shift?> GetWithCashAsync(Guid shiftId, CancellationToken cancellationToken = default) =>
             GetAsync(shiftId, cancellationToken);
+        public Task<IReadOnlyList<Shift>> GetOpenShiftsWithCashAsync(CancellationToken cancellationToken = default) =>
+            Task.FromResult<IReadOnlyList<Shift>>(new[] { from, to }.Where(s => s.Status == GHOST.Domain.Enums.ShiftStatus.Open).ToList());
         public Task<IReadOnlyList<Shift>> GetOpenShiftsForUserWithCashAsync(Guid userId, CancellationToken cancellationToken = default) =>
             Task.FromResult<IReadOnlyList<Shift>>(
                 new[] { from, to }.Where(s => s.StaffUserId == userId && s.Status == GHOST.Domain.Enums.ShiftStatus.Open).ToList());

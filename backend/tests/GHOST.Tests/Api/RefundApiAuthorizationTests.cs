@@ -61,7 +61,7 @@ public sealed class RefundApiAuthorizationTests : IClassFixture<RefundApiFactory
     private sealed record Actor(ApplicationUser User, string Token);
     private sealed record Scenario(Guid SaleId, Guid ProductId, Guid AdminShiftId, Guid StaffShiftId, Actor Admin, Actor Staff, Actor NoRole, Actor Inactive);
 
-    private async Task<Scenario> SeedAsync(bool adminHasOpenShift = true, bool adminHasSecondOpenShift = false)
+    private async Task<Scenario> SeedAsync(bool anyShiftOpen = true, bool secondShiftOpen = false)
     {
         using var scope = _factory.Services.CreateScope();
         var sp = scope.ServiceProvider;
@@ -85,13 +85,17 @@ public sealed class RefundApiAuthorizationTests : IClassFixture<RefundApiFactory
         var noRole = MakeActor("nor", null);
         var inactive = MakeActor("ina", "Admin", active: false);
 
+        // The venue has one open shift. This test database is shared by all tests of the class, so close what earlier tests left open.
+        foreach (var leftOpen in await db.Shifts.Where(x => x.Status == ShiftStatus.Open).ToListAsync())
+            leftOpen.Close(leftOpen.ExpectedCash, null);
+        await db.SaveChangesAsync();
+
         var offset = Random.Shared.Next(1, 100000);
         var day = new BusinessDay(new DateOnly(2100, 1, 1).AddDays(offset));
         var staffShift = day.OpenShift(staff.User.Id, 100m);
-        Shift? adminShift = null;
-        if (adminHasOpenShift) adminShift = day.OpenShift(admin.User.Id, 200m);
+        Shift? adminShift = null; // the Admin has no shift of their own: the refund uses the open (staff) shift
         db.BusinessDays.Add(day);
-        if (adminHasSecondOpenShift)
+        if (secondShiftOpen)
         {
             var day2 = new BusinessDay(new DateOnly(2100, 1, 1).AddDays(offset + 200000));
             day2.OpenShift(admin.User.Id, 50m);
@@ -108,6 +112,7 @@ public sealed class RefundApiAuthorizationTests : IClassFixture<RefundApiFactory
         var sale = Sale.CheckoutCash(staffShift, staff.User.Id, "TEST-" + Guid.NewGuid().ToString("N")[..8],
             new[] { new Sale.ProductLine(product, 3) }, null, null, "api-" + Guid.NewGuid());
         db.Sales.Add(sale);
+        if (!anyShiftOpen) staffShift.Close(staffShift.ExpectedCash, null);
         await db.SaveChangesAsync();
 
         return new Scenario(sale.Id, product.Id, adminShift?.Id ?? Guid.Empty, staffShift.Id, admin, staff, noRole, inactive);
@@ -173,7 +178,7 @@ public sealed class RefundApiAuthorizationTests : IClassFixture<RefundApiFactory
     }
 
     [Fact]
-    public async Task Admin_with_an_open_shift_can_refund_and_cash_leaves_the_admins_shift_with_stock_untouched_by_default()
+    public async Task Admin_can_refund_from_the_open_staff_shift_with_stock_untouched_by_default()
     {
         var s = await SeedAsync();
         var response = await RefundAsync(s.SaleId, s.Admin.Token, new { reason = "customer returned" });
@@ -181,8 +186,7 @@ public sealed class RefundApiAuthorizationTests : IClassFixture<RefundApiFactory
         var state = await StateAsync(s);
         Assert.Equal(SaleStatus.Refunded, state.Status);
         Assert.Equal(7m, state.Stock);          // ReturnToStock omitted = false: stock not returned
-        Assert.Equal(140m, state.AdminCash);    // 200 - 60 from the admin's own shift
-        Assert.Equal(160m, state.StaffCash);    // the sale's shift is not touched
+        Assert.Equal(100m, state.StaffCash);    // 100 + 60 sale - 60 refund: cash leaves the shift open now
     }
 
     [Fact]
@@ -195,19 +199,19 @@ public sealed class RefundApiAuthorizationTests : IClassFixture<RefundApiFactory
     }
 
     [Fact]
-    public async Task Admin_cannot_name_another_users_shift()
+    public async Task Admin_cannot_name_a_shift_that_is_not_the_open_one()
     {
         var s = await SeedAsync();
         var before = await StateAsync(s);
-        var response = await RefundAsync(s.SaleId, s.Admin.Token, new { reason = "tamper", returnToStock = true, cashShiftId = s.StaffShiftId });
+        var response = await RefundAsync(s.SaleId, s.Admin.Token, new { reason = "tamper", returnToStock = true, cashShiftId = Guid.NewGuid() });
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
         Assert.Equal(before, await StateAsync(s));
     }
 
     [Fact]
-    public async Task Admin_without_an_open_shift_is_refused()
+    public async Task Refund_with_no_open_shift_is_refused()
     {
-        var s = await SeedAsync(adminHasOpenShift: false);
+        var s = await SeedAsync(anyShiftOpen: false);
         var before = await StateAsync(s);
         var response = await RefundAsync(s.SaleId, s.Admin.Token, new { reason = "no shift", returnToStock = true });
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
@@ -215,13 +219,13 @@ public sealed class RefundApiAuthorizationTests : IClassFixture<RefundApiFactory
     }
 
     [Fact]
-    public async Task Admin_with_two_open_shifts_is_refused_and_nothing_changes()
+    public async Task Two_open_shifts_refuse_the_refund_and_nothing_changes()
     {
-        var s = await SeedAsync(adminHasSecondOpenShift: true);
+        var s = await SeedAsync(secondShiftOpen: true);
         var before = await StateAsync(s);
         var response = await RefundAsync(s.SaleId, s.Admin.Token, new { reason = "two shifts", returnToStock = true });
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
-        Assert.Contains("more than one open shift", await response.Content.ReadAsStringAsync(), StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("more than one shift is open", await response.Content.ReadAsStringAsync(), StringComparison.OrdinalIgnoreCase);
         Assert.Equal(before, await StateAsync(s));
     }
 
@@ -233,6 +237,6 @@ public sealed class RefundApiAuthorizationTests : IClassFixture<RefundApiFactory
         Assert.Equal(HttpStatusCode.BadRequest, (await RefundAsync(s.SaleId, s.Admin.Token, new { reason = "second", returnToStock = true })).StatusCode);
         var state = await StateAsync(s);
         Assert.Equal(10m, state.Stock);
-        Assert.Equal(140m, state.AdminCash);
+        Assert.Equal(100m, state.StaffCash);
     }
 }

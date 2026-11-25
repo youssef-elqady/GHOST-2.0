@@ -259,20 +259,21 @@ public sealed class SaleHandler
         if (sale is null)
             return Result<SaleDto>.Failure("Invoice was not found.");
 
-        // The server decides where the cash comes from: the acting Admin's own shift that is open right now.
-        // A shift id sent by the client is only a check; it can never choose a different shift.
-        var openShifts = await _shifts.GetOpenShiftsForUserWithCashAsync(adminUserId, cancellationToken);
+        // The server decides where the cash comes from: the shift that is open right now, whoever owns it (the venue
+        // has one till and one open shift). The Admin is recorded as the approver. A shift id sent by the client is
+        // only a check; it can never choose a different shift.
+        var openShifts = await _shifts.GetOpenShiftsWithCashAsync(cancellationToken);
         if (openShifts.Count == 0)
-            return Result<SaleDto>.Failure("A refund needs your own open shift. Open a shift first.");
+            return Result<SaleDto>.Failure("A refund needs an open shift. Open a shift first.");
         if (openShifts.Count > 1)
         {
             // Unexpected state: never guess which shift the cash should leave from.
-            await _rejections.RejectedAsync(adminUserId, "Sale.RefundRejected", "Sale", saleId, "More than one open shift for this Admin.", cancellationToken);
-            return Result<SaleDto>.Failure("You have more than one open shift. Close the extra shift before refunding.");
+            await _rejections.RejectedAsync(adminUserId, "Sale.RefundRejected", "Sale", saleId, "More than one open shift.", cancellationToken);
+            return Result<SaleDto>.Failure("More than one shift is open. Close the extra shift before refunding.");
         }
         var shift = openShifts[0];
         if (requestedShiftId is { } requested && requested != shift.Id)
-            return Result<SaleDto>.Failure("That shift is not allowed for this refund. Refunds post to your own open shift.");
+            return Result<SaleDto>.Failure("That shift is not allowed for this refund. Refunds post to the shift that is open now.");
 
         var ids = sale.Items.Where(i => i.ProductId is not null).Select(i => i.ProductId!.Value).Distinct().ToList();
         var products = (await _products.GetManyAsync(ids, cancellationToken)).ToDictionary(p => p.Id);
@@ -286,7 +287,7 @@ public sealed class SaleHandler
                 "Sale.Refunded",
                 "Sale",
                 sale.Id.ToString(),
-                JsonSerializer.Serialize(new { sale.InvoiceNumber, amount = sale.PaidTotal, returnToStock, reason }));
+                JsonSerializer.Serialize(new { sale.InvoiceNumber, amount = sale.PaidTotal, returnToStock, reason, cashShiftId = shift.Id }));
 
             await _unitOfWork.SaveChangesAsync(cancellationToken);
             return Result<SaleDto>.Success(ToDto(sale));

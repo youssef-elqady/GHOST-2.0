@@ -22,6 +22,15 @@ public sealed class ShiftRepository : IShiftRepository
             .FirstOrDefaultAsync(shift => shift.Id == shiftId, cancellationToken);
     }
 
+    public async Task<IReadOnlyList<Shift>> GetOpenShiftsWithCashAsync(CancellationToken cancellationToken = default)
+    {
+        return await _dbContext.Shifts
+            .Include(shift => shift.CashTransactions)
+            .Where(shift => shift.Status == GHOST.Domain.Enums.ShiftStatus.Open)
+            .Take(2)
+            .ToListAsync(cancellationToken);
+    }
+
     public async Task<IReadOnlyList<Shift>> GetOpenShiftsForUserWithCashAsync(
         Guid userId,
         CancellationToken cancellationToken = default)

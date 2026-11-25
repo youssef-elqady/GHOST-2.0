@@ -47,6 +47,7 @@ public sealed class StockReceiptIdempotencyTests
     {
         public Task<Shift?> GetWithCashAsync(Guid id, CancellationToken ct = default) => Task.FromResult<Shift?>(shift);
         public Task<Shift?> GetAsync(Guid id, CancellationToken ct = default) => Task.FromResult<Shift?>(shift);
+        public Task<IReadOnlyList<Shift>> GetOpenShiftsWithCashAsync(CancellationToken ct = default) => Task.FromResult<IReadOnlyList<Shift>>(new[] { shift });
         public Task<IReadOnlyList<Shift>> GetOpenShiftsForUserWithCashAsync(Guid userId, CancellationToken ct = default) => Task.FromResult<IReadOnlyList<Shift>>(new[] { shift });
         public Task<bool> HandoverExistsAsync(Guid a, Guid b, CancellationToken ct = default) => Task.FromResult(false);
         public Task AddHandoverAsync(ShiftHandover h, CancellationToken ct = default) => Task.CompletedTask;

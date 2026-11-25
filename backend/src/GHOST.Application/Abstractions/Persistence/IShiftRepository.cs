@@ -21,6 +21,12 @@ public interface IShiftRepository
         Guid userId,
         CancellationToken cancellationToken = default);
 
+    /// <summary>
+    /// Every shift that is open right now, whoever owns it (with its cash ledger). The schema allows one, so more than one
+    /// is an unexpected state: callers must refuse, never pick. Used to decide where a refund's cash leaves from.
+    /// </summary>
+    Task<IReadOnlyList<Shift>> GetOpenShiftsWithCashAsync(CancellationToken cancellationToken = default);
+
     /// <summary>True when either shift already takes part in a recorded handover.</summary>
     Task<bool> HandoverExistsAsync(
         Guid fromShiftId,

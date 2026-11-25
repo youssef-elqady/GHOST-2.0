@@ -20,6 +20,7 @@ public sealed class SessionControlAccessTests
     {
         public Task<Shift?> GetWithCashAsync(Guid shiftId, CancellationToken cancellationToken = default) => throw new NotSupportedException();
         public Task<Shift?> GetAsync(Guid shiftId, CancellationToken cancellationToken = default) => throw new NotSupportedException();
+        public Task<IReadOnlyList<Shift>> GetOpenShiftsWithCashAsync(CancellationToken cancellationToken = default) => Task.FromResult<IReadOnlyList<Shift>>(open);
         public Task<IReadOnlyList<Shift>> GetOpenShiftsForUserWithCashAsync(Guid userId, CancellationToken cancellationToken = default)
             => Task.FromResult<IReadOnlyList<Shift>>(open.Where(s => s.StaffUserId == userId).ToList());
         public Task<bool> HandoverExistsAsync(Guid fromShiftId, Guid toShiftId, CancellationToken cancellationToken = default) => throw new NotSupportedException();

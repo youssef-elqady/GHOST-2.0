@@ -62,22 +62,20 @@ public sealed class SaleHandlerIdempotencyTests
     private sealed class Shifts : IShiftRepository
     {
         public Shift Shift = null!;
-        public Shift? AdminShift;
         public Dictionary<Guid, Shift> OtherOpenShifts = new();
 
         public List<Shift> ExtraAdminShifts = new();
 
-        public Task<IReadOnlyList<Shift>> GetOpenShiftsForUserWithCashAsync(Guid userId, CancellationToken ct = default)
+        public Task<IReadOnlyList<Shift>> GetOpenShiftsWithCashAsync(CancellationToken ct = default)
         {
             var list = new List<Shift>();
-            if (userId == Admin)
-            {
-                if (AdminShift is { Status: ShiftStatus.Open }) list.Add(AdminShift);
-                list.AddRange(ExtraAdminShifts.Where(s => s.Status == ShiftStatus.Open));
-            }
-            else if (OtherOpenShifts.TryGetValue(userId, out var other)) list.Add(other);
+            if (Shift.Status == ShiftStatus.Open) list.Add(Shift);
+            list.AddRange(ExtraAdminShifts.Where(s => s.Status == ShiftStatus.Open));
             return Task.FromResult<IReadOnlyList<Shift>>(list);
         }
+
+        public Task<IReadOnlyList<Shift>> GetOpenShiftsForUserWithCashAsync(Guid userId, CancellationToken ct = default)
+            => Task.FromResult<IReadOnlyList<Shift>>(new List<Shift>());
 
         public Task<Shift?> GetWithCashAsync(Guid shiftId, CancellationToken ct = default) => Task.FromResult<Shift?>(Shift);
         public Task<Shift?> GetAsync(Guid shiftId, CancellationToken ct = default) => Task.FromResult<Shift?>(Shift);
@@ -137,7 +135,6 @@ public sealed class SaleHandlerIdempotencyTests
         {
             var day = new BusinessDay(new DateOnly(2026, 11, 21));
             Shifts.Shift = day.OpenShift(Staff, 100m);
-            Shifts.AdminShift = day.OpenShift(Admin, 200m);
             Cola = Product.CreateActive("Cola", null, null, "Drinks", "can", 20m, Admin);
             Cola.ApplyMovement(StockMovementType.Purchase, 10, Admin, "seed", unitCost: 12m);
             Products.Map[Cola.Id] = Cola;
@@ -276,18 +273,18 @@ public sealed class SaleHandlerIdempotencyTests
         Assert.True(first.IsSuccess);
         Assert.False(second.IsSuccess);
         Assert.Equal(10m, w.Cola.StockQuantity);
-        Assert.Equal(140m, w.Shifts.AdminShift!.ExpectedCash); // 200 - 60 once
-        Assert.Equal(160m, w.Shifts.Shift.ExpectedCash); // the sale's own shift is untouched by the refund
+        Assert.Equal(100m, w.Shifts.Shift.ExpectedCash); // 100 + 60 sale - 60 refund, once
     }
 
     [Fact]
-    public async Task Refund_posts_to_the_admins_own_open_shift_even_if_client_sends_nothing()
+    public async Task Refund_posts_to_the_shift_open_now_whoever_owns_it_with_the_admin_as_approver()
     {
         var w = new World();
         var sale = (await w.Handler.CheckoutCashAsync(w.Command("k-7"))).Value!;
         var result = await w.Handler.RefundAsync(sale.Id, Admin, "returned", false, null);
         Assert.True(result.IsSuccess);
-        Assert.Equal(140m, w.Shifts.AdminShift!.ExpectedCash);
+        Assert.Equal(100m, w.Shifts.Shift.ExpectedCash); // the staff shift is the one open: 160 - 60
+        Assert.Equal(Admin, Assert.Single((await w.Sales.GetAsync(sale.Id))!.Refunds).ApprovedById);
     }
 
     [Fact]
@@ -295,12 +292,11 @@ public sealed class SaleHandlerIdempotencyTests
     {
         var w = new World();
         var sale = (await w.Handler.CheckoutCashAsync(w.Command("k-8"))).Value!;
-        var result = await w.Handler.RefundAsync(sale.Id, Admin, "returned", true, w.Shifts.Shift.Id); // staff's shift
+        var result = await w.Handler.RefundAsync(sale.Id, Admin, "returned", true, Guid.NewGuid()); // not the open shift
         Assert.False(result.IsSuccess);
         Assert.Contains("not allowed", result.Error!, StringComparison.OrdinalIgnoreCase);
         Assert.Equal(7m, w.Cola.StockQuantity);
         Assert.Equal(160m, w.Shifts.Shift.ExpectedCash);
-        Assert.Equal(200m, w.Shifts.AdminShift!.ExpectedCash);
         Assert.Contains("Sale.RefundRejected", w.Rejections.Actions);
     }
 
@@ -309,21 +305,11 @@ public sealed class SaleHandlerIdempotencyTests
     {
         var w = new World();
         var sale = (await w.Handler.CheckoutCashAsync(w.Command("k-9"))).Value!;
-        w.Shifts.AdminShift!.Close(w.Shifts.AdminShift.ExpectedCash, null);
+        w.Shifts.Shift.Close(w.Shifts.Shift.ExpectedCash, null);
         var result = await w.Handler.RefundAsync(sale.Id, Admin, "returned", true, null);
         Assert.False(result.IsSuccess);
         Assert.Equal(7m, w.Cola.StockQuantity);
-        Assert.Equal(200m, w.Shifts.AdminShift.ExpectedCash);
-    }
-
-    [Fact]
-    public async Task A_user_without_an_open_shift_cannot_refund()
-    {
-        var w = new World();
-        var sale = (await w.Handler.CheckoutCashAsync(w.Command("k-10"))).Value!;
-        var result = await w.Handler.RefundAsync(sale.Id, Guid.NewGuid(), "returned", true, null);
-        Assert.False(result.IsSuccess);
-        Assert.Equal(7m, w.Cola.StockQuantity);
+        Assert.Equal(160m, w.Shifts.Shift.ExpectedCash);
     }
 
     [Fact]
@@ -341,7 +327,7 @@ public sealed class SaleHandlerIdempotencyTests
     }
 
     [Fact]
-    public async Task Refund_is_rejected_when_the_admin_has_more_than_one_open_shift_and_nothing_changes()
+    public async Task Refund_is_rejected_when_more_than_one_shift_is_open_and_nothing_changes()
     {
         var w = new World();
         var sale = (await w.Handler.CheckoutCashAsync(w.Command("k-13"))).Value!;
@@ -350,9 +336,9 @@ public sealed class SaleHandlerIdempotencyTests
         var result = await w.Handler.RefundAsync(sale.Id, Admin, "returned", true, null);
 
         Assert.False(result.IsSuccess);
-        Assert.Contains("more than one open shift", result.Error!, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("more than one shift is open", result.Error!, StringComparison.OrdinalIgnoreCase);
         Assert.Equal(7m, w.Cola.StockQuantity);
-        Assert.Equal(200m, w.Shifts.AdminShift!.ExpectedCash);
+        Assert.Equal(160m, w.Shifts.Shift.ExpectedCash);
         Assert.Equal(50m, w.Shifts.ExtraAdminShifts[0].ExpectedCash);
         Assert.Contains("Sale.RefundRejected", w.Rejections.Actions);
     }
