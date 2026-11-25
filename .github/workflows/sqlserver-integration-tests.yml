@@ -1,0 +1,153 @@
+name: SQL Server integration tests
+
+# Runs the SQL Server integration tests against a throwaway SQL Server container on a GitHub-hosted runner.
+# The container, its random password and its databases exist only for this run. No repository secret is used and
+# no local or production database is reachable from here.
+on:
+  pull_request:
+    paths:
+      - "backend/**"
+      - "scripts/ci/**"
+      - ".github/workflows/sqlserver-integration-tests.yml"
+  push:
+    branches:
+      - feature/auth03-refresh-tokens
+    paths:
+      - "backend/**"
+      - "scripts/ci/**"
+      - ".github/workflows/sqlserver-integration-tests.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: sqlserver-it-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  # SQL Server 2025 matches the version installed for GHOST (MSSQL17 in docs/STATE.md). Pinned by tag, not "latest".
+  SQL_IMAGE: mcr.microsoft.com/mssql/server:2025-CU11-ubuntu-24.04
+  DOTNET_NOLOGO: "1"
+  DOTNET_CLI_TELEMETRY_OPTOUT: "1"
+
+jobs:
+  sqlserver:
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 10.0.x
+
+      - name: Self-test the result checker
+        run: python3 scripts/ci/check_sql_results.py --self-test
+
+      - name: Start a temporary SQL Server container
+        run: |
+          set -euo pipefail
+          mkdir -p ci-out
+          PW="Aa1!$(openssl rand -hex 16)"
+          echo "::add-mask::$PW"
+          echo "SQL_PW=$PW" >> "$GITHUB_ENV"
+          # Bound to the runner loopback only: never exposed publicly.
+          docker run -d --name ghost-sql -e ACCEPT_EULA=Y -e MSSQL_SA_PASSWORD="$PW" \
+            -p 127.0.0.1:1433:1433 "$SQL_IMAGE" > /dev/null
+          echo "Started container from $SQL_IMAGE"
+
+      - name: Wait until SQL Server accepts real connections
+        run: |
+          set -euo pipefail
+          for i in $(seq 1 60); do
+            if docker exec -e SQLCMDPASSWORD="$SQL_PW" ghost-sql /opt/mssql-tools18/bin/sqlcmd -C -S localhost -U sa -h -1 -b -Q "SELECT 1" > /dev/null 2>&1; then
+              echo "SQL Server ready after about $((i*2)) seconds"; exit 0
+            fi
+            sleep 2
+          done
+          echo "SQL Server did not become ready"; docker logs ghost-sql 2>&1 | tail -40; exit 1
+
+      - name: Create the isolated databases
+        run: |
+          set -euo pipefail
+          IT_DB="GHOST_IT_${GITHUB_RUN_ID}_${GITHUB_RUN_ATTEMPT}"
+          case "$IT_DB" in GHOST_IT_[0-9]*_[0-9]*) ;; *) echo "Unexpected database name"; exit 1;; esac
+          echo "IT_DB=$IT_DB" >> "$GITHUB_ENV"
+          q() { docker exec -e SQLCMDPASSWORD="$SQL_PW" ghost-sql /opt/mssql-tools18/bin/sqlcmd -C -S localhost -U sa -b "$@"; }
+          # The two test families use different guarded names. Both exist only inside this container.
+          q -Q "CREATE DATABASE [$IT_DB]; CREATE DATABASE [GHOST_AUTH02_IT];"
+          q -h -1 -Q "SET NOCOUNT ON; SELECT name + ' compat=' + CAST(compatibility_level AS varchar(5)) FROM sys.databases WHERE name IN (N'$IT_DB', N'GHOST_AUTH02_IT'); SELECT 'version=' + CAST(SERVERPROPERTY('ProductVersion') AS varchar(40)) + ' edition=' + CAST(SERVERPROPERTY('Edition') AS varchar(60));" | tee ci-out/sqlserver-info.txt
+
+      - name: Install dotnet-ef and build
+        run: |
+          set -euo pipefail
+          dotnet tool install --global dotnet-ef --version "10.0.*"
+          echo "$HOME/.dotnet/tools" >> "$GITHUB_PATH"
+          dotnet --version | tee ci-out/dotnet-version.txt
+          dotnet restore backend/GHOST.slnx
+          dotnet build backend/GHOST.slnx --configuration Release --no-restore
+          grep -hE 'Microsoft.EntityFrameworkCore(.SqlServer)?" Version' backend/src/GHOST.Infrastructure/GHOST.Infrastructure.csproj | tee ci-out/ef-versions.txt
+
+      - name: Apply the real EF Core migrations to both databases
+        run: |
+          set -euo pipefail
+          export Authentication__Jwt__Issuer=ci Authentication__Jwt__Audience=ci
+          export Authentication__Jwt__SigningKey=0123456789012345678901234567890123456789
+          export Authentication__Jwt__AccessTokenLifetimeMinutes=10
+          for DB in "$IT_DB" GHOST_AUTH02_IT; do
+            CS="Server=127.0.0.1,1433;Database=$DB;User ID=sa;Password=$SQL_PW;Encrypt=True;TrustServerCertificate=True"
+            export ConnectionStrings__DefaultConnection="$CS"
+            echo "== migrating $DB"
+            dotnet ef database update -p backend/src/GHOST.Infrastructure -s backend/src/GHOST.API --configuration Release --connection "$CS" 2>&1 \
+              | sed "s/$SQL_PW/***/g" | tee -a ci-out/migrations.log
+          done
+
+      - name: Verify the schema the tests rely on
+        run: |
+          set -euo pipefail
+          q() { docker exec -e SQLCMDPASSWORD="$SQL_PW" ghost-sql /opt/mssql-tools18/bin/sqlcmd -C -S localhost -U sa -b -d "$1" -h -1 -W -Q "SET NOCOUNT ON; $2"; }
+          {
+            echo "database: $IT_DB"
+            echo -n "applied migrations: "; q "$IT_DB" "SELECT COUNT(1) FROM dbo.__EFMigrationsHistory"
+            echo -n "sequences: "; q "$IT_DB" "SELECT STRING_AGG(name, ',') FROM sys.sequences"
+            echo -n "unique indexes: "; q "$IT_DB" "SELECT COUNT(1) FROM sys.indexes WHERE is_unique = 1 AND is_primary_key = 0"
+            echo -n "foreign keys: "; q "$IT_DB" "SELECT COUNT(1) FROM sys.foreign_keys"
+            echo -n "triggers: "; q "$IT_DB" "SELECT COUNT(1) FROM sys.triggers"
+            echo -n "tables: "; q "$IT_DB" "SELECT COUNT(1) FROM sys.tables"
+          } | tee ci-out/schema-check.txt
+          grep -q 'InvoiceNumbers' ci-out/schema-check.txt
+          grep -q 'InternalBarcodes' ci-out/schema-check.txt
+
+      - name: Run the SQL Server integration tests
+        run: |
+          set -uo pipefail
+          export GHOST_SCRATCH_TEST_CONNECTION_STRING="Server=127.0.0.1,1433;Database=$IT_DB;User ID=sa;Password=$SQL_PW;Encrypt=True;TrustServerCertificate=True"
+          export GHOST_AUTH02_TEST_CONNECTION_STRING="Server=127.0.0.1,1433;Database=GHOST_AUTH02_IT;User ID=sa;Password=$SQL_PW;Encrypt=True;TrustServerCertificate=True"
+          dotnet test backend/tests/GHOST.SqlServer.Tests/GHOST.SqlServer.Tests.csproj --configuration Release --no-build \
+            --logger "trx;LogFileName=sqlserver.trx" --results-directory ci-out/trx 2>&1 | sed "s/$SQL_PW/***/g" | tee ci-out/sql-test-console.log
+          exit "${PIPESTATUS[0]}"
+
+      - name: Check that no SQL Server test was skipped
+        if: always()
+        run: |
+          python3 scripts/ci/check_sql_results.py --trx-glob 'ci-out/trx/*.trx' --min-sql 14 --summary ci-out/summary.md | tee -a "$GITHUB_STEP_SUMMARY"
+
+      - name: Run the unit tests (no database)
+        run: dotnet test backend/tests/GHOST.Tests/GHOST.Tests.csproj --configuration Release --no-build --logger "trx;LogFileName=unit.trx" --results-directory ci-out/unit-trx
+
+      - name: Sanitized SQL Server startup log
+        if: always()
+        run: |
+          docker logs ghost-sql 2>&1 | sed "s/$SQL_PW/***/g" > ci-out/sqlserver-startup.log || true
+          docker rm -f ghost-sql > /dev/null 2>&1 || true
+
+      - name: Upload results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: sqlserver-integration-results
+          path: ci-out/
+          if-no-files-found: warn
