@@ -214,6 +214,15 @@ public sealed class ScratchSuiteTests : IAsyncLifetime
             sessionId = session.Id;
         }
 
+        // Fixture: the session really started 4 hours ago (before the simulated outage that began 3 hours ago).
+        // Without this the session starts "now" and the later approved end time (now - 1 minute) is before it started.
+        var sessionStart = DateTimeOffset.UtcNow.AddHours(-4);
+        await using (var backdate = ScratchDb.NewContext())
+        {
+            await backdate.Database.ExecuteSqlInterpolatedAsync($"UPDATE dbo.SessionSegments SET StartedAt = {sessionStart} WHERE SessionId = {sessionId}");
+            await backdate.Database.ExecuteSqlInterpolatedAsync($"UPDATE dbo.Sessions SET CreatedAt = {sessionStart} WHERE Id = {sessionId}");
+        }
+
         PowerOutageHandler Handler(GHOSTDbContext db) => new(
             new OutageRepository(db), new SessionRepository(db), new UnitOfWork(db), new AuditTrail(db), new SystemAuditTrail(db));
 
