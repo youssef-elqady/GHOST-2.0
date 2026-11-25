@@ -78,8 +78,9 @@ jobs:
           echo "IT_DB=$IT_DB" >> "$GITHUB_ENV"
           q() { docker exec -e SQLCMDPASSWORD="$SQL_PW" ghost-sql /opt/mssql-tools18/bin/sqlcmd -C -S localhost -U sa -b "$@"; }
           # The two test families use different guarded names. Both exist only inside this container.
-          q -Q "CREATE DATABASE [$IT_DB]; CREATE DATABASE [GHOST_AUTH02_IT];"
-          q -h -1 -Q "SET NOCOUNT ON; SELECT name + ' compat=' + CAST(compatibility_level AS varchar(5)) FROM sys.databases WHERE name IN (N'$IT_DB', N'GHOST_AUTH02_IT'); SELECT 'version=' + CAST(SERVERPROPERTY('ProductVersion') AS varchar(40)) + ' edition=' + CAST(SERVERPROPERTY('Edition') AS varchar(60));" | tee ci-out/sqlserver-info.txt
+          echo "AUTH_SRC_DB=${IT_DB}_auth" >> "$GITHUB_ENV"
+          q -Q "CREATE DATABASE [$IT_DB]; CREATE DATABASE [${IT_DB}_auth];"
+          q -h -1 -Q "SET NOCOUNT ON; SELECT name + ' compat=' + CAST(compatibility_level AS varchar(5)) FROM sys.databases WHERE name IN (N'$IT_DB', N'${IT_DB}_auth'); SELECT 'version=' + CAST(SERVERPROPERTY('ProductVersion') AS varchar(40)) + ' edition=' + CAST(SERVERPROPERTY('Edition') AS varchar(60));" | tee ci-out/sqlserver-info.txt
 
       - name: Install dotnet-ef and build
         run: |
@@ -97,20 +98,19 @@ jobs:
           export Authentication__Jwt__Issuer=ci Authentication__Jwt__Audience=ci
           export Authentication__Jwt__SigningKey=0123456789012345678901234567890123456789
           export Authentication__Jwt__AccessTokenLifetimeMinutes=10
-          CS="Server=127.0.0.1,1433;Database=$IT_DB;User ID=sa;Password=$SQL_PW;Encrypt=True;TrustServerCertificate=True"
-          export ConnectionStrings__DefaultConnection="$CS"
-          echo "== migrating $IT_DB with dotnet ef database update"
-          dotnet ef database update -p backend/src/GHOST.Infrastructure -s backend/src/GHOST.API --configuration Release --no-build --connection "$CS" 2>&1 \
-            | sed "s/$SQL_PW/***/g" | tee -a ci-out/migrations.log
-          # The API host refuses the protected catalog name GHOST_AUTH02_IT (its own guard), so dotnet ef cannot target it.
-          # The same migrations are applied to it as a SQL script generated from this same migration set.
-          echo "== generating the migration script (fresh database, from the first migration)"
-          dotnet ef migrations script -p backend/src/GHOST.Infrastructure -s backend/src/GHOST.API --configuration Release --no-build -o ci-out/migrations.sql 2>&1 \
-            | sed "s/$SQL_PW/***/g" | tee -a ci-out/migrations.log
-          docker cp ci-out/migrations.sql ghost-sql:/tmp/migrations.sql
-          echo "== applying the script to GHOST_AUTH02_IT"
-          docker exec -e SQLCMDPASSWORD="$SQL_PW" ghost-sql /opt/mssql-tools18/bin/sqlcmd -C -I -S localhost -U sa -b -d GHOST_AUTH02_IT -i /tmp/migrations.sql 2>&1 \
-            | sed "s/$SQL_PW/***/g" | tail -5 | tee -a ci-out/migrations.log
+          for DB in "$IT_DB" "$AUTH_SRC_DB"; do
+            CS="Server=127.0.0.1,1433;Database=$DB;User ID=sa;Password=$SQL_PW;Encrypt=True;TrustServerCertificate=True"
+            export ConnectionStrings__DefaultConnection="$CS"
+            echo "== migrating $DB with dotnet ef database update"
+            dotnet ef database update -p backend/src/GHOST.Infrastructure -s backend/src/GHOST.API --configuration Release --no-build --connection "$CS" 2>&1 \
+              | sed "s/$SQL_PW/***/g" | tee -a ci-out/migrations.log
+          done
+          # The API host refuses the protected catalog name GHOST_AUTH02_IT, so dotnet ef cannot target that name directly.
+          # The second database is migrated under an allowed name and then renamed inside the throwaway container.
+          docker exec -e SQLCMDPASSWORD="$SQL_PW" ghost-sql /opt/mssql-tools18/bin/sqlcmd -C -S localhost -U sa -b \
+            -Q "ALTER DATABASE [$AUTH_SRC_DB] MODIFY NAME = [GHOST_AUTH02_IT]"
+          docker exec -e SQLCMDPASSWORD="$SQL_PW" ghost-sql /opt/mssql-tools18/bin/sqlcmd -C -S localhost -U sa -b -h -1 -W \
+            -Q "SET NOCOUNT ON; SELECT 'GHOST_AUTH02_IT migrations: ' + CAST(COUNT(1) AS varchar(10)) FROM GHOST_AUTH02_IT.dbo.__EFMigrationsHistory" | tee -a ci-out/migrations.log
 
       - name: Verify the schema the tests rely on
         run: |
