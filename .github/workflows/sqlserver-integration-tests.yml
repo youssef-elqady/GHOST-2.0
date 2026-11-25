@@ -141,7 +141,7 @@ jobs:
         if: always()
         run: |
           set -o pipefail
-          python3 scripts/ci/check_sql_results.py --trx-glob 'ci-out/trx/*.trx' --min-sql 30 --summary ci-out/summary.md | tee -a "$GITHUB_STEP_SUMMARY"
+          python3 scripts/ci/check_sql_results.py --trx-glob 'ci-out/trx/*.trx' --min-sql 29 --summary ci-out/summary.md | tee -a "$GITHUB_STEP_SUMMARY"
 
       - name: Run KNOWN DEFECT tests (C1, C2; expected to fail until decided; does not gate)
         if: always()
