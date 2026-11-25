@@ -18,9 +18,12 @@ No SQL Server or API/Frontend run has been done by this work. Nothing is TESTED 
       DB: migration 20261125121337_StockReceiptIdempotency (adds 2 columns, unique filtered index (CreatedById, IdempotencyKey), drops IX_StockReceipts_CreatedById). NOT APPLIED to any database.
       API: key now required on POST /api/stock-receipts (400 without). Frontend staff-intake.tsx sends one key per delivery (tsc clean).
       SQL Server test SC10 (6 concurrent identical receipts) written, NOT RUN.
-- [ ] B4 pause/resume/transfer ownership
+- [ ] B4 pause/resume/transfer ownership: ON HOLD, his decision needed (sessions span handover)
 - [ ] B6 complete another staff's session
-- [ ] B7 discount cap setting, B10 fingerprint with discount reason
+- [x] B10 fingerprint now includes the discount reason (trimmed). Invoices stored before this (hash without reason, or null hash) are still matched. CODE + BUILT + 2 unit tests.
+- [x] B7 discount policy. New Admin settings Sales:MaxDiscountPercent (1-100, default 100 = no extra cap, so no behaviour change until he sets it) and Sales:AllowZeroTotalInvoice (0/1, default 0).
+      A discount is checked as effective percent of subtotal (fixed amounts too). Zero-total invoice is refused unless the setting is 1 (this DOES change today's behaviour: 100% discount is now refused by default).
+      No schema change (settings are rows). CODE + BUILT + 4 unit tests (mutation-checked). Cap VALUE is his decision; default left permissive on purpose.
 - [ ] B5 persistent alert for completed sessions with no invoice
 
 ## Waiting on decisions (do not guess)

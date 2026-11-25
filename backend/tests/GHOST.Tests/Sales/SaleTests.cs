@@ -185,4 +185,36 @@ public sealed class SaleTests
         Assert.True(sale.RegisterPrint());
         Assert.Equal(2, sale.PrintCount);
     }
+
+    [Fact]
+    public void Discount_ToZeroTotal_IsRefusedByDefault_AndAllowedOnlyWhenThePolicySaysSo()
+    {
+        var cola = Stocked("Cola", 25m, 20, 10m);
+        Assert.Throws<BusinessRuleValidationException>(() =>
+            Sale.CheckoutCash(OpenShift(), Staff, "GS-1", new[] { Line(cola, 2) }, null,
+                new Sale.DiscountInput(DiscountType.Percent, 100m, "free", Admin), null));
+        Assert.Throws<BusinessRuleValidationException>(() =>
+            Sale.CheckoutCash(OpenShift(), Staff, "GS-2", new[] { Line(cola, 2) }, null,
+                new Sale.DiscountInput(DiscountType.Fixed, 50m, "free", Admin), null));
+
+        var allowed = Sale.CheckoutCash(OpenShift(), Staff, "GS-3", new[] { Line(cola, 2) }, null,
+            new Sale.DiscountInput(DiscountType.Percent, 100m, "owner approved", Admin, 100m, true), null);
+        Assert.Equal(0m, allowed.Total);
+    }
+
+    [Fact]
+    public void Discount_AboveTheConfiguredCap_IsRefused_EvenWhenGivenAsAFixedAmount()
+    {
+        var cola = Stocked("Cola", 25m, 20, 10m);
+        // Subtotal 100, cap 10%: 10 is allowed, 11 is not.
+        var ok = Sale.CheckoutCash(OpenShift(), Staff, "GS-1", new[] { Line(cola, 4) }, null,
+            new Sale.DiscountInput(DiscountType.Fixed, 10m, "regular", Admin, 10m), null);
+        Assert.Equal(90m, ok.Total);
+        Assert.Throws<BusinessRuleValidationException>(() =>
+            Sale.CheckoutCash(OpenShift(), Staff, "GS-2", new[] { Line(cola, 4) }, null,
+                new Sale.DiscountInput(DiscountType.Fixed, 11m, "regular", Admin, 10m), null));
+        Assert.Throws<BusinessRuleValidationException>(() =>
+            Sale.CheckoutCash(OpenShift(), Staff, "GS-3", new[] { Line(cola, 4) }, null,
+                new Sale.DiscountInput(DiscountType.Percent, 20m, "promo", Admin, 10m), null));
+    }
 }

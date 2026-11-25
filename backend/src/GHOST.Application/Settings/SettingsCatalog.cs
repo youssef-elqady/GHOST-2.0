@@ -28,6 +28,8 @@ public static class SettingsCatalog
     public const string DiscountAlertPercent = "Alerts:DiscountPercent";
     public const string CancellationsAlertCount = "Alerts:CancellationsPerShift";
     public const string StocktakeLossAlertValue = "Alerts:StocktakeLossValue";
+    public const string MaxDiscountPercent = "Sales:MaxDiscountPercent";
+    public const string AllowZeroTotalInvoice = "Sales:AllowZeroTotalInvoice";
 
     private static readonly SettingDefinition[] Definitions =
     [
@@ -42,7 +44,11 @@ public static class SettingsCatalog
         new(CancellationsAlertCount, SettingKind.Integer, 1, 1000, 3,
             "Alert when one shift cancels at least this many sessions."),
         new(StocktakeLossAlertValue, SettingKind.Money, 1, 10_000_000, 200,
-            "Alert when an approved stocktake loses at least this value at cost.")
+            "Alert when an approved stocktake loses at least this value at cost."),
+        new(MaxDiscountPercent, SettingKind.Integer, 1, 100, 100,
+            "Largest discount, in percent of the invoice subtotal, that any Admin can give. Default 100 means no extra cap."),
+        new(AllowZeroTotalInvoice, SettingKind.Integer, 0, 1, 0,
+            "1 lets an Admin discount an invoice down to a zero total. 0 (default) refuses it.")
     ];
 
     public static IReadOnlyList<SettingDefinition> All => Definitions;

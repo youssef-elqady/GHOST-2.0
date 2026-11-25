@@ -154,7 +154,13 @@ public sealed class Sale : BaseEntity
 
     public sealed record ProductLine(Product Product, decimal Quantity);
 
-    public sealed record DiscountInput(DiscountType Type, decimal Value, string? Reason, Guid ApprovedById);
+    /// <summary>
+/// A discount request plus the policy it must respect. The defaults are strict on purpose: an invoice with a zero total
+/// is refused unless the caller passes AllowZeroTotal = true (Admin setting), and the cap defaults to the full subtotal.
+/// </summary>
+public sealed record DiscountInput(
+    DiscountType Type, decimal Value, string? Reason, Guid ApprovedById,
+    decimal MaxPercent = 100m, bool AllowZeroTotal = false);
 
     /// <summary>Total a completed gaming session adds to an invoice.</summary>
     public sealed record GamingLine(Session Session, string Description);
@@ -366,6 +372,17 @@ public sealed class Sale : BaseEntity
 
         if (amount > Subtotal)
             throw new BusinessRuleValidationException("Discount cannot exceed the subtotal.");
+
+        if (discount.MaxPercent is < 0 or > 100)
+            throw new BusinessRuleValidationException("The maximum discount setting is invalid.");
+
+        if (amount * 100m > Subtotal * discount.MaxPercent)
+            throw new BusinessRuleValidationException(
+                $"This discount is above the maximum allowed discount ({discount.MaxPercent:0}% of the invoice).");
+
+        if (amount == Subtotal && !discount.AllowZeroTotal)
+            throw new BusinessRuleValidationException(
+                "A discount that makes the invoice total zero is not allowed. An Admin can allow zero-total invoices in Settings.");
 
         DiscountType = discount.Type;
         DiscountValue = discount.Value;

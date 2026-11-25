@@ -356,4 +356,74 @@ public sealed class SaleHandlerIdempotencyTests
         Assert.Equal(50m, w.Shifts.ExtraAdminShifts[0].ExpectedCash);
         Assert.Contains("Sale.RefundRejected", w.Rejections.Actions);
     }
+
+    [Fact]
+    public async Task SameKey_SameDiscount_DifferentReason_IsRejected_AndChargesNothingExtra()
+    {
+        var w = new World();
+        var first = await w.Handler.CheckoutCashAsync(w.Command("k-b10", new DiscountRequest(DiscountType.Fixed, 10m, "regular customer"), admin: true));
+        Assert.True(first.IsSuccess, first.Error);
+
+        var second = await w.Handler.CheckoutCashAsync(w.Command("k-b10", new DiscountRequest(DiscountType.Fixed, 10m, "owner friend"), admin: true));
+
+        Assert.False(second.IsSuccess);
+        Assert.Single(w.Sales.Rows);
+        Assert.Equal(7m, w.Cola.StockQuantity);
+    }
+
+    [Fact]
+    public async Task SameKey_SameDiscount_ReasonWithOnlyOuterSpaces_IsTheSameRequest()
+    {
+        var w = new World();
+        var first = await w.Handler.CheckoutCashAsync(w.Command("k-b10b", new DiscountRequest(DiscountType.Fixed, 10m, "regular customer"), admin: true));
+        var again = await w.Handler.CheckoutCashAsync(w.Command("k-b10b", new DiscountRequest(DiscountType.Fixed, 10m, "  regular customer "), admin: true));
+
+        Assert.True(again.IsSuccess, again.Error);
+        Assert.Equal(first.Value!.Id, again.Value!.Id);
+        Assert.Single(w.Sales.Rows);
+    }
+
+    private sealed class FixedSettings(params (string Key, string Value)[] rows) : ISettingsRepository
+    {
+        public Task<IReadOnlyList<SystemSetting>> ListAsync(CancellationToken ct = default)
+            => Task.FromResult<IReadOnlyList<SystemSetting>>(rows.Select(r => new SystemSetting(r.Key, r.Value, Admin, DateTimeOffset.UtcNow)).ToList());
+        public Task<SystemSetting?> GetAsync(string key, CancellationToken ct = default)
+            => Task.FromResult(rows.Where(r => r.Key == key).Select(r => new SystemSetting(r.Key, r.Value, Admin, DateTimeOffset.UtcNow)).FirstOrDefault());
+        public Task AddAsync(SystemSetting setting, CancellationToken ct = default) => Task.CompletedTask;
+    }
+
+    private static SaleHandler HandlerWith(World w, ISettingsRepository settings)
+        => new(w.Sales, w.Products, w.Shifts, new NoSessions(), w.Uow, w.Audit, w.Rejections, settings);
+
+    [Fact]
+    public async Task AdminDiscount_AboveTheStoredCap_IsRefused_AndNothingChanges()
+    {
+        var w = new World();
+        var handler = HandlerWith(w, new FixedSettings((GHOST.Application.Settings.SettingsCatalog.MaxDiscountPercent, "10")));
+
+        // Subtotal 60. 20% = 12 is above the 10% cap.
+        var tooMuch = await handler.CheckoutCashAsync(w.Command("k-cap1", new DiscountRequest(DiscountType.Percent, 20m, "promo"), admin: true));
+        var fine = await handler.CheckoutCashAsync(w.Command("k-cap2", new DiscountRequest(DiscountType.Percent, 10m, "promo"), admin: true));
+
+        Assert.False(tooMuch.IsSuccess);
+        Assert.Contains("maximum allowed discount", tooMuch.Error!);
+        Assert.True(fine.IsSuccess, fine.Error);
+        Assert.Single(w.Sales.Rows);
+        Assert.Equal(7m, w.Cola.StockQuantity);
+    }
+
+    [Fact]
+    public async Task HundredPercentDiscount_IsRefusedUnlessZeroTotalIsAllowedInSettings()
+    {
+        var w = new World();
+        var refused = await w.Handler.CheckoutCashAsync(w.Command("k-zero1", new DiscountRequest(DiscountType.Percent, 100m, "gift"), admin: true));
+        Assert.False(refused.IsSuccess);
+        Assert.Empty(w.Sales.Rows);
+        Assert.Equal(10m, w.Cola.StockQuantity);
+
+        var handler = HandlerWith(w, new FixedSettings((GHOST.Application.Settings.SettingsCatalog.AllowZeroTotalInvoice, "1")));
+        var allowed = await handler.CheckoutCashAsync(w.Command("k-zero2", new DiscountRequest(DiscountType.Percent, 100m, "gift"), admin: true));
+        Assert.True(allowed.IsSuccess, allowed.Error);
+        Assert.Equal(0m, allowed.Value!.Total);
+    }
 }

@@ -3,6 +3,7 @@ using GHOST.Application.Abstractions.Auditing;
 using GHOST.Application.Abstractions.Persistence;
 using GHOST.Application.Common.Exceptions;
 using GHOST.Application.Common.Result;
+using GHOST.Application.Settings;
 using GHOST.Domain.Entities;
 using GHOST.Domain.Enums;
 using GHOST.Domain.Exceptions;
@@ -54,6 +55,7 @@ public sealed class SaleHandler
     private readonly IUnitOfWork _unitOfWork;
     private readonly IAuditTrail _audit;
     private readonly IRejectionAudit? _rejections;
+    private readonly ISettingsRepository? _settings;
 
     public SaleHandler(
         ISaleRepository sales,
@@ -62,8 +64,10 @@ public sealed class SaleHandler
         ISessionRepository sessions,
         IUnitOfWork unitOfWork,
         IAuditTrail audit,
-        IRejectionAudit? rejections = null)
+        IRejectionAudit? rejections = null,
+        ISettingsRepository? settings = null)
     {
+        _settings = settings;
         _rejections = rejections;
         _sales = sales;
         _products = products;
@@ -73,19 +77,43 @@ public sealed class SaleHandler
         _audit = audit;
     }
 
+    /// <summary>The Admin setting if it is stored and valid, otherwise the catalog default.</summary>
+    private async Task<decimal> ReadSettingAsync(string key, CancellationToken cancellationToken)
+    {
+        var definition = SettingsCatalog.Find(key)!;
+        if (_settings is null)
+            return definition.Default;
+        var row = await _settings.GetAsync(key, cancellationToken);
+        return row is not null
+               && decimal.TryParse(row.Value, System.Globalization.NumberStyles.Number, System.Globalization.CultureInfo.InvariantCulture, out var value)
+               && value >= definition.Min && value <= definition.Max
+            ? value
+            : definition.Default;
+    }
+
     private static bool SameCheckout(Sale existing, CheckoutCommand command)
         => existing.CreatedById == command.ActorUserId
            && existing.ShiftId == command.ShiftId
-           && (existing.RequestFingerprint is null || existing.RequestFingerprint == Fingerprint(command));
+           // A null fingerprint exists only on invoices created before the fingerprint column (migration SaleRequestFingerprint).
+           // A fingerprint stored before the discount reason was part of it is matched by the legacy form.
+           && (existing.RequestFingerprint is null
+               || existing.RequestFingerprint == Fingerprint(command)
+               || existing.RequestFingerprint == LegacyFingerprint(command));
 
-    /// <summary>Canonical hash of the request content. Order of lines does not matter.</summary>
-    internal static string Fingerprint(CheckoutCommand command)
+    /// <summary>Canonical hash of the request content (lines, session, discount type, value and reason). Order of lines does not matter.</summary>
+    internal static string Fingerprint(CheckoutCommand command) => Hash(command, includeDiscountReason: true);
+
+    /// <summary>The hash as it was before the discount reason was added. Only used to recognise invoices stored earlier.</summary>
+    private static string LegacyFingerprint(CheckoutCommand command) => Hash(command, includeDiscountReason: false);
+
+    private static string Hash(CheckoutCommand command, bool includeDiscountReason)
     {
         var lines = string.Join(";", command.Lines
             .OrderBy(l => l.ProductId)
             .Select(l => FormattableString.Invariant($"{l.ProductId:N}x{l.Quantity:0.####}")));
         var discount = command.Discount is { Type: not DiscountType.None } d
             ? FormattableString.Invariant($"{(int)d.Type}:{d.Value:0.####}")
+              + (includeDiscountReason ? "|" + (d.Reason ?? string.Empty).Trim() : string.Empty)
             : "none";
         var raw = FormattableString.Invariant($"{command.ShiftId:N}|{command.SessionId:N}|{lines}|{discount}");
         return Convert.ToHexString(System.Security.Cryptography.SHA256.HashData(System.Text.Encoding.UTF8.GetBytes(raw)));
@@ -150,7 +178,9 @@ public sealed class SaleHandler
             var invoiceNumber = await _sales.NextInvoiceNumberAsync(DateTimeOffset.UtcNow, cancellationToken);
 
             var discount = command.Discount is { Type: not DiscountType.None } d
-                ? new Sale.DiscountInput(d.Type, d.Value, d.Reason, command.ActorUserId)
+                ? new Sale.DiscountInput(d.Type, d.Value, d.Reason, command.ActorUserId,
+                    await ReadSettingAsync(SettingsCatalog.MaxDiscountPercent, cancellationToken),
+                    await ReadSettingAsync(SettingsCatalog.AllowZeroTotalInvoice, cancellationToken) == 1m)
                 : null;
 
             var sale = Sale.CheckoutCash(
