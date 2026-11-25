@@ -34,3 +34,13 @@ Remove-Item Env:GHOST_AUTH02_TEST_CONNECTION_STRING
 Use your own approved authentication method. Never commit a real connection string or paste credentials into chat, source files, terminal transcripts, or logs.
 
 The test connection should use a least-privilege SQL principal. These tests require only access to read the database identity/schema and to insert/attempt mutation of an AuditLogs row within a transaction that is rolled back.
+
+## CI (GitHub Actions) and what it proves
+
+`.github/workflows/sqlserver-integration-tests.yml` starts a temporary SQL Server 2025 **Developer edition** container on a
+GitHub-hosted runner, applies the real EF migrations, and runs these tests with none skipped (a checker fails the run if any SQL
+test is not Passed). Tests in classes whose name contains `KnownDefect` assert the correct behaviour for confirmed bugs and run in a
+separate non-gating step. Unit tests run in a separate job.
+
+Passing in CI proves the code on SQL Server 2025 Developer. It does not prove anything about SQL Server Express (size and memory
+limits, service setup, authentication mode). Run the SQL tests against an Express instance before relying on Express.

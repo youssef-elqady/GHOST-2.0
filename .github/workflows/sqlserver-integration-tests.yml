@@ -44,6 +44,16 @@ jobs:
         with:
           dotnet-version: 10.0.x
 
+      - name: Pin the .NET SDK to 10.0 (the runner image also has a newer preview SDK)
+        run: |
+          set -euo pipefail
+          V=$(dotnet --list-sdks | awk '{print $1}' | grep -E '^10\.0\.' | sort -V | tail -1)
+          test -n "$V" || { echo ".NET 10 SDK not installed"; exit 1; }
+          printf '{"sdk":{"version":"%s","rollForward":"disable"}}\n' "$V" > global.json
+          mkdir -p ci-out
+          dotnet --version | tee ci-out/dotnet-version.txt
+          case "$(dotnet --version)" in 10.0.*) ;; *) echo "Wrong SDK in use"; exit 1;; esac
+
       - name: Self-test the result checker
         run: python3 scripts/ci/check_sql_results.py --self-test
 
@@ -87,7 +97,6 @@ jobs:
           set -euo pipefail
           dotnet tool install --global dotnet-ef --version "10.0.*"
           echo "$HOME/.dotnet/tools" >> "$GITHUB_PATH"
-          dotnet --version | tee ci-out/dotnet-version.txt
           dotnet restore backend/GHOST.slnx
           dotnet build backend/GHOST.slnx --configuration Release --no-restore
           grep -hE 'Microsoft.EntityFrameworkCore(.SqlServer)?" Version' backend/src/GHOST.Infrastructure/GHOST.Infrastructure.csproj | tee ci-out/ef-versions.txt
@@ -155,8 +164,21 @@ jobs:
             --results-directory ci-out/trx-known-defect 2>&1 | sed "s/$SQL_PW/***/g" | tee ci-out/known-defect-console.log
           python3 scripts/ci/check_sql_results.py --trx-glob 'ci-out/trx-known-defect/*.trx' --min-sql 1 --summary ci-out/known-defect-summary.md | tee -a "$GITHUB_STEP_SUMMARY" || true
 
-      - name: Run the unit tests (no database)
-        run: dotnet test backend/tests/GHOST.Tests/GHOST.Tests.csproj --configuration Release --no-build --logger "trx;LogFileName=unit.trx" --results-directory ci-out/unit-trx
+      - name: Collect SQL Server deadlock reports (diagnostics only)
+        if: always()
+        run: |
+          docker exec -e SQLCMDPASSWORD="$SQL_PW" ghost-sql /opt/mssql-tools18/bin/sqlcmd -C -S localhost -U sa -h -1 -y 0 -Q "SET NOCOUNT ON; SELECT CAST(event_data AS nvarchar(max)) FROM sys.fn_xe_file_target_read_file(N'/var/opt/mssql/log/system_health*.xel', NULL, NULL, NULL) WHERE object_name = N'xml_deadlock_report'" 2>&1 | sed "s/$SQL_PW/***/g" > ci-out/deadlock-reports.xml || true
+          echo "deadlock reports captured: $(grep -c '<deadlock>' ci-out/deadlock-reports.xml || true)"
+
+      - name: Note about the SQL Server edition
+        if: always()
+        run: |
+          cat > ci-out/EDITION-NOTE.md <<'EOF'
+          The CI SQL Server is the Developer edition (Enterprise feature set) in a Linux container.
+          Passing here proves the code works on SQL Server 2025 Developer. It does NOT prove anything about
+          SQL Server Express (size and memory limits, feature limits, service configuration, Windows authentication).
+          EOF
+          cat ci-out/EDITION-NOTE.md >> "$GITHUB_STEP_SUMMARY"
 
       - name: Sanitized SQL Server startup log
         if: always()
@@ -170,4 +192,38 @@ jobs:
         with:
           name: sqlserver-integration-results
           path: ci-out/
+          if-no-files-found: warn
+
+  unit-tests:
+    # Separate job: a SQL Server failure can never skip the unit tests, and the other way around.
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 10.0.x
+      - name: Pin the .NET SDK to 10.0 (the runner image also has a newer preview SDK)
+        run: |
+          set -euo pipefail
+          V=$(dotnet --list-sdks | awk '{print $1}' | grep -E '^10\.0\.' | sort -V | tail -1)
+          test -n "$V" || { echo ".NET 10 SDK not installed"; exit 1; }
+          printf '{"sdk":{"version":"%s","rollForward":"disable"}}\n' "$V" > global.json
+          mkdir -p ci-out-unit
+          dotnet --version | tee ci-out-unit/dotnet-version.txt
+          case "$(dotnet --version)" in 10.0.*) ;; *) echo "Wrong SDK in use"; exit 1;; esac
+
+      - name: Unit tests (no database)
+        run: |
+          dotnet restore backend/GHOST.slnx
+          dotnet build backend/GHOST.slnx --configuration Release --no-restore
+          dotnet test backend/tests/GHOST.Tests/GHOST.Tests.csproj --configuration Release --no-build --logger "trx;LogFileName=unit.trx" --results-directory ci-out-unit/trx
+      - name: Upload unit test results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: unit-test-results
+          path: ci-out-unit/
           if-no-files-found: warn
