@@ -31,5 +31,6 @@ No SQL Server or API/Frontend run has been done by this work. Nothing is TESTED 
 Admin refund shift/source (B2), pause/resume/transfer across handover, re-invoice after refund (B8),
 discount cap value, expense/withdrawal/advance approval, hour-adjustment approval.
 
-## Phase 3 - auth tab isolation: design write-up first, no auth change.
+## Phase 3 - auth tab isolation: DESIGN WRITTEN (docs/AUTH-TAB-ISOLATION-DESIGN-ar.txt). No auth code changed. Waiting for his OK.
+Finding: one shared refresh cookie ghost_refresh for the whole browser, so a second login overwrites it and the first tab changes identity at its next refresh/reload. Proposed fix: one cookie per tab (session slot header), HttpOnly kept.
 ## Phase 4 - new modules: not started.
