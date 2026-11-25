@@ -122,9 +122,53 @@ public sealed class SessionSegment : BaseEntity
             end = EndedAt.Value;
 
         var totalDuration = end - StartedAt;
-        var totalPausedTimeTicks = _pauses.Sum(p => p.GetDuration(end).Ticks);
-        var billableDuration = totalDuration - TimeSpan.FromTicks(totalPausedTimeTicks);
+        var billableDuration = totalDuration - GetDeductedPauseDuration(end);
 
         return billableDuration.Ticks < 0 ? TimeSpan.Zero : billableDuration;
+    }
+
+    /// <summary>
+    /// C1: the union of all pause intervals clipped to [segment start, end]. Overlapping pauses are deducted once.
+    /// An active pause counts up to <paramref name="end"/>. Stored pause rows are never changed.
+    /// </summary>
+    private TimeSpan GetDeductedPauseDuration(DateTimeOffset end)
+    {
+        var intervals = new List<(DateTimeOffset From, DateTimeOffset To)>();
+        foreach (var pause in _pauses)
+        {
+            var from = pause.StartedAt < StartedAt ? StartedAt : pause.StartedAt;
+            var to = pause.EndedAt ?? end;
+            if (to > end)
+                to = end;
+            if (to > from)
+                intervals.Add((from, to));
+        }
+
+        if (intervals.Count == 0)
+            return TimeSpan.Zero;
+
+        intervals.Sort((a, b) => a.From.CompareTo(b.From));
+
+        long ticks = 0;
+        var curFrom = intervals[0].From;
+        var curTo = intervals[0].To;
+        for (var i = 1; i < intervals.Count; i++)
+        {
+            var (f, t) = intervals[i];
+            if (f <= curTo)
+            {
+                if (t > curTo)
+                    curTo = t;
+            }
+            else
+            {
+                ticks += (curTo - curFrom).Ticks;
+                curFrom = f;
+                curTo = t;
+            }
+        }
+        ticks += (curTo - curFrom).Ticks;
+
+        return TimeSpan.FromTicks(ticks);
     }
 }
