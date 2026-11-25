@@ -1,0 +1,198 @@
+name: SQL Server deadlock diagnostic
+
+# DIAGNOSTIC ONLY. Loops the concurrency tests SC04, SC05 and SC10 against a throwaway SQL Server container and collects the
+# deadlock graphs (Extended Events) as an artifact. It changes no code, adds no retry and no lock-order change, and never
+# enables READ_COMMITTED_SNAPSHOT. Run it manually (workflow_dispatch); it also runs when this file itself is pushed.
+on:
+  workflow_dispatch:
+    inputs:
+      iterations:
+        description: "Number of loop iterations"
+        default: "30"
+  push:
+    branches:
+      - feature/auth03-refresh-tokens
+    paths:
+      - ".github/workflows/sqlserver-deadlock-diagnostic.yml"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: sqlserver-deadlock-diag-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  SQL_IMAGE: mcr.microsoft.com/mssql/server:2025-CU11-ubuntu-24.04
+  DOTNET_NOLOGO: "1"
+  DOTNET_CLI_TELEMETRY_OPTOUT: "1"
+  ITERATIONS: ${{ github.event.inputs.iterations || '30' }}
+
+jobs:
+  deadlock-diagnostic:
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 10.0.x
+
+      - name: Pin the .NET SDK to 10.0 (the runner image also has a newer preview SDK)
+        run: |
+          set -euo pipefail
+          V=$(dotnet --list-sdks | awk '{print $1}' | grep -E '^10\.0\.' | sort -V | tail -1)
+          test -n "$V" || { echo ".NET 10 SDK not installed"; exit 1; }
+          printf '{"sdk":{"version":"%s","rollForward":"disable"}}\n' "$V" > global.json
+          mkdir -p ci-out
+          dotnet --version | tee ci-out/dotnet-version.txt
+          case "$(dotnet --version)" in 10.0.*) ;; *) echo "Wrong SDK in use"; exit 1;; esac
+
+      - name: Start a temporary SQL Server container
+        run: |
+          set -euo pipefail
+          mkdir -p ci-out
+          PW="Aa1!$(openssl rand -hex 16)"
+          echo "::add-mask::$PW"
+          echo "SQL_PW=$PW" >> "$GITHUB_ENV"
+          # Bound to the runner loopback only: never exposed publicly.
+          docker run -d --name ghost-sql -e ACCEPT_EULA=Y -e MSSQL_SA_PASSWORD="$PW" \
+            -p 127.0.0.1:1433:1433 "$SQL_IMAGE" > /dev/null
+          echo "Started container from $SQL_IMAGE"
+
+      - name: Wait until SQL Server accepts real connections
+        run: |
+          set -euo pipefail
+          for i in $(seq 1 60); do
+            if docker exec -e SQLCMDPASSWORD="$SQL_PW" ghost-sql /opt/mssql-tools18/bin/sqlcmd -C -S localhost -U sa -h -1 -b -Q "SELECT 1" > /dev/null 2>&1; then
+              echo "SQL Server ready after about $((i*2)) seconds"; exit 0
+            fi
+            sleep 2
+          done
+          echo "SQL Server did not become ready"; docker logs ghost-sql 2>&1 | tail -40; exit 1
+
+      - name: Create the isolated databases
+        run: |
+          set -euo pipefail
+          IT_DB="GHOST_IT_${GITHUB_RUN_ID}_${GITHUB_RUN_ATTEMPT}"
+          case "$IT_DB" in GHOST_IT_[0-9]*_[0-9]*) ;; *) echo "Unexpected database name"; exit 1;; esac
+          echo "IT_DB=$IT_DB" >> "$GITHUB_ENV"
+          q() { docker exec -e SQLCMDPASSWORD="$SQL_PW" ghost-sql /opt/mssql-tools18/bin/sqlcmd -C -S localhost -U sa -b "$@"; }
+          # The two test families use different guarded names. Both exist only inside this container.
+          echo "AUTH_SRC_DB=${IT_DB}_auth" >> "$GITHUB_ENV"
+          q -Q "CREATE DATABASE [$IT_DB]; CREATE DATABASE [${IT_DB}_auth];"
+          q -h -1 -Q "SET NOCOUNT ON; SELECT name + ' compat=' + CAST(compatibility_level AS varchar(5)) FROM sys.databases WHERE name IN (N'$IT_DB', N'${IT_DB}_auth'); SELECT 'version=' + CAST(SERVERPROPERTY('ProductVersion') AS varchar(40)) + ' edition=' + CAST(SERVERPROPERTY('Edition') AS varchar(60));" | tee ci-out/sqlserver-info.txt
+
+      - name: Install dotnet-ef and build
+        run: |
+          set -euo pipefail
+          dotnet tool install --global dotnet-ef --version "10.0.*"
+          echo "$HOME/.dotnet/tools" >> "$GITHUB_PATH"
+          dotnet restore backend/GHOST.slnx
+          dotnet build backend/GHOST.slnx --configuration Release --no-restore
+          grep -hE 'Microsoft.EntityFrameworkCore(.SqlServer)?" Version' backend/src/GHOST.Infrastructure/GHOST.Infrastructure.csproj | tee ci-out/ef-versions.txt
+
+      - name: Apply the real EF Core migrations to both databases
+        run: |
+          set -euo pipefail
+          export Authentication__Jwt__Issuer=ci Authentication__Jwt__Audience=ci
+          export Authentication__Jwt__SigningKey=0123456789012345678901234567890123456789
+          export Authentication__Jwt__AccessTokenLifetimeMinutes=10
+          for DB in "$IT_DB" "$AUTH_SRC_DB"; do
+            CS="Server=127.0.0.1,1433;Database=$DB;User ID=sa;Password=$SQL_PW;Encrypt=True;TrustServerCertificate=True"
+            export ConnectionStrings__DefaultConnection="$CS"
+            echo "== migrating $DB with dotnet ef database update"
+            dotnet ef database update -p backend/src/GHOST.Infrastructure -s backend/src/GHOST.API --configuration Release --no-build --connection "$CS" 2>&1 \
+              | sed "s/$SQL_PW/***/g" | tee -a ci-out/migrations.log
+          done
+          # The API host refuses the protected catalog name GHOST_AUTH02_IT, so dotnet ef cannot target that name directly.
+          # The second database is migrated under an allowed name and then renamed inside the throwaway container.
+          docker exec -e SQLCMDPASSWORD="$SQL_PW" ghost-sql /opt/mssql-tools18/bin/sqlcmd -C -S localhost -U sa -b \
+            -Q "ALTER DATABASE [$AUTH_SRC_DB] MODIFY NAME = [GHOST_AUTH02_IT]"
+          docker exec -e SQLCMDPASSWORD="$SQL_PW" ghost-sql /opt/mssql-tools18/bin/sqlcmd -C -S localhost -U sa -b -h -1 -W \
+            -Q "SET NOCOUNT ON; SELECT 'GHOST_AUTH02_IT migrations: ' + CAST(COUNT(1) AS varchar(10)) FROM GHOST_AUTH02_IT.dbo.__EFMigrationsHistory" | tee -a ci-out/migrations.log
+
+      - name: Verify the schema the tests rely on
+        run: |
+          set -euo pipefail
+          q() { docker exec -e SQLCMDPASSWORD="$SQL_PW" ghost-sql /opt/mssql-tools18/bin/sqlcmd -C -S localhost -U sa -b -d "$1" -h -1 -W -Q "SET NOCOUNT ON; $2"; }
+          {
+            echo "database: $IT_DB"
+            echo -n "applied migrations: "; q "$IT_DB" "SELECT COUNT(1) FROM dbo.__EFMigrationsHistory"
+            echo -n "sequences: "; q "$IT_DB" "SELECT STRING_AGG(name, ',') FROM sys.sequences"
+            echo -n "unique indexes: "; q "$IT_DB" "SELECT COUNT(1) FROM sys.indexes WHERE is_unique = 1 AND is_primary_key = 0"
+            echo -n "foreign keys: "; q "$IT_DB" "SELECT COUNT(1) FROM sys.foreign_keys"
+            echo -n "triggers: "; q "$IT_DB" "SELECT COUNT(1) FROM sys.triggers"
+            echo -n "tables: "; q "$IT_DB" "SELECT COUNT(1) FROM sys.tables"
+          } | tee ci-out/schema-check.txt
+          grep -q 'InvoiceNumbers' ci-out/schema-check.txt
+          grep -q 'InternalBarcodes' ci-out/schema-check.txt
+
+      - name: Start a dedicated deadlock Extended Events session
+        run: |
+          set -euo pipefail
+          docker exec -e SQLCMDPASSWORD="$SQL_PW" ghost-sql /opt/mssql-tools18/bin/sqlcmd -C -S localhost -U sa -b -Q "
+          CREATE EVENT SESSION ghost_deadlocks ON SERVER
+            ADD EVENT sqlserver.xml_deadlock_report
+            ADD TARGET package0.event_file (SET filename = N'/var/opt/mssql/log/ghost_dl.xel', max_file_size = 50)
+            WITH (STARTUP_STATE = OFF);
+          ALTER EVENT SESSION ghost_deadlocks ON SERVER STATE = START;"
+
+      - name: Loop SC04, SC05 and SC10 (diagnostic, never fails the job)
+        run: |
+          set -uo pipefail
+          export GHOST_SCRATCH_TEST_CONNECTION_STRING="Server=127.0.0.1,1433;Database=$IT_DB;User ID=sa;Password=$SQL_PW;Encrypt=True;TrustServerCertificate=True"
+          export GHOST_AUTH02_TEST_CONNECTION_STRING="Server=127.0.0.1,1433;Database=GHOST_AUTH02_IT;User ID=sa;Password=$SQL_PW;Encrypt=True;TrustServerCertificate=True"
+          : > ci-out/loop-results.txt
+          for i in $(seq 1 "$ITERATIONS"); do
+            dotnet test backend/tests/GHOST.SqlServer.Tests/GHOST.SqlServer.Tests.csproj --configuration Release --no-build \
+              --filter "FullyQualifiedName~SC04|FullyQualifiedName~SC05|FullyQualifiedName~SC10" \
+              --logger "trx;LogFileName=loop-$i.trx" --results-directory ci-out/trx-loop > ci-out/loop-$i.log 2>&1
+            echo "iteration $i exit=$? $(grep -E 'Passed!|Failed!' ci-out/loop-$i.log | tail -1 | sed "s/$SQL_PW/***/g")" | tee -a ci-out/loop-results.txt
+            grep -E "^  Failed |deadlocked" ci-out/loop-$i.log | sed "s/$SQL_PW/***/g" | head -6 >> ci-out/loop-results.txt
+          done
+          true
+
+      - name: Collect deadlock graphs
+        if: always()
+        run: |
+          docker exec -e SQLCMDPASSWORD="$SQL_PW" ghost-sql /opt/mssql-tools18/bin/sqlcmd -C -S localhost -U sa -Q "ALTER EVENT SESSION ghost_deadlocks ON SERVER STATE = STOP;" || true
+          docker exec -e SQLCMDPASSWORD="$SQL_PW" ghost-sql /opt/mssql-tools18/bin/sqlcmd -C -S localhost -U sa -h -1 -y 0 -Q "SET NOCOUNT ON; SELECT CAST(event_data AS nvarchar(max)) FROM sys.fn_xe_file_target_read_file(N'/var/opt/mssql/log/ghost_dl*.xel', NULL, NULL, NULL)" 2>&1 | sed "s/$SQL_PW/***/g" > ci-out/deadlock-graphs.xml || true
+          python3 - <<'PY'
+          import re
+          t = open("ci-out/deadlock-graphs.xml", encoding="utf8", errors="replace").read()
+          graphs = re.findall(r"<deadlock>.*?</deadlock>", t, flags=re.S)
+          out = [f"deadlock graphs captured: {len(graphs)}"]
+          for n, g in enumerate(graphs, 1):
+              out.append(f"--- graph {n}")
+              for m in re.finditer(r"<(keylock|pagelock|objectlock|ridlock)[^>]*objectname=\"([^\"]*)\"[^>]*indexname=\"([^\"]*)\"[^>]*mode=\"([^\"]*)\"", g):
+                  out.append(f"resource {m.group(1)} {m.group(2)} index={m.group(3)} mode={m.group(4)}")
+              for m in re.finditer(r"<process [^>]*>.*?</process>", g, flags=re.S):
+                  p = m.group(0)
+                  vic = re.search(r'victimProcess id="([^"]+)"', g)
+                  pid = re.search(r'id="([^"]+)"', p).group(1)
+                  stmt = re.search(r"<frame[^>]*>(.*?)</frame>", p, flags=re.S)
+                  wr = re.search(r'waitresource="([^"]*)"', p)
+                  out.append(f"process {pid} victim={bool(vic and vic.group(1)==pid)} waitresource={wr.group(1) if wr else ''} frame={(stmt.group(1).strip()[:200] if stmt else '')}")
+              for m in re.finditer(r"<(owner|waiter) id=\"([^\"]+)\" mode=\"([^\"]+)\"", g):
+                  out.append(f"  {m.group(1)} {m.group(2)} mode={m.group(3)}")
+          open("ci-out/deadlock-summary.txt", "w").write("\n".join(out) + "\n")
+          print("\n".join(out)[:6000])
+          PY
+          echo "iterations: $ITERATIONS; failed iterations: $(grep -c 'exit=[1-9]' ci-out/loop-results.txt || true)" | tee -a ci-out/deadlock-summary.txt >> "$GITHUB_STEP_SUMMARY"
+          cat ci-out/deadlock-summary.txt >> "$GITHUB_STEP_SUMMARY" || true
+
+      - name: Remove the container
+        if: always()
+        run: docker rm -f ghost-sql > /dev/null 2>&1 || true
+
+      - name: Upload diagnostics
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: sqlserver-deadlock-diagnostic
+          path: ci-out/
+          if-no-files-found: warn
