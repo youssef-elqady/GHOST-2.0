@@ -97,13 +97,20 @@ jobs:
           export Authentication__Jwt__Issuer=ci Authentication__Jwt__Audience=ci
           export Authentication__Jwt__SigningKey=0123456789012345678901234567890123456789
           export Authentication__Jwt__AccessTokenLifetimeMinutes=10
-          for DB in "$IT_DB" GHOST_AUTH02_IT; do
-            CS="Server=127.0.0.1,1433;Database=$DB;User ID=sa;Password=$SQL_PW;Encrypt=True;TrustServerCertificate=True"
-            export ConnectionStrings__DefaultConnection="$CS"
-            echo "== migrating $DB"
-            dotnet ef database update -p backend/src/GHOST.Infrastructure -s backend/src/GHOST.API --configuration Release --connection "$CS" 2>&1 \
-              | sed "s/$SQL_PW/***/g" | tee -a ci-out/migrations.log
-          done
+          CS="Server=127.0.0.1,1433;Database=$IT_DB;User ID=sa;Password=$SQL_PW;Encrypt=True;TrustServerCertificate=True"
+          export ConnectionStrings__DefaultConnection="$CS"
+          echo "== migrating $IT_DB with dotnet ef database update"
+          dotnet ef database update -p backend/src/GHOST.Infrastructure -s backend/src/GHOST.API --configuration Release --no-build --connection "$CS" 2>&1 \
+            | sed "s/$SQL_PW/***/g" | tee -a ci-out/migrations.log
+          # The API host refuses the protected catalog name GHOST_AUTH02_IT (its own guard), so dotnet ef cannot target it.
+          # The same migrations are applied to it as an idempotent SQL script generated from this same migration set.
+          echo "== generating the idempotent migration script"
+          dotnet ef migrations script --idempotent -p backend/src/GHOST.Infrastructure -s backend/src/GHOST.API --configuration Release --no-build -o ci-out/migrations.sql 2>&1 \
+            | sed "s/$SQL_PW/***/g" | tee -a ci-out/migrations.log
+          docker cp ci-out/migrations.sql ghost-sql:/tmp/migrations.sql
+          echo "== applying the script to GHOST_AUTH02_IT"
+          docker exec -e SQLCMDPASSWORD="$SQL_PW" ghost-sql /opt/mssql-tools18/bin/sqlcmd -C -S localhost -U sa -b -d GHOST_AUTH02_IT -i /tmp/migrations.sql 2>&1 \
+            | sed "s/$SQL_PW/***/g" | tail -5 | tee -a ci-out/migrations.log
 
       - name: Verify the schema the tests rely on
         run: |
@@ -133,6 +140,7 @@ jobs:
       - name: Check that no SQL Server test was skipped
         if: always()
         run: |
+          set -o pipefail
           python3 scripts/ci/check_sql_results.py --trx-glob 'ci-out/trx/*.trx' --min-sql 14 --summary ci-out/summary.md | tee -a "$GITHUB_STEP_SUMMARY"
 
       - name: Run the unit tests (no database)
