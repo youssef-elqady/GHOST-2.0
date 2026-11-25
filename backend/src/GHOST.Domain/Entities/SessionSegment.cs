@@ -78,8 +78,12 @@ public sealed class SessionSegment : BaseEntity
         MarkAsUpdated();
     }
 
-    /// <summary>Ends the segment at an explicit time (admin-approved end after an outage).</summary>
-    internal void EndAt(DateTimeOffset at, string outageReason, bool dropOutagePauseCoveringEnd)
+    /// <summary>
+    /// Ends the segment at an explicit time (admin-approved end after an outage). Pause records are never deleted or
+    /// rewritten: billing clips every pause to the segment end, and an outage pause that covers the approved end does not
+    /// subtract the time up to that end (see <see cref="IsWaivedByApprovedEnd"/>).
+    /// </summary>
+    internal void EndAt(DateTimeOffset at)
     {
         if (!IsActive)
             throw new BusinessRuleValidationException("Segment is already ended.");
@@ -88,13 +92,20 @@ public sealed class SessionSegment : BaseEntity
 
         _pauses.FirstOrDefault(p => p.IsActive)?.EndAt(at);
 
-        // Admin says play really lasted until `at`: an outage pause that covers that moment must not subtract it.
-        if (dropOutagePauseCoveringEnd)
-            _pauses.RemoveAll(p => p.Reason == outageReason && p.StartedAt < at);
-
         EndedAt = at;
         MarkAsUpdated();
     }
+
+    /// <summary>
+    /// The Admin chose an end time that falls inside a power outage: the session really ran until then, so that outage does
+    /// not subtract the time before the end. Other outages (earlier or later) are not affected. The pause row stays as it is.
+    /// </summary>
+    private bool IsWaivedByApprovedEnd(SessionPause pause)
+        => EndedAt is { } end
+           && pause.Reason == Session.PowerOutageReason
+           && pause.EndedAt is { } pauseEnd
+           && pause.StartedAt < end
+           && end <= pauseEnd;
 
     internal void Resume()
     {
@@ -122,7 +133,7 @@ public sealed class SessionSegment : BaseEntity
             end = EndedAt.Value;
 
         var totalDuration = end - StartedAt;
-        var totalPausedTimeTicks = _pauses.Sum(p => p.GetDuration(end).Ticks);
+        var totalPausedTimeTicks = _pauses.Where(p => !IsWaivedByApprovedEnd(p)).Sum(p => p.GetDuration(end).Ticks);
         var billableDuration = totalDuration - TimeSpan.FromTicks(totalPausedTimeTicks);
 
         return billableDuration.Ticks < 0 ? TimeSpan.Zero : billableDuration;

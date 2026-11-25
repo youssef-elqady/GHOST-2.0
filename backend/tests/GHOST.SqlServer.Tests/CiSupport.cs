@@ -51,8 +51,11 @@ internal static class CiSupport
         return (s.Segments.Sum(x => x.Pauses.Count), s.GetTotalBillableDuration(upTo));
     }
 
+    internal sealed record Approved(
+        TimeSpan Billable, decimal Amount, string Status, List<(DateTimeOffset Start, DateTimeOffset? End)> Pauses);
+
     /// <summary>Admin approval in its own request: load, ApproveAfterOutage, save. Returns what a fresh read shows afterwards.</summary>
-    internal static async Task<(int Pauses, TimeSpan Billable)> ApproveAsync(Guid sessionId, Guid shiftId, DateTimeOffset actualEnd)
+    internal static async Task<Approved> ApproveAsync(Guid sessionId, Guid shiftId, DateTimeOffset actualEnd)
     {
         await using (var db = ScratchDb.NewContext())
         {
@@ -61,6 +64,9 @@ internal static class CiSupport
             s.ApproveAfterOutage(admin, shiftId, actualEnd, actualEnd.AddMinutes(1));
             await db.SaveChangesAsync();
         }
-        return await ReadAsync(sessionId, actualEnd);
+        await using var check = ScratchDb.NewContext();
+        var after = await LoadSessionAsync(check, sessionId);
+        var pauses = after.Segments.SelectMany(x => x.Pauses).OrderBy(p => p.StartedAt).Select(p => (p.StartedAt, p.EndedAt)).ToList();
+        return new Approved(after.GetTotalBillableDuration(actualEnd), after.GetTotalAmount(actualEnd), after.Status.ToString(), pauses);
     }
 }

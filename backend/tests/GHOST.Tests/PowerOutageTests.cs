@@ -65,6 +65,72 @@ public sealed class PowerOutageTests
         Assert.Equal(30m, s.GetTotalAmount(s.StartedAt.AddDays(1)));
     }
 
+    // C2 rule: the Admin-approved end is the session end even inside an outage. No pause row is deleted.
+    // Outage 1: 10-60 min, normal 60-120, outage 2: 120-240; rate 60 EGP/h so 1 minute = 1 EGP.
+    private static Session TwoOutages()
+    {
+        var s = NewSession();
+        var t0 = s.StartedAt;
+        s.MarkPowerOutage(t0.AddMinutes(10), t0.AddMinutes(60));
+        s.MarkPowerOutage(t0.AddMinutes(120), t0.AddMinutes(240));
+        return s;
+    }
+
+    private static int PauseRows(Session s) => s.Segments.Sum(x => x.Pauses.Count);
+
+    [Fact]
+    public void Admin_end_inside_later_outage_keeps_earlier_outage_deducted_and_that_part_of_the_later_one_billed()
+    {
+        var s = TwoOutages();
+        var t0 = s.StartedAt;
+        s.ApproveAfterOutage(Guid.NewGuid(), Guid.NewGuid(), t0.AddMinutes(180), t0.AddHours(5));
+        // 180 minutes on the clock - 50 (outage 1) = 130. Outage 2 covers the approved end, so its first 60 minutes are session time.
+        Assert.Equal(130m, s.GetTotalAmount(t0.AddDays(1)));
+        Assert.Equal(2, PauseRows(s));
+        Assert.Equal(SessionStatus.Completed, s.Status);
+    }
+
+    [Fact]
+    public void Admin_end_inside_first_outage_ignores_the_later_outage()
+    {
+        var s = TwoOutages();
+        var t0 = s.StartedAt;
+        s.ApproveAfterOutage(Guid.NewGuid(), Guid.NewGuid(), t0.AddMinutes(30), t0.AddHours(5));
+        Assert.Equal(30m, s.GetTotalAmount(t0.AddDays(1)));
+        Assert.Equal(2, PauseRows(s));
+    }
+
+    [Fact]
+    public void Admin_end_between_outages_keeps_the_earlier_outage_and_the_later_one_does_not_count()
+    {
+        var s = TwoOutages();
+        var t0 = s.StartedAt;
+        s.ApproveAfterOutage(Guid.NewGuid(), Guid.NewGuid(), t0.AddMinutes(90), t0.AddHours(5));
+        Assert.Equal(40m, s.GetTotalAmount(t0.AddDays(1))); // 90 - 50
+        Assert.Equal(2, PauseRows(s));
+    }
+
+    [Fact]
+    public void Admin_end_after_all_outages_deducts_both()
+    {
+        var s = TwoOutages();
+        var t0 = s.StartedAt;
+        s.ApproveAfterOutage(Guid.NewGuid(), Guid.NewGuid(), t0.AddMinutes(300), t0.AddHours(6));
+        Assert.Equal(130m, s.GetTotalAmount(t0.AddDays(1))); // 300 - 50 - 120
+        Assert.Equal(2, PauseRows(s));
+    }
+
+    [Fact]
+    public void Approval_never_changes_the_stored_pause_times()
+    {
+        var s = TwoOutages();
+        var t0 = s.StartedAt;
+        var before = s.Segments.SelectMany(x => x.Pauses).Select(p => (p.StartedAt, p.EndedAt)).OrderBy(x => x.StartedAt).ToList();
+        s.ApproveAfterOutage(Guid.NewGuid(), Guid.NewGuid(), t0.AddMinutes(180), t0.AddHours(5));
+        var after = s.Segments.SelectMany(x => x.Pauses).Select(p => (p.StartedAt, p.EndedAt)).OrderBy(x => x.StartedAt).ToList();
+        Assert.Equal(before, after);
+    }
+
     [Fact]
     public void Approve_rejects_future_end_and_unflagged_sessions()
     {

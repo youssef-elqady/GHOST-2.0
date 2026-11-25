@@ -251,8 +251,7 @@ public sealed class Session : BaseEntity
         var segment = GetActiveSegment()
             ?? throw new BusinessRuleValidationException("No active segment to end.");
 
-        var insideOutage = OutageStartedAt is { } s && OutageEndedAt is { } e && actualEnd > s && actualEnd <= e;
-        segment.EndAt(actualEnd, PowerOutageReason, dropOutagePauseCoveringEnd: insideOutage);
+        segment.EndAt(actualEnd);
 
         Status = SessionStatus.Completed;
         EndShiftId = endShiftId;
