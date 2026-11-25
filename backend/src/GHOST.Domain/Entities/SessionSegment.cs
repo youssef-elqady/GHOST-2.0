@@ -69,6 +69,11 @@ public sealed class SessionSegment : BaseEntity
         if (endedAt <= start)
             return;
 
+        // The same outage window can be replayed (a crash between the session save and the heartbeat save makes the next
+        // start use the same window). Never store the same closed pause twice: it would be deducted from billing twice.
+        if (_pauses.Any(p => p.EndedAt == endedAt && p.StartedAt == start && p.Reason == reason))
+            return;
+
         _pauses.Add(new SessionPause(Id, reason, start, endedAt));
         MarkAsUpdated();
     }

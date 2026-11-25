@@ -32,6 +32,25 @@ public sealed class GHOSTDbContext
 
     public GHOSTDbContext(DbContextOptions<GHOSTDbContext> options) : base(options)
     {
+        ChangeTracker.Tracked += TreatNewDiscoveredEntityAsAdded;
+    }
+
+    /// <summary>
+    /// Our entities set their Guid key in the constructor. For an entity whose key is generated on add, EF reads a
+    /// non-empty key on an entity it discovers through a tracked parent (a new pause, segment or shift added to a loaded
+    /// session or business day) as an existing row, and sends UPDATE, which affects 0 rows. An entity that EF starts
+    /// tracking because of that discovery (not loaded from a query, not explicitly attached) and that is marked Modified
+    /// cannot be an existing row we loaded, so it is a new row. Entities loaded from a query (FromQuery) and entities
+    /// the code marks explicitly are not touched. Nothing is hidden: a real conflict still throws at save.
+    /// </summary>
+    private void TreatNewDiscoveredEntityAsAdded(object? sender, Microsoft.EntityFrameworkCore.ChangeTracking.EntityTrackedEventArgs e)
+    {
+        if (!e.FromQuery
+            && e.Entry.State == EntityState.Modified
+            && e.Entry.Entity is GHOST.Domain.Common.BaseEntity)
+        {
+            e.Entry.State = EntityState.Added;
+        }
     }
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
