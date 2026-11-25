@@ -160,7 +160,7 @@ jobs:
         if: always()
         run: |
           docker exec -e SQLCMDPASSWORD="$SQL_PW" ghost-sql /opt/mssql-tools18/bin/sqlcmd -C -S localhost -U sa -Q "ALTER EVENT SESSION ghost_deadlocks ON SERVER STATE = STOP;" || true
-          docker exec -e SQLCMDPASSWORD="$SQL_PW" ghost-sql /opt/mssql-tools18/bin/sqlcmd -C -S localhost -U sa -h -1 -y 0 -Q "SET NOCOUNT ON; SELECT CAST(event_data AS nvarchar(max)) FROM sys.fn_xe_file_target_read_file(N'/var/opt/mssql/log/ghost_dl*.xel', NULL, NULL, NULL)" 2>&1 | sed "s/$SQL_PW/***/g" > ci-out/deadlock-graphs.xml || true
+          docker exec -e SQLCMDPASSWORD="$SQL_PW" ghost-sql /opt/mssql-tools18/bin/sqlcmd -C -S localhost -U sa -y 0 -Q "SET NOCOUNT ON; SELECT CAST(event_data AS nvarchar(max)) FROM sys.fn_xe_file_target_read_file(N'/var/opt/mssql/log/ghost_dl*.xel', NULL, NULL, NULL)" 2>&1 | sed "s/$SQL_PW/***/g" > ci-out/deadlock-graphs.xml || true
           python3 - <<'PY'
           import re
           t = open("ci-out/deadlock-graphs.xml", encoding="utf8", errors="replace").read()
