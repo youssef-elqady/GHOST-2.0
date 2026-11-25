@@ -207,6 +207,7 @@ public sealed class ScratchSuiteTests : IAsyncLifetime
         await using (var db = ScratchDb.NewContext())
         {
             var device = new Device("PS5-" + Guid.NewGuid().ToString("N")[..6], "PS5");
+            device.SetRate(PlayType.Single, 60m);
             device.MarkAsRunning(PlayType.Single); // a session in progress occupies its device, as StartSession does
             db.Devices.Add(device);
             var session = new Session(shiftId, device.Id, PlayType.Single, 60m);
