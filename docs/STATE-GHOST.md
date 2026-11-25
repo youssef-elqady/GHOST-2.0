@@ -34,3 +34,6 @@ discount cap value, expense/withdrawal/advance approval, hour-adjustment approva
 ## Phase 3 - auth tab isolation: DESIGN WRITTEN (docs/AUTH-TAB-ISOLATION-DESIGN-ar.txt). No auth code changed. Waiting for his OK.
 Finding: one shared refresh cookie ghost_refresh for the whole browser, so a second login overwrites it and the first tab changes identity at its next refresh/reload. Proposed fix: one cookie per tab (session slot header), HttpOnly kept.
 ## Phase 4 - new modules: not started.
+
+## B4 - Pause/Resume/Transfer ownership (decided Nov 25 2:23 PM: "any running session")
+Decision: any running session may be paused/resumed/transferred by any signed-in Staff/Admin (handover-safe). Code check: SessionsController (StaffOrAdmin) -> SessionLifecycleHandler.PauseAsync/ResumeAsync and TransferSessionHandler take no owner/shift parameter, so no owner-only rule exists. No code change needed. NOT done: requiring an open shift for the actor (not requested, would be a new rule).
