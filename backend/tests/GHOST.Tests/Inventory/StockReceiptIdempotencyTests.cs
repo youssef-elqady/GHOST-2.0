@@ -96,6 +96,27 @@ public sealed class StockReceiptIdempotencyTests
     }
 
     [Fact]
+    public async Task KeyLongerThanColumn_IsRejectedCleanly_NothingMoves()
+    {
+        var (handler, receipts, shift, cola) = Build();
+        var result = await handler.CreateAsync(Cmd(shift, cola, 10, new string('k', 101)));
+
+        Assert.False(result.IsSuccess);
+        Assert.Empty(receipts.Saved);
+        Assert.Equal(0m, cola.StockQuantity);
+    }
+
+    [Fact]
+    public async Task KeyOfExactlyMaxLength_AcceptedEvenWithSurroundingSpaces()
+    {
+        var (handler, receipts, shift, cola) = Build();
+        var result = await handler.CreateAsync(Cmd(shift, cola, 10, " " + new string('k', 100) + " "));
+
+        Assert.True(result.IsSuccess);
+        Assert.Single(receipts.Saved);
+    }
+
+    [Fact]
     public async Task SameKeyDifferentQuantity_IsRejected_NothingExtraMoves()
     {
         var (handler, receipts, shift, cola) = Build();

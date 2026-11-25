@@ -37,3 +37,6 @@ Finding: one shared refresh cookie ghost_refresh for the whole browser, so a sec
 
 ## B4 - Pause/Resume/Transfer ownership (decided Nov 25 2:23 PM: "any running session")
 Decision: any running session may be paused/resumed/transferred by any signed-in Staff/Admin (handover-safe). Code check: SessionsController (StaffOrAdmin) -> SessionLifecycleHandler.PauseAsync/ResumeAsync and TransferSessionHandler take no owner/shift parameter, so no owner-only rule exists. No code change needed. NOT done: requiring an open shift for the actor (not requested, would be a new rule).
+
+## Fourth review (Nov 25 2:27 PM) of aec96f6, 5b7fc10, 7a50b6f, 4473c0f
+No defect found. My first reading (stock receipt key over 100 chars would hit the DB) was wrong: StockReceipt.Create already rejects it (domain rule, MaxIdempotencyKeyLength 100) and the handler returns a clean failure. Added 2 boundary tests (101 chars rejected; exactly 100 with spaces accepted). Notes: B5 alert list is oldest first, capped 200; Refunded counts as invoiced (B8 open).
