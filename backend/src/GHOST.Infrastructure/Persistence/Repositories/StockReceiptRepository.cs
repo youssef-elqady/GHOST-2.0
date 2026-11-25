@@ -14,6 +14,10 @@ public sealed class StockReceiptRepository : IStockReceiptRepository
     public Task<StockReceipt?> GetAsync(Guid id, CancellationToken cancellationToken = default)
         => _db.StockReceipts.Include(r => r.Items).FirstOrDefaultAsync(r => r.Id == id, cancellationToken);
 
+    public Task<StockReceipt?> GetByIdempotencyKeyAsync(Guid createdById, string key, CancellationToken cancellationToken = default)
+        => _db.StockReceipts.Include(r => r.Items)
+            .FirstOrDefaultAsync(r => r.CreatedById == createdById && r.IdempotencyKey == key, cancellationToken);
+
     public async Task<IReadOnlyList<StockReceipt>> ListAsync(
         StockReceiptStatus? status,
         Guid? createdById,

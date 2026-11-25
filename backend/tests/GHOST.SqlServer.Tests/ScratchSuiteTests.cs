@@ -13,8 +13,12 @@ namespace GHOST.SqlServer.Tests;
 /// Real SQL Server tests on a scratch database. Test IDs (SC-xx) map to docs/engineering/GHOST-TEST-STRATEGY.md.
 /// Every scenario uses new rows only and never deletes. Concurrency tests use one DbContext per request.
 /// </summary>
-public sealed class ScratchSuiteTests
+public sealed class ScratchSuiteTests : IAsyncLifetime
 {
+    // One scenario at a time: the database allows only one open shift. LeaveAsync closes what the scenario opened.
+    public Task InitializeAsync() => ScratchDb.EnterAsync();
+    public Task DisposeAsync() => ScratchDb.LeaveAsync();
+
     // SC-01 All migrations are applied.
     [ScratchFact]
     public async Task SC01_all_migrations_are_applied()
@@ -163,33 +167,35 @@ public sealed class ScratchSuiteTests
         Assert.Equal(9m, await check.Products.Where(p => p.Id == productId).Select(p => p.StockQuantity).SingleAsync());
     }
 
-    // SC-08 Two admins refund the same invoice at the same time: one refund, stock returned once.
+    // SC-08 Two concurrent refund requests for the SAME invoice (same Admin, double tap / two tabs): one refund, stock returned once, cash leaves once.
+    // The database allows only one open shift, so the Admin is the cashier here. A staff-sale plus Admin-refund variant
+    // waits for the product decision on which shift an Admin refund posts to.
     [ScratchFact]
-    public async Task SC08_double_refund_by_two_admins_refunds_once()
+    public async Task SC08_concurrent_duplicate_refund_same_invoice_refunds_once()
     {
-        var (admin, staff, shiftId) = await ScratchDb.SeedOpenShiftAsync();
-        var admin2 = await ScratchDb.SeedUserAsync("adm2");
-        await ScratchDb.OpenShiftForUserAsync(admin);
-        await ScratchDb.OpenShiftForUserAsync(admin2);
+        var admin = await ScratchDb.SeedUserAsync("adm");
+        var (_, _, shiftId) = await ScratchDb.SeedOpenShiftAsync(shiftOwner: admin);
         var productId = await ScratchDb.SeedProductAsync(admin, 20m, stock: 10);
 
         var (sh, sdb) = ScratchDb.NewSaleHandler();
         SaleDto sale;
         await using (sdb)
-            sale = (await sh.CheckoutCashAsync(new CheckoutCommand(shiftId, staff, false, new[] { new SaleLineInput(productId, 4) }, null, null, "sc08-" + Guid.NewGuid()))).Value!;
+            sale = (await sh.CheckoutCashAsync(new CheckoutCommand(shiftId, admin, false, new[] { new SaleLineInput(productId, 4) }, null, null, "sc08-" + Guid.NewGuid()))).Value!;
 
-        async Task<bool> Refund(Guid who)
+        async Task<bool> Refund()
         {
             var (handler, db) = ScratchDb.NewSaleHandler();
             await using var _ = db;
-            return (await handler.RefundAsync(sale.Id, who, "scratch test", true, null)).IsSuccess;
+            return (await handler.RefundAsync(sale.Id, admin, "scratch test", true, null)).IsSuccess;
         }
 
-        var results = await Task.WhenAll(Refund(admin), Refund(admin2));
+        var results = await Task.WhenAll(Refund(), Refund());
 
         Assert.Equal(1, results.Count(r => r));
         await using var check = ScratchDb.NewContext();
         Assert.Equal(10m, await check.Products.Where(p => p.Id == productId).Select(p => p.StockQuantity).SingleAsync());
+        // opening 100 + sale 80 - refund 80
+        Assert.Equal(100m, await check.Shifts.Where(s => s.Id == shiftId).Select(s => s.ExpectedCash).SingleAsync());
     }
 
     // SC-09 Power cut: active session is flagged after a long heartbeat gap, outage is not billed, Admin approves once, all audited.
@@ -245,5 +251,31 @@ public sealed class ScratchSuiteTests
             Assert.Equal(SessionStatus.Completed, await db.Sessions.Where(x => x.Id == sessionId).Select(x => x.Status).SingleAsync());
             Assert.Equal(1, await db.AuditLogs.CountAsync(a => a.EntityId == sessionId.ToString() && a.Action == "Session.OutageApproved"));
         }
+    }
+    // SC-10 The same stock receipt sent 6 times at once (double tap / retry): one receipt, stock up once, cash out once.
+    [ScratchFact]
+    public async Task SC10_same_key_stock_receipt_concurrently_is_recorded_once()
+    {
+        var (admin, staff, shiftId) = await ScratchDb.SeedOpenShiftAsync();
+        var productId = await ScratchDb.SeedProductAsync(admin, 20m, stock: 0);
+        var key = "sc10-" + Guid.NewGuid();
+
+        var results = await Task.WhenAll(Enumerable.Range(0, 6).Select(async _ =>
+        {
+            await using var db = ScratchDb.NewContext();
+            var handler = new GHOST.Application.Inventory.StockReceiptHandler(
+                new StockReceiptRepository(db), new ProductRepository(db), new ShiftRepository(db), new UnitOfWork(db), new AuditTrail(db));
+            return await handler.CreateAsync(new GHOST.Application.Inventory.CreateReceiptCommand(
+                shiftId, staff, "Supplier", new[] { new GHOST.Application.Inventory.ReceiptLineInput(productId, 10, 5m, null) }, "INV-SC10", null, key));
+        }));
+
+        // Winner and losers that lost on the unique index all report the one receipt. A loser that hit a RowVersion
+        // conflict instead (stock/drawer changed) may report a retryable error, but must never create a second receipt.
+        Assert.Contains(results, r => r.IsSuccess);
+        Assert.Single(results.Where(r => r.IsSuccess).Select(r => r.Value!.Id).Distinct());
+        await using var check = ScratchDb.NewContext();
+        Assert.Equal(1, await check.StockReceipts.CountAsync(r => r.ShiftId == shiftId));
+        Assert.Equal(10m, await check.Products.Where(p => p.Id == productId).Select(p => p.StockQuantity).SingleAsync());
+        Assert.Equal(50m, 100m - await check.Shifts.Where(s => s.Id == shiftId).Select(s => s.ExpectedCash).SingleAsync());
     }
 }

@@ -26,7 +26,7 @@ public sealed class StockReceiptsController : ControllerBase
 
     public sealed record ReceiptLineRequest(Guid ProductId, decimal Quantity, decimal UnitCost, DateOnly? ExpiryDate);
 
-    public sealed record CreateReceiptRequest(Guid ShiftId, string? SupplierName, List<ReceiptLineRequest>? Items, string? InvoiceReference = null, string? Notes = null);
+    public sealed record CreateReceiptRequest(Guid ShiftId, string? SupplierName, List<ReceiptLineRequest>? Items, string? InvoiceReference = null, string? Notes = null, string? IdempotencyKey = null);
 
     public sealed record RejectReceiptRequest(string? Reason, ReceiptRejectionOutcome Outcome, Guid? CashReturnShiftId);
 
@@ -39,6 +39,10 @@ public sealed class StockReceiptsController : ControllerBase
         if (!await _shiftAccess.CanOperateOnShiftAsync(request.ShiftId, cancellationToken))
             return Forbid();
 
+        // A key is required over HTTP so a double tap or a retry after a timeout cannot record the delivery twice.
+        if (string.IsNullOrWhiteSpace(request.IdempotencyKey))
+            return BadRequest(new { error = "An idempotency key is required for a stock receipt." });
+
         var result = await _handler.CreateAsync(
             new CreateReceiptCommand(
                 request.ShiftId,
@@ -46,7 +50,8 @@ public sealed class StockReceiptsController : ControllerBase
                 request.SupplierName,
                 (request.Items ?? new()).Select(i => new ReceiptLineInput(i.ProductId, i.Quantity, i.UnitCost, i.ExpiryDate)).ToList(),
                 request.InvoiceReference,
-                request.Notes),
+                request.Notes,
+                request.IdempotencyKey),
             cancellationToken);
 
         return result.IsSuccess

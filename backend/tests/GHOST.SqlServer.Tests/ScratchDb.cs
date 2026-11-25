@@ -57,29 +57,62 @@ internal static partial class ScratchDb
         return user.Id;
     }
 
-    /// <summary>A fresh business day (unique far-future date) with one open shift for a new staff user.</summary>
-    internal static async Task<(Guid Admin, Guid Staff, Guid ShiftId)> SeedOpenShiftAsync(decimal openingCash = 100m)
+    // The schema allows ONE open shift and ONE open business day in the whole database (IX_Shifts_Status, IsClosed filtered index).
+    // So the scenarios run one at a time (Gate) and every shift/day a scenario opens is closed again when it ends.
+    private static readonly SemaphoreSlim Gate = new(1, 1);
+    private static readonly List<Guid> OpenedBusinessDays = new();
+    private static readonly object OpenedLock = new();
+
+    internal static Task EnterAsync() => Gate.WaitAsync();
+
+    /// <summary>Closes (never deletes) the shifts and business days this scenario opened, then lets the next scenario start.</summary>
+    internal static async Task LeaveAsync()
+    {
+        try
+        {
+            Guid[] days;
+            lock (OpenedLock) { days = OpenedBusinessDays.ToArray(); OpenedBusinessDays.Clear(); }
+            foreach (var dayId in days)
+            {
+                await using var db = NewContext();
+                var day = await db.BusinessDays.Include(d => d.Shifts).SingleAsync(d => d.Id == dayId);
+                foreach (var shift in day.Shifts.Where(s => s.Status == GHOST.Domain.Enums.ShiftStatus.Open))
+                    shift.Close(shift.ExpectedCash, "scratch test cleanup");
+                if (!day.IsClosed)
+                    day.Close();
+                await db.SaveChangesAsync();
+            }
+        }
+        finally { Gate.Release(); }
+    }
+
+    private static async Task EnsureNoOtherOpenShiftAsync(GHOSTDbContext db)
+    {
+        // Another open shift that this suite did not open (for example real data in the scratch DB) must never be touched:
+        // fail with a clear message instead of a unique-index error.
+        if (await db.Shifts.AnyAsync(s => s.Status == GHOST.Domain.Enums.ShiftStatus.Open))
+            throw new InvalidOperationException("The scratch database already has an open shift. The suite does not close shifts it did not open; use a fresh GHOST_SCRATCH_* database.");
+        if (await db.BusinessDays.AnyAsync(d => !d.IsClosed))
+            throw new InvalidOperationException("The scratch database already has an open business day. The suite does not close days it did not open; use a fresh GHOST_SCRATCH_* database.");
+    }
+
+    /// <summary>
+    /// A fresh business day (unique far-future date) with one open shift. The shift owner is a new staff user, or
+    /// <paramref name="shiftOwner"/> when given (for example an Admin who is the cashier). Call between EnterAsync and LeaveAsync only.
+    /// </summary>
+    internal static async Task<(Guid Admin, Guid Staff, Guid ShiftId)> SeedOpenShiftAsync(decimal openingCash = 100m, Guid? shiftOwner = null)
     {
         var admin = await SeedUserAsync("adm");
-        var staff = await SeedUserAsync("stf");
+        var staff = shiftOwner ?? await SeedUserAsync("stf");
         await using var db = NewContext();
+        await EnsureNoOtherOpenShiftAsync(db);
         var date = DateOnly.FromDayNumber(new Random().Next(DateOnly.Parse("2100-01-01").DayNumber, DateOnly.Parse("2900-01-01").DayNumber));
         var day = new BusinessDay(date);
         var shift = day.OpenShift(staff, openingCash);
         db.BusinessDays.Add(day);
         await db.SaveChangesAsync();
+        lock (OpenedLock) OpenedBusinessDays.Add(day.Id);
         return (admin, staff, shift.Id);
-    }
-
-    /// <summary>Opens a shift for an existing user on a fresh far-future business day.</summary>
-    internal static async Task OpenShiftForUserAsync(Guid userId, decimal openingCash = 100m)
-    {
-        await using var db = NewContext();
-        var date = DateOnly.FromDayNumber(new Random().Next(DateOnly.Parse("2100-01-01").DayNumber, DateOnly.Parse("2900-01-01").DayNumber));
-        var day = new BusinessDay(date);
-        day.OpenShift(userId, openingCash);
-        db.BusinessDays.Add(day);
-        await db.SaveChangesAsync();
     }
 
     internal static async Task<Guid> SeedProductAsync(Guid createdBy, decimal price, decimal stock)

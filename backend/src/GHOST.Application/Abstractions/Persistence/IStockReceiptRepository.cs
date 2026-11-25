@@ -12,5 +12,7 @@ public interface IStockReceiptRepository
         Guid? createdById,
         CancellationToken cancellationToken = default);
 
+    Task<StockReceipt?> GetByIdempotencyKeyAsync(Guid createdById, string key, CancellationToken cancellationToken = default);
+
     Task AddAsync(StockReceipt receipt, CancellationToken cancellationToken = default);
 }

@@ -49,6 +49,15 @@ public sealed class StockReceipt : BaseEntity
     public string? InvoiceReference { get; private set; }
 
     public string? Notes { get; private set; }
+
+    public const int MaxIdempotencyKeyLength = 100;
+
+    /// <summary>Client-generated key. The same key from the same user can create the receipt only once.</summary>
+    public string? IdempotencyKey { get; private set; }
+
+    /// <summary>SHA-256 of the request content, used to tell a true retry from a different request with the same key.</summary>
+    public string? RequestFingerprint { get; private set; }
+
     public StockReceiptStatus Status { get; private set; }
     public decimal TotalCost { get; private set; }
     public Guid? DecidedById { get; private set; }
@@ -69,8 +78,13 @@ public sealed class StockReceipt : BaseEntity
     /// Pure domain logic; the caller persists the shift, products and receipt in one unit of work.
     /// </summary>
     public static StockReceipt Receive(Shift shift, Guid staffId, string? supplierName, IReadOnlyList<Line> lines,
-        string? invoiceReference = null, string? notes = null)
+        string? invoiceReference = null, string? notes = null,
+        string? idempotencyKey = null, string? requestFingerprint = null)
     {
+        var key = string.IsNullOrWhiteSpace(idempotencyKey) ? null : idempotencyKey.Trim();
+        if (key is { Length: > MaxIdempotencyKeyLength })
+            throw new BusinessRuleValidationException($"Idempotency key cannot exceed {MaxIdempotencyKeyLength} characters.");
+
         var reference = string.IsNullOrWhiteSpace(invoiceReference) ? null : invoiceReference.Trim();
         var note = string.IsNullOrWhiteSpace(notes) ? null : notes.Trim();
         if (reference is { Length: > MaxReferenceLength })
@@ -91,6 +105,8 @@ public sealed class StockReceipt : BaseEntity
             SupplierName = string.IsNullOrWhiteSpace(supplierName) ? null : supplierName.Trim(),
             InvoiceReference = reference,
             Notes = note,
+            IdempotencyKey = key,
+            RequestFingerprint = key is null ? null : requestFingerprint,
             Status = StockReceiptStatus.Pending
         };
 

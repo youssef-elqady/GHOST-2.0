@@ -17,7 +17,8 @@ public sealed record CreateReceiptCommand(
     string? SupplierName,
     IReadOnlyList<ReceiptLineInput> Lines,
     string? InvoiceReference = null,
-    string? Notes = null);
+    string? Notes = null,
+    string? IdempotencyKey = null);
 
 public sealed record RejectReceiptCommand(
     Guid ReceiptId,
@@ -65,10 +66,44 @@ public sealed class StockReceiptHandler
         _audit = audit;
     }
 
+    private static string? CleanKey(string? key) => string.IsNullOrWhiteSpace(key) ? null : key.Trim();
+
+    /// <summary>Canonical hash of the request content. Order of lines does not matter.</summary>
+    public static string Fingerprint(CreateReceiptCommand command)
+    {
+        static string Clean(string? s) => string.IsNullOrWhiteSpace(s) ? string.Empty : s.Trim();
+        var lines = string.Join(";", command.Lines
+            .OrderBy(l => l.ProductId).ThenBy(l => l.Quantity).ThenBy(l => l.UnitCost)
+            .Select(l => FormattableString.Invariant($"{l.ProductId:N}x{l.Quantity:0.####}@{l.UnitCost:0.####}#{l.ExpiryDate:yyyy-MM-dd}")));
+        var raw = FormattableString.Invariant(
+            $"{command.ShiftId:N}|{Clean(command.SupplierName)}|{Clean(command.InvoiceReference)}|{Clean(command.Notes)}|{lines}");
+        return Convert.ToHexString(System.Security.Cryptography.SHA256.HashData(System.Text.Encoding.UTF8.GetBytes(raw)));
+    }
+
+    private static bool SameReceipt(StockReceipt existing, CreateReceiptCommand command)
+        => existing.CreatedById == command.ActorUserId
+           && existing.ShiftId == command.ShiftId
+           && existing.RequestFingerprint is not null
+           && existing.RequestFingerprint == Fingerprint(command);
+
     public async Task<Result<ReceiptDto>> CreateAsync(
         CreateReceiptCommand command,
         CancellationToken cancellationToken = default)
     {
+        var key = CleanKey(command.IdempotencyKey);
+
+        // Same key again (retry after a timeout, double tap) returns the original receipt: no second stock increase, no second cash movement.
+        if (key is not null)
+        {
+            var existing = await _receipts.GetByIdempotencyKeyAsync(command.ActorUserId, key, cancellationToken);
+            if (existing is not null)
+            {
+                return SameReceipt(existing, command)
+                    ? Result<ReceiptDto>.Success(ToDto(existing))
+                    : Result<ReceiptDto>.Failure("This idempotency key was already used for a different receipt.");
+            }
+        }
+
         var shift = await _shifts.GetWithCashAsync(command.ShiftId, cancellationToken);
         if (shift is null)
             return Result<ReceiptDto>.Failure("Shift was not found.");
@@ -85,7 +120,7 @@ public sealed class StockReceiptHandler
                 .ToList();
 
             var receipt = StockReceipt.Receive(shift, command.ActorUserId, command.SupplierName, lines,
-                command.InvoiceReference, command.Notes);
+                command.InvoiceReference, command.Notes, key, key is null ? null : Fingerprint(command));
             await _receipts.AddAsync(receipt, cancellationToken);
 
             _audit.Record(
@@ -104,6 +139,16 @@ public sealed class StockReceiptHandler
         }
         catch (PersistenceConflictException exception)
         {
+            // Two identical requests at the same instant: the other one won the unique index on the key.
+            // Return its receipt instead of an error. This handler instance's DbContext still tracks the failed
+            // changes, so the winner is read through a repository call that does not depend on them.
+            if (key is not null)
+            {
+                var winner = await _receipts.GetByIdempotencyKeyAsync(command.ActorUserId, key, cancellationToken);
+                if (winner is not null && SameReceipt(winner, command))
+                    return Result<ReceiptDto>.Success(ToDto(winner));
+            }
+
             return Result<ReceiptDto>.Failure(exception.Message);
         }
     }

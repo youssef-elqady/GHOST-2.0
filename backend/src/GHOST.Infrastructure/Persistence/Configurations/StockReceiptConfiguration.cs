@@ -25,6 +25,8 @@ public sealed class StockReceiptConfiguration : IEntityTypeConfiguration<StockRe
         builder.Property(x => x.Notes).HasMaxLength(StockReceipt.MaxNotesLength);
         builder.Property(x => x.TotalCost).HasColumnType("decimal(18,2)");
         builder.Property(x => x.RejectionReason).HasMaxLength(500);
+        builder.Property(x => x.IdempotencyKey).HasMaxLength(StockReceipt.MaxIdempotencyKeyLength);
+        builder.Property(x => x.RequestFingerprint).HasMaxLength(64);
 
         builder.HasOne<Shift>().WithMany().HasForeignKey(x => x.ShiftId).OnDelete(DeleteBehavior.Restrict);
         builder.HasOne<ApplicationUser>().WithMany().HasForeignKey(x => x.CreatedById).OnDelete(DeleteBehavior.Restrict);
@@ -33,6 +35,10 @@ public sealed class StockReceiptConfiguration : IEntityTypeConfiguration<StockRe
 
         builder.HasMany(x => x.Items).WithOne().HasForeignKey(i => i.ReceiptId).OnDelete(DeleteBehavior.Cascade);
         builder.Navigation(x => x.Items).UsePropertyAccessMode(PropertyAccessMode.Field);
+
+        // The same user cannot create two receipts with the same key, even when two requests arrive at the same instant.
+        builder.HasIndex(x => new { x.CreatedById, x.IdempotencyKey }).IsUnique()
+            .HasFilter("[IdempotencyKey] IS NOT NULL").HasDatabaseName("UX_StockReceipts_CreatedById_IdempotencyKey");
 
         builder.HasIndex(x => new { x.Status, x.CreatedAt }).HasDatabaseName("IX_StockReceipts_Status_CreatedAt");
     }

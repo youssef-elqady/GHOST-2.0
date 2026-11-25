@@ -1,8 +1,8 @@
 'use client'
 
-import { useCallback, useEffect, useState, type FormEvent } from 'react'
+import { useCallback, useEffect, useRef, useState, type FormEvent } from 'react'
 import { Alert } from '@/components/ui/alert'
-import { correctIntake, createStockReceipt, getProductMovements, getProducts, listStockReceipts, type ApiProduct, type ApiReceipt, type ApiStockMovement } from '@/lib/ghost-api'
+import { correctIntake, createStockReceipt, getProductMovements, getProducts, listStockReceipts, newIdempotencyKey, type ApiProduct, type ApiReceipt, type ApiStockMovement } from '@/lib/ghost-api'
 
 const money = (v: number) => `${new Intl.NumberFormat('ar-EG').format(v)} ج.م`
 const when = (iso: string) => new Date(iso).toLocaleString('ar-EG', { dateStyle: 'medium', timeStyle: 'short' })
@@ -28,6 +28,8 @@ export function StaffIntake({ token, shiftId }: { token: string; shiftId: string
   const [corrQty, setCorrQty] = useState<Record<string, string>>({})
   const [corrReason, setCorrReason] = useState<Record<string, string>>({})
   const [key, setKey] = useState(0)
+  // One key per delivery. A retry of the same content (timeout, double tap) reuses it so the server records it once.
+  const receiptKeyRef = useRef<{ signature: string; key: string } | null>(null)
 
   useEffect(() => {
     let cancelled = false
@@ -56,7 +58,10 @@ export function StaffIntake({ token, shiftId }: { token: string; shiftId: string
     if (!invoiceRef.trim() && !notes.trim()) { setError('اكتب رقم الفاتورة أو سبب/ملاحظة التوريد (إجباري).'); return }
     setBusy(true)
     try {
-      const r = await createStockReceipt(token, { shiftId, supplierName: supplier.trim() || undefined, invoiceReference: invoiceRef.trim() || undefined, notes: notes.trim() || undefined, items: [{ productId, quantity: q, unitCost: c }] })
+      const signature = JSON.stringify([shiftId, supplier.trim(), invoiceRef.trim(), notes.trim(), productId, q, c])
+      if (receiptKeyRef.current?.signature !== signature) receiptKeyRef.current = { signature, key: newIdempotencyKey() }
+      const r = await createStockReceipt(token, { shiftId, supplierName: supplier.trim() || undefined, invoiceReference: invoiceRef.trim() || undefined, notes: notes.trim() || undefined, idempotencyKey: receiptKeyRef.current.key, items: [{ productId, quantity: q, unitCost: c }] })
+      receiptKeyRef.current = null
       setMessage(`تم تسجيل التوريد. الإجمالي ${money(r.totalCost)}. الكمية دخلت المخزون فورًا وهو بانتظار مراجعة الأدمن.`)
       setQuantity(''); setUnitCost(''); setInvoiceRef(''); setNotes('')
       setKey((k) => k + 1)

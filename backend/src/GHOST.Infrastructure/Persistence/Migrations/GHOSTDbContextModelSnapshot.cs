@@ -1107,6 +1107,10 @@ namespace GHOST.Infrastructure.Persistence.Migrations
                     b.Property<Guid?>("DecidedById")
                         .HasColumnType("uniqueidentifier");
 
+                    b.Property<string>("IdempotencyKey")
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
+
                     b.Property<string>("InvoiceReference")
                         .HasMaxLength(100)
                         .HasColumnType("nvarchar(100)");
@@ -1121,6 +1125,10 @@ namespace GHOST.Infrastructure.Persistence.Migrations
                     b.Property<string>("RejectionReason")
                         .HasMaxLength(500)
                         .HasColumnType("nvarchar(500)");
+
+                    b.Property<string>("RequestFingerprint")
+                        .HasMaxLength(64)
+                        .HasColumnType("nvarchar(64)");
 
                     b.Property<byte[]>("RowVersion")
                         .IsConcurrencyToken()
@@ -1145,11 +1153,14 @@ namespace GHOST.Infrastructure.Persistence.Migrations
 
                     b.HasKey("Id");
 
-                    b.HasIndex("CreatedById");
-
                     b.HasIndex("DecidedById");
 
                     b.HasIndex("ShiftId");
+
+                    b.HasIndex("CreatedById", "IdempotencyKey")
+                        .IsUnique()
+                        .HasDatabaseName("UX_StockReceipts_CreatedById_IdempotencyKey")
+                        .HasFilter("[IdempotencyKey] IS NOT NULL");
 
                     b.HasIndex("Status", "CreatedAt")
                         .HasDatabaseName("IX_StockReceipts_Status_CreatedAt");
