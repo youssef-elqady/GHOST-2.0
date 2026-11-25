@@ -143,7 +143,7 @@ jobs:
 
       - name: Loop SC04, SC05 and SC10 (diagnostic, never fails the job)
         run: |
-          set -uo pipefail
+          set +e; set -uo pipefail
           export GHOST_SCRATCH_TEST_CONNECTION_STRING="Server=127.0.0.1,1433;Database=$IT_DB;User ID=sa;Password=$SQL_PW;Encrypt=True;TrustServerCertificate=True"
           export GHOST_AUTH02_TEST_CONNECTION_STRING="Server=127.0.0.1,1433;Database=GHOST_AUTH02_IT;User ID=sa;Password=$SQL_PW;Encrypt=True;TrustServerCertificate=True"
           : > ci-out/loop-results.txt
