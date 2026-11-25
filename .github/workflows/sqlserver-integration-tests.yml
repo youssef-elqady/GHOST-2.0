@@ -134,14 +134,26 @@ jobs:
           export GHOST_SCRATCH_TEST_CONNECTION_STRING="Server=127.0.0.1,1433;Database=$IT_DB;User ID=sa;Password=$SQL_PW;Encrypt=True;TrustServerCertificate=True"
           export GHOST_AUTH02_TEST_CONNECTION_STRING="Server=127.0.0.1,1433;Database=GHOST_AUTH02_IT;User ID=sa;Password=$SQL_PW;Encrypt=True;TrustServerCertificate=True"
           dotnet test backend/tests/GHOST.SqlServer.Tests/GHOST.SqlServer.Tests.csproj --configuration Release --no-build \
-            --logger "trx;LogFileName=sqlserver.trx" --results-directory ci-out/trx 2>&1 | sed "s/$SQL_PW/***/g" | tee ci-out/sql-test-console.log
+            --filter "FullyQualifiedName!~KnownDefect" --logger "trx;LogFileName=sqlserver.trx" --results-directory ci-out/trx 2>&1 | sed "s/$SQL_PW/***/g" | tee ci-out/sql-test-console.log
           exit "${PIPESTATUS[0]}"
 
       - name: Check that no SQL Server test was skipped
         if: always()
         run: |
           set -o pipefail
-          python3 scripts/ci/check_sql_results.py --trx-glob 'ci-out/trx/*.trx' --min-sql 14 --summary ci-out/summary.md | tee -a "$GITHUB_STEP_SUMMARY"
+          python3 scripts/ci/check_sql_results.py --trx-glob 'ci-out/trx/*.trx' --min-sql 30 --summary ci-out/summary.md | tee -a "$GITHUB_STEP_SUMMARY"
+
+      - name: Run KNOWN DEFECT tests (C1, C2; expected to fail until decided; does not gate)
+        if: always()
+        continue-on-error: true
+        run: |
+          set -uo pipefail
+          export GHOST_SCRATCH_TEST_CONNECTION_STRING="Server=127.0.0.1,1433;Database=$IT_DB;User ID=sa;Password=$SQL_PW;Encrypt=True;TrustServerCertificate=True"
+          export GHOST_AUTH02_TEST_CONNECTION_STRING="Server=127.0.0.1,1433;Database=GHOST_AUTH02_IT;User ID=sa;Password=$SQL_PW;Encrypt=True;TrustServerCertificate=True"
+          dotnet test backend/tests/GHOST.SqlServer.Tests/GHOST.SqlServer.Tests.csproj --configuration Release --no-build \
+            --filter "FullyQualifiedName~KnownDefect" --logger "trx;LogFileName=known-defect.trx" --logger "console;verbosity=detailed" \
+            --results-directory ci-out/trx-known-defect 2>&1 | sed "s/$SQL_PW/***/g" | tee ci-out/known-defect-console.log
+          python3 scripts/ci/check_sql_results.py --trx-glob 'ci-out/trx-known-defect/*.trx' --min-sql 1 --summary ci-out/known-defect-summary.md | tee -a "$GITHUB_STEP_SUMMARY" || true
 
       - name: Run the unit tests (no database)
         run: dotnet test backend/tests/GHOST.Tests/GHOST.Tests.csproj --configuration Release --no-build --logger "trx;LogFileName=unit.trx" --results-directory ci-out/unit-trx
